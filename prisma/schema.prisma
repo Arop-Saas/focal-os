@@ -1,0 +1,811 @@
+// ============================================================
+// FOCAL OS — Prisma Schema
+// Multi-tenant SaaS for real estate photography companies
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// WORKSPACE (Tenant)
+// ─────────────────────────────────────────────────────────────
+
+model Workspace {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  logoUrl       String?
+  website       String?
+  phone         String?
+  email         String?
+  timezone      String   @default("America/New_York")
+  currency      String   @default("USD")
+  country       String   @default("US")
+
+  // Address
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+
+  // Billing
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
+  stripePriceId         String?
+  subscriptionStatus    SubscriptionStatus @default(TRIALING)
+  subscriptionEndsAt    DateTime?
+  trialEndsAt           DateTime?
+
+  // Settings
+  defaultTaxRate        Float    @default(0)
+  invoicePrefix         String   @default("INV")
+  invoiceNextNumber     Int      @default(1001)
+  brandColor            String   @default("#1B4F9E")
+
+  // Relations
+  members     WorkspaceMember[]
+  clients     Client[]
+  jobs        Job[]
+  packages    Package[]
+  services    Service[]
+  orders      Order[]
+  invoices    Invoice[]
+  staff       StaffProfile[]
+  galleries   Gallery[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
+// ─────────────────────────────────────────────────────────────
+// USERS & WORKSPACE MEMBERS
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  supabaseId    String   @unique  // Maps to Supabase Auth user ID
+  email         String   @unique
+  fullName      String
+  avatarUrl     String?
+  phone         String?
+  timezone      String   @default("America/New_York")
+  onboardingCompleted Boolean @default(false)
+
+  workspaces    WorkspaceMember[]
+  activityLogs  ActivityLog[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([supabaseId])
+  @@index([email])
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        MemberRole @default(PHOTOGRAPHER)
+  isOwner     Boolean   @default(false)
+  joinedAt    DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  staffProfile StaffProfile?
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MANAGER
+  PHOTOGRAPHER
+  EDITOR
+  VA
+  VIEWER
+}
+
+// ─────────────────────────────────────────────────────────────
+// STAFF PROFILES
+// ─────────────────────────────────────────────────────────────
+
+model StaffProfile {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  memberId        String   @unique
+  employeeId      String?
+  title           String?
+  bio             String?
+
+  // Availability & Skills
+  skills          String[]  // ["photography", "drone", "video", "3d_tour"]
+  serviceRegions  String[]  // City/region names
+  maxJobsPerDay   Int      @default(4)
+  isActive        Boolean  @default(true)
+
+  // Compensation
+  payType         PayType  @default(HOURLY)
+  payRate         Float?
+  commissionRate  Float?   // Percentage 0-100
+
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member          WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  jobAssignments  JobAssignment[]
+  availability    StaffAvailability[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+enum PayType {
+  HOURLY
+  SALARY
+  PER_JOB
+  COMMISSION
+}
+
+model StaffAvailability {
+  id          String   @id @default(cuid())
+  staffId     String
+  dayOfWeek   Int      // 0=Sunday, 6=Saturday
+  startTime   String   // "09:00"
+  endTime     String   // "18:00"
+  isAvailable Boolean  @default(true)
+
+  staff       StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// CLIENTS
+// ─────────────────────────────────────────────────────────────
+
+model Client {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  type          ClientType @default(AGENT)
+
+  // Contact Info
+  firstName     String
+  lastName      String
+  email         String
+  phone         String?
+  company       String?
+  avatarUrl     String?
+
+  // Address
+  addressLine1  String?
+  city          String?
+  state         String?
+  postalCode    String?
+
+  // CRM
+  status        ClientStatus @default(ACTIVE)
+  source        String?      // "referral", "website", "google", etc.
+  notes         String?
+  tags          String[]
+  stripeCustomerId String?
+
+  // Stats (denormalized for perf)
+  totalJobs     Int      @default(0)
+  totalRevenue  Float    @default(0)
+  lastJobAt     DateTime?
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  jobs          Job[]
+  orders        Order[]
+  invoices      Invoice[]
+  contacts      ClientContact[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([email, workspaceId])
+}
+
+enum ClientType {
+  AGENT
+  BROKER
+  BUILDER
+  HOMEOWNER
+  PROPERTY_MANAGER
+  OTHER
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+model ClientContact {
+  id          String  @id @default(cuid())
+  clientId    String
+  name        String
+  email       String?
+  phone       String?
+  role        String?  // "assistant", "coordinator", etc.
+  isPrimary   Boolean @default(false)
+
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// SERVICES & PACKAGES
+// ─────────────────────────────────────────────────────────────
+
+model Service {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  description   String?
+  category      ServiceCategory
+  basePrice     Float    @default(0)
+  durationMins  Int      @default(60)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  packageItems  PackageItem[]
+  jobServices   JobService[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+enum ServiceCategory {
+  PHOTOGRAPHY
+  VIDEO
+  DRONE
+  VIRTUAL_TOUR_3D
+  FLOOR_PLAN
+  VIRTUAL_STAGING
+  TWILIGHT
+  SOCIAL_MEDIA
+  RUSH_EDITING
+  OTHER
+}
+
+model Package {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  description   String?
+  price         Float
+  isActive      Boolean  @default(true)
+  isPopular     Boolean  @default(false)
+  sortOrder     Int      @default(0)
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items         PackageItem[]
+  jobs          Job[]
+  orderItems    OrderItem[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+model PackageItem {
+  id          String  @id @default(cuid())
+  packageId   String
+  serviceId   String
+  quantity    Int     @default(1)
+  notes       String?
+
+  package     Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  service     Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, serviceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// JOBS / SHOOTS
+// ─────────────────────────────────────────────────────────────
+
+model Job {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  jobNumber       String
+  clientId        String
+  packageId       String?
+
+  // Property Info
+  propertyAddress String
+  propertyCity    String
+  propertyState   String
+  propertyZip     String?
+  propertyType    PropertyType @default(RESIDENTIAL)
+  squareFootage   Int?
+  bedrooms        Int?
+  bathrooms       Float?
+  mlsNumber       String?
+  listingUrl      String?
+  accessNotes     String?
+
+  // Scheduling
+  status          JobStatus  @default(PENDING)
+  scheduledAt     DateTime?
+  estimatedDurationMins Int  @default(90)
+  actualStartAt   DateTime?
+  actualEndAt     DateTime?
+
+  // Financials
+  subtotal        Float    @default(0)
+  taxAmount       Float    @default(0)
+  discountAmount  Float    @default(0)
+  totalAmount     Float    @default(0)
+
+  // Internal
+  internalNotes   String?
+  clientNotes     String?
+  priority        JobPriority @default(NORMAL)
+  isRush          Boolean  @default(false)
+  rushFee         Float    @default(0)
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client          @relation(fields: [clientId], references: [id])
+  package         Package?        @relation(fields: [packageId], references: [id])
+  assignments     JobAssignment[]
+  services        JobService[]
+  gallery         Gallery?
+  order           Order?
+  invoice         Invoice?
+  statusHistory   JobStatusHistory[]
+  notifications   Notification[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([workspaceId, jobNumber])
+  @@index([workspaceId])
+  @@index([clientId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+enum JobStatus {
+  PENDING
+  CONFIRMED
+  ASSIGNED
+  IN_PROGRESS
+  EDITING
+  REVIEW
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum PropertyType {
+  RESIDENTIAL
+  COMMERCIAL
+  LAND
+  MULTI_FAMILY
+  RENTAL
+  NEW_CONSTRUCTION
+}
+
+enum JobPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model JobStatusHistory {
+  id        String    @id @default(cuid())
+  jobId     String
+  status    JobStatus
+  notes     String?
+  changedBy String?   // User ID
+
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([jobId])
+}
+
+model JobAssignment {
+  id        String   @id @default(cuid())
+  jobId     String
+  staffId   String
+  role      AssignmentRole @default(PHOTOGRAPHER)
+  isPrimary Boolean  @default(true)
+  confirmedAt DateTime?
+  travelMinutes Int?   // Calculated from previous job
+
+  job       Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  staff     StaffProfile @relation(fields: [staffId], references: [id])
+
+  @@unique([jobId, staffId])
+  @@index([jobId])
+  @@index([staffId])
+}
+
+enum AssignmentRole {
+  PHOTOGRAPHER
+  VIDEOGRAPHER
+  DRONE_PILOT
+  EDITOR
+  COORDINATOR
+}
+
+model JobService {
+  id          String  @id @default(cuid())
+  jobId       String
+  serviceId   String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  job         Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  service     Service @relation(fields: [serviceId], references: [id])
+
+  @@index([jobId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// ORDERS
+// ─────────────────────────────────────────────────────────────
+
+model Order {
+  id            String      @id @default(cuid())
+  workspaceId   String
+  orderNumber   String
+  jobId         String?     @unique
+  clientId      String
+  status        OrderStatus @default(PENDING)
+
+  subtotal      Float
+  taxAmount     Float       @default(0)
+  discountAmount Float      @default(0)
+  totalAmount   Float
+
+  notes         String?
+
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job           Job?        @relation(fields: [jobId], references: [id])
+  client        Client      @relation(fields: [clientId], references: [id])
+  items         OrderItem[]
+  invoice       Invoice?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([workspaceId, orderNumber])
+  @@index([workspaceId])
+  @@index([clientId])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  packageId   String?
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  package     Package? @relation(fields: [packageId], references: [id])
+
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// INVOICES
+// ─────────────────────────────────────────────────────────────
+
+model Invoice {
+  id                String        @id @default(cuid())
+  workspaceId       String
+  invoiceNumber     String
+  jobId             String?       @unique
+  orderId           String?       @unique
+  clientId          String
+  status            InvoiceStatus @default(DRAFT)
+
+  // Amounts
+  subtotal          Float
+  taxRate           Float         @default(0)
+  taxAmount         Float         @default(0)
+  discountAmount    Float         @default(0)
+  totalAmount       Float
+  amountPaid        Float         @default(0)
+  amountDue         Float
+
+  // Dates
+  issuedAt          DateTime?
+  dueAt             DateTime?
+  paidAt            DateTime?
+
+  // Stripe
+  stripePaymentIntentId  String?
+  stripeInvoiceId        String?
+  paymentLink            String?
+
+  notes             String?
+  lineItems         InvoiceLineItem[]
+
+  workspace         Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job               Job?        @relation(fields: [jobId], references: [id])
+  order             Order?      @relation(fields: [orderId], references: [id])
+  client            Client      @relation(fields: [clientId], references: [id])
+  payments          Payment[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId])
+  @@index([clientId])
+  @@index([status])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+  UNCOLLECTIBLE
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+  sortOrder   Int     @default(0)
+
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  amount          Float
+  method          PaymentMethod @default(CARD)
+  status          PaymentStatus @default(PENDING)
+  stripePaymentId String?
+  notes           String?
+  paidAt          DateTime?
+
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@index([invoiceId])
+}
+
+enum PaymentMethod {
+  CARD
+  ACH
+  CHECK
+  CASH
+  WIRE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+// ─────────────────────────────────────────────────────────────
+// GALLERIES
+// ─────────────────────────────────────────────────────────────
+
+model Gallery {
+  id              String        @id @default(cuid())
+  workspaceId     String
+  jobId           String        @unique
+  name            String
+  slug            String        @unique
+  status          GalleryStatus @default(PROCESSING)
+
+  // Access
+  isPublic        Boolean       @default(false)
+  password        String?
+  expiresAt       DateTime?
+
+  // Delivery
+  downloadEnabled Boolean       @default(true)
+  watermarkEnabled Boolean      @default(true)
+  downloadCount   Int           @default(0)
+
+  // Stats
+  viewCount       Int           @default(0)
+  mediaCount      Int           @default(0)
+
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job             Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  media           GalleryMedia[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([workspaceId])
+  @@index([slug])
+}
+
+enum GalleryStatus {
+  PROCESSING
+  READY
+  DELIVERED
+  EXPIRED
+  ARCHIVED
+}
+
+model GalleryMedia {
+  id            String     @id @default(cuid())
+  galleryId     String
+  fileName      String
+  originalName  String
+  mimeType      String
+  fileSize      Int
+  width         Int?
+  height        Int?
+  duration      Int?       // For video, in seconds
+
+  // Storage
+  storageKey    String     // S3/Supabase storage path
+  thumbnailKey  String?
+  watermarkedKey String?
+  cdnUrl        String?
+
+  mediaType     MediaType  @default(PHOTO)
+  sortOrder     Int        @default(0)
+  isCover       Boolean    @default(false)
+
+  gallery       Gallery    @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime   @default(now())
+
+  @@index([galleryId])
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+  DRONE_PHOTO
+  DRONE_VIDEO
+  FLOOR_PLAN
+  VIRTUAL_TOUR
+  DOCUMENT
+}
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String             @id @default(cuid())
+  workspaceId String
+  jobId       String?
+  userId      String?            // Target user (null = workspace-wide)
+  type        NotificationType
+  channel     NotificationChannel @default(IN_APP)
+  status      NotificationStatus  @default(PENDING)
+  title       String
+  body        String
+  data        Json?
+  readAt      DateTime?
+  sentAt      DateTime?
+  error       String?
+
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job         Job?               @relation(fields: [jobId], references: [id])
+
+  createdAt   DateTime           @default(now())
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([jobId])
+}
+
+enum NotificationType {
+  JOB_BOOKED
+  JOB_CONFIRMED
+  JOB_ASSIGNED
+  JOB_REMINDER
+  JOB_STARTED
+  JOB_DELIVERED
+  JOB_CANCELLED
+  INVOICE_SENT
+  INVOICE_PAID
+  INVOICE_OVERDUE
+  GALLERY_READY
+  PAYMENT_RECEIVED
+  STAFF_ASSIGNED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// ─────────────────────────────────────────────────────────────
+// ACTIVITY LOG (Audit Trail)
+// ─────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  action      String   // "job.created", "invoice.paid", etc.
+  entityType  String   // "job", "invoice", "client", etc.
+  entityId    String
+  metadata    Json?
+  ipAddress   String?
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
