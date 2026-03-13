@@ -10,6 +10,7 @@ const publicRoutes = [
   "/verify",
   "/api/webhooks",
   "/gallery", // Public gallery share links
+  "/book",    // Public client booking form
 ];
 
 export async function middleware(request: NextRequest) {
