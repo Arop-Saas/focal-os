@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { formatRelative, JOB_STATUS_COLORS, JOB_STATUS_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
