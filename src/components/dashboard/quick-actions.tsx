@@ -3,15 +3,15 @@ import { Plus, UserPlus, FileText, Package } from "lucide-react";
 
 const actions = [
   {
-    label: "Nd JÛâ'",
+    label: "New Job",
     href: "/jobs/new",
     icon: Plus,
     description: "Schedule a shoot",
   },
   {
-    label: "Nd IÈÄ{{",
+    label: "New Client",
     href: "/clients?new=1",
-    icon: UserPlus
+    icon: UserPlus,
     description: "Add a contact",
   },
   {
@@ -47,5 +47,5 @@ export function QuickActions() {
         </Link>
       ))}
     </div>
-  
-+};
+  );
+}
