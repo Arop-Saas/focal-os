@@ -89,10 +89,10 @@ export const workspaceRouter = router({
           },
         });
 
-        // Mark onboarding as started
+        // Mark onboarding as completed
         await tx.user.update({
           where: { id: ctx.user.id },
-          data: { onboardingCompleted: false },
+          data: { onboardingCompleted: true },
         });
 
         return ws;
