@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc/client";
-import { Aperture, Loader2, Building2, Clock, Globe, ChevronRight, Check } from "lucide-react";
+import { Aperture, Loader2, ChevronRight, Check } from "lucide-react";
 import { slugify } from "@/lib/utils";
 
 const TIMEZONES = [
@@ -80,64 +80,65 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
+      <div className="bg-white border-b border-gray-100 px-6 h-14 flex items-center shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600">
             <Aperture className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="font-semibold text-gray-900">Focal OS</span>
-          <span className="text-gray-400 text-sm ml-2">Setup</span>
+          <span className="text-[15px] font-semibold text-gray-900">Focal OS</span>
+          <span className="text-gray-300 mx-1.5 text-xs">.</span>
+          <span className="text-[13px] text-gray-400">Workspace setup</span>
         </div>
       </div>
 
-      <div className="flex-1 flex items-start justify-center p-6 pt-10">
-        <div className="w-full max-w-lg">
-          {/* Step indicators */}
-          <div className="flex items-center gap-2 mb-8">
+      <div className="flex-1 flex items-start justify-center p-6 pt-12">
+        <div className="w-full max-w-[480px]">
+          {/* Progress steps */}
+          <div className="flex items-center gap-0 mb-8">
             {STEPS.map((s, i) => (
-              <div key={i} className="flex items-center gap-2 flex-1">
-                <div
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    i < step
-                      ? "bg-green-500 text-white"
-                      : i === step
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  {i < step ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                </div>
-                <div className="min-w-0 hidden sm:block">
-                  <p className={`text-xs font-medium ${i === step ? "text-gray-900" : "text-gray-500"}`}>
+              <div key={i} className="flex items-center flex-1">
+                <div className="flex items-center gap-2 shrink-0">
+                  <div
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+                      i < step
+                        ? "bg-emerald-500 text-white"
+                        : i === step
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-400"
+                    }`}
+                  >
+                    {i < step ? <Check className="h-3 w-3" /> : i + 1}
+                  </div>
+                  <span className={`text-[12px] font-medium hidden sm:block ${i === step ? "text-gray-800" : "text-gray-400"}`}>
                     {s.label}
-                  </p>
+                  </span>
                 </div>
                 {i < STEPS.length - 1 && (
-                  <div className={`h-px flex-1 ml-2 ${i < step ? "bg-green-400" : "bg-gray-200"}`} />
+                  <div className={`flex-1 h-px mx-3 transition-colors ${i < step ? "bg-emerald-300" : "bg-gray-200"}`} />
                 )}
               </div>
             ))}
           </div>
 
-          {/* Step 1 — Company Info */}
+          {/* Step 1 */}
           {step === 0 && (
-            <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl border p-6 space-y-5">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Set up your workspace</h2>
-                <p className="text-sm text-muted-foreground mt-1">
+            <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 space-y-5">
+              <div className="pb-1">
+                <h2 className="text-[18px] font-bold text-gray-900">Set up your workspace</h2>
+                <p className="text-[13px] text-gray-500 mt-1">
                   This is your company's home in Focal OS.
                 </p>
               </div>
 
               {createWorkspace.error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-[13px] text-red-600">
                   {createWorkspace.error.message}
                 </div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Company name <span className="text-red-500">*</span>
+              <div className="space-y-1.5">
+                <label className="block text-[13px] font-medium text-gray-700">
+                  Company name <span className="text-red-400">*</span>
                 </label>
                 <input
                   {...register("name")}
@@ -146,75 +147,75 @@ export default function OnboardingPage() {
                     handleNameChange(e);
                   }}
                   placeholder="Blue Sky Real Estate Photography"
-                  className="w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
                 />
-                {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
+                {errors.name && <p className="text-[11px] text-red-500 mt-1">{errors.name.message}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Workspace URL <span className="text-red-500">*</span>
+              <div className="space-y-1.5">
+                <label className="block text-[13px] font-medium text-gray-700">
+                  Workspace URL <span className="text-red-400">*</span>
                 </label>
-                <div className="flex rounded-lg border overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
-                  <span className="flex items-center px-3 bg-gray-50 border-r text-sm text-gray-500 shrink-0">
-                    app.focal-os.com/
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent bg-gray-50 focus-within:bg-white transition-colors">
+                  <span className="flex items-center px-3 bg-gray-100 border-r border-gray-200 text-[12px] text-gray-500 shrink-0 font-mono">
+                    focal-os.com/
                   </span>
                   <input
                     {...register("slug")}
                     onFocus={() => setAutoSlug(false)}
                     placeholder="blue-sky-photo"
-                    className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none"
+                    className="flex-1 px-3.5 py-2.5 text-sm bg-transparent focus:outline-none"
                   />
                 </div>
-                {errors.slug && <p className="mt-1 text-xs text-red-600">{errors.slug.message}</p>}
+                {errors.slug && <p className="text-[11px] text-red-500 mt-1">{errors.slug.message}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Work email</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[13px] font-medium text-gray-700">Work email <span className="text-red-400">*</span></label>
                   <input
                     {...register("email")}
                     type="email"
-                    placeholder="hello@yourcompany.com"
-                    className="w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="hello@company.com"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
                   />
-                  {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
+                  {errors.email && <p className="text-[11px] text-red-500">{errors.email.message}</p>}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
+                <div className="space-y-1.5">
+                  <label className="block text-[13px] font-medium text-gray-700">Phone</label>
                   <input
                     {...register("phone")}
                     type="tel"
                     placeholder="(555) 000-0000"
-                    className="w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">City</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[13px] font-medium text-gray-700">City</label>
                   <input
                     {...register("city")}
                     placeholder="Nashville"
-                    className="w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">State</label>
+                <div className="space-y-1.5">
+                  <label className="block text-[13px] font-medium text-gray-700">State</label>
                   <input
                     {...register("state")}
                     placeholder="TN"
-                    className="w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Timezone</label>
+              <div className="space-y-1.5">
+                <label className="block text-[13px] font-medium text-gray-700">Timezone</label>
                 <select
                   {...register("timezone")}
-                  className="w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
                 >
                   {TIMEZONES.map((tz) => (
                     <option key={tz} value={tz}>
@@ -227,14 +228,14 @@ export default function OnboardingPage() {
               <button
                 type="submit"
                 disabled={createWorkspace.isPending}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 text-sm transition-colors disabled:opacity-60 mt-2"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 text-sm transition-colors disabled:opacity-60 shadow-sm mt-1"
               >
                 {createWorkspace.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
-                {createWorkspace.isPending ? "Creating workspace…" : "Create workspace & continue"}
+                {createWorkspace.isPending ? "Creating workspace..." : "Create workspace & continue"}
               </button>
             </form>
           )}
