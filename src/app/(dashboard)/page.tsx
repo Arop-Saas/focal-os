@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { Header } from "@/components/layout/header";
@@ -13,14 +14,22 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
+  if (!supabaseUser) {
+    redirect("/login");
+  }
+
   const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
+    where: { supabaseId: supabaseUser.id },
     include: {
       workspaces: { include: { workspace: true }, take: 1 },
     },
   });
 
-  const workspace = user!.workspaces[0].workspace;
+  if (!user || !user.workspaces.length) {
+    redirect("/onboarding");
+  }
+
+  const workspace = user.workspaces[0].workspace;
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -89,7 +98,7 @@ export default async function DashboardPage() {
     ? 100
     : Math.round(((jobsThisMonth - jobsLastMonth) / jobsLastMonth) * 100);
 
-  const firstName = user!.fullName.split(" ")[0];
+  const firstName = user.fullName.split(" ")[0];
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
