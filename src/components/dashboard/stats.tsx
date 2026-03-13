@@ -16,42 +16,48 @@ interface StatCardProps {
   delta?: number;
   deltaLabel?: string;
   icon: React.ElementType;
-  iconColor: string;
-  iconBg: string;
+  accentColor: string;
   prefix?: string;
 }
 
-function StatCard({ title, value, delta, deltaLabel, icon: Icon, iconColor, iconBg, prefix }: StatCardProps) {
+function StatCard({ title, value, delta, deltaLabel, icon: Icon, accentColor, prefix }: StatCardProps) {
   const isPositive = (delta ?? 0) >= 0;
-  const TrendIcon = delta === 0 ? Minus : isPositive ? TrendingUp : TrendingDown;
+  const TrendIcon = delta === undefined || delta === 0 ? Minus : isPositive ? TrendingUp : TrendingDown;
 
   return (
-    <div className="bg-white rounded-xl border p-5 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconBg}`}>
-          <Icon className={`h-4 w-4 ${iconColor}`} />
+    <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide leading-tight">{title}</p>
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 ${accentColor}`}>
+          <Icon className="h-3.5 w-3.5 text-white" />
         </div>
       </div>
-      <div className="flex items-end justify-between gap-2">
-        <p className="text-2xl font-bold text-gray-900 tabular-nums">
+
+      <div>
+        <p className="text-[26px] font-bold text-gray-900 tabular-nums leading-none tracking-tight">
           {prefix}{value}
         </p>
-        {delta !== undefined && (
+        {deltaLabel && (
+          <p className="text-[11px] text-gray-400 mt-1.5">{deltaLabel}</p>
+        )}
+      </div>
+
+      {delta !== undefined && (
+        <div className="flex items-center gap-1.5 pt-0.5 border-t border-gray-50">
           <div
-            className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-              isPositive
-                ? "bg-green-50 text-green-700"
-                : "bg-red-50 text-red-700"
+            className={`flex items-center gap-1 text-[11px] font-semibold ${
+              delta === 0
+                ? "text-gray-400"
+                : isPositive
+                ? "text-emerald-600"
+                : "text-red-500"
             }`}
           >
             <TrendIcon className="h-3 w-3" />
             {Math.abs(delta)}%
           </div>
-        )}
-      </div>
-      {deltaLabel && (
-        <p className="text-xs text-muted-foreground">{deltaLabel}</p>
+          <span className="text-[11px] text-gray-400">vs last month</span>
+        </div>
       )}
     </div>
   );
@@ -71,35 +77,29 @@ export function DashboardStats({
         title="Jobs This Month"
         value={jobsThisMonth}
         delta={jobsDelta}
-        deltaLabel="vs last month"
         icon={Briefcase}
-        iconColor="text-blue-600"
-        iconBg="bg-blue-50"
+        accentColor="bg-blue-500"
       />
       <StatCard
-        title="Revenue This Month"
+        title="Revenue"
         value={formatCurrency(revenueThisMonth)}
         delta={revenueDelta}
-        deltaLabel="vs last month"
         icon={DollarSign}
-        iconColor="text-green-600"
-        iconBg="bg-green-50"
+        accentColor="bg-emerald-500"
       />
       <StatCard
-        title="Outstanding Invoices"
+        title="Outstanding"
         value={formatCurrency(pendingInvoicesTotal)}
-        icon={Receipt}
-        iconColor="text-orange-600"
-        iconBg="bg-orange-50"
         deltaLabel="awaiting payment"
+        icon={Receipt}
+        accentColor="bg-amber-500"
       />
       <StatCard
         title="Active Clients"
         value={activeClients}
-        icon={Users}
-        iconColor="text-purple-600"
-        iconBg="bg-purple-50"
         deltaLabel="in your workspace"
+        icon={Users}
+        accentColor="bg-violet-500"
       />
     </div>
   );
