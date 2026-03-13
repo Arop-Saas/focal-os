@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { formatRelative, JOB_STATUS_COLORS, JOB_STATUS_LABELS } from "A/lib/utils";
+import { formatRelative, JOB_STATUS_COLORS, JOB_STATUS_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Activity, ChevronRight } from "lucide-react";
 
@@ -53,7 +55,7 @@ export function RecentActivity({ jobs }: { jobs: Job[] }) {
               <span
                 className={cn(
                   "shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full border mt-0.5",
-                  JOB_STATUL_COLORS[job.status]
+                  JOB_STATUS_COLORS[job.status]
                 )}
               >
                 {JOB_STATUS_LABELS[job.status]}
@@ -63,5 +65,5 @@ export function RecentActivity({ jobs }: { jobs: Job[] }) {
         </div>
       )}
     </div>
-  
-+};
+  );
+}
