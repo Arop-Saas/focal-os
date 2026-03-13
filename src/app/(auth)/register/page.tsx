@@ -121,25 +121,25 @@ export default function RegisterPage() {
           </label>
         </div>
         {errors.agreeToTerms && (
-          <p class"name="text-[11px] text-red-500">{errors.agreeToTerms.message}</p>
+          <p className="text-[11px] text-red-500">{errors.agreeToTerms.message}</p>
         )}
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className=Š{µ flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 text-sm transition-colors disabled:opacity-60 shadow-sm mt-2"
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 text-sm transition-colors disabled:opacity-60 shadow-sm mt-2"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isSubmitting ? "Creating accountâ€¦" : "Create free account"}
         </button>
       </form>
 
-      <p class"name="text-center text-[13px] text-gray-500">
+      <p className="text-center text-[13px] text-gray-500">
         Already have an account?{" "}
         <Link href="/login" className="font-semibold text-blue-600 hover:text-blue-700 transition-colors">
           Sign in
         </Link>
       </p>
     </div>
-  
-+};
+  );
+}
