@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
-import { Aperture, Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -50,31 +50,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Mobile logo */}
-      <div className="flex items-center gap-2 lg:hidden">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-          <Aperture className="h-4 w-4 text-white" />
-        </div>
-        <span className="text-lg font-semibold">Focal OS</span>
-      </div>
-
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Sign in</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Welcome back. Enter your credentials to continue.
+        <h2 className="text-xl font-bold text-gray-900">Welcome back</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Sign in to your account to continue.
         </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {serverError && (
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+          <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-[13px] text-red-600">
             {serverError}
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <div className="space-y-1.5">
+          <label className="block text-[13px] font-medium text-gray-700">
             Email
           </label>
           <input
@@ -82,17 +74,17 @@ export default function LoginPage() {
             type="email"
             autoComplete="email"
             placeholder="you@company.com"
-            className="w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
           />
           {errors.email && (
-            <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
+            <p className="text-[11px] text-red-500">{errors.email.message}</p>
           )}
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-sm font-medium text-gray-700">Password</label>
-            <Link href="/forgot-password" className="text-xs text-blue-600 hover:underline">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="block text-[13px] font-medium text-gray-700">Password</label>
+            <Link href="/forgot-password" className="text-[11px] text-blue-600 hover:text-blue-700 transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -102,34 +94,34 @@ export default function LoginPage() {
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               placeholder="••••••••"
-              className="w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors pr-10"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
           {errors.password && (
-            <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
+            <p className="text-[11px] text-red-500">{errors.password.message}</p>
           )}
         </div>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 text-sm transition-colors disabled:opacity-60"
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 text-sm transition-colors disabled:opacity-60 shadow-sm mt-2"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isSubmitting ? "Signing in…" : "Sign in"}
         </button>
       </form>
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-center text-[13px] text-gray-500">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-medium text-blue-600 hover:underline">
+        <Link href="/register" className="font-semibold text-blue-600 hover:text-blue-700 transition-colors">
           Start free trial
         </Link>
       </p>

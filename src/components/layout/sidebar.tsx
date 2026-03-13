@@ -14,12 +14,9 @@ import {
   CalendarDays,
   BarChart3,
   Settings,
-  ChevronDown,
   Aperture,
   Bell,
-  HelpCircle,
   LogOut,
-  Building2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -85,33 +82,33 @@ export function Sidebar({ workspaceName, userEmail }: SidebarProps) {
     return pathname.startsWith(href);
   }
 
+  const initial = userEmail ? userEmail[0].toUpperCase() : "U";
+
   return (
-    <aside className="flex h-screen w-64 flex-col bg-[#0F2547] text-slate-300 shrink-0">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2.5 px-5 border-b border-white/10">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500">
-          <Aperture className="h-4 w-4 text-white" />
+    <aside className="flex h-screen w-60 flex-col bg-[#0c1e3d] text-slate-300 shrink-0 border-r border-white/[0.06]">
+      {/* Logo / workspace */}
+      <div className="flex h-14 items-center gap-3 px-4 border-b border-white/[0.06]">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 shrink-0">
+          <Aperture className="h-3.5 w-3.5 text-white" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-white leading-tight">Focal OS</span>
-          {workspaceName && (
-            <span className="text-xs text-slate-400 leading-tight truncate max-w-[140px]">
-              {workspaceName}
-            </span>
-          )}
+        <div className="min-w-0">
+          <span className="text-sm font-semibold text-white block leading-tight truncate">
+            {workspaceName ?? "Focal OS"}
+          </span>
+          <span className="text-[10px] text-slate-500 block leading-tight">Photography Studio</span>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
         {navGroups.map((group) => (
           <div key={group.label ?? "main"}>
             {group.label && (
-              <p className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+              <p className="px-2.5 mb-1 text-[9px] font-semibold uppercase tracking-widest text-slate-600">
                 {group.label}
               </p>
             )}
-            <div className="space-y-0.5">
+            <div className="space-y-px">
               {group.items.map((item) => {
                 const active = isActive(item.href);
                 return (
@@ -119,22 +116,22 @@ export function Sidebar({ workspaceName, userEmail }: SidebarProps) {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
+                      "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-all duration-150",
                       active
-                        ? "bg-blue-600/20 text-white"
-                        : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                        ? "bg-white/[0.08] text-white"
+                        : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
                     )}
                   >
+                    {active && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r-full bg-blue-400" />
+                    )}
                     <item.icon
                       className={cn(
-                        "h-4 w-4 shrink-0",
+                        "h-[15px] w-[15px] shrink-0 transition-colors",
                         active ? "text-blue-400" : "text-slate-500"
                       )}
                     />
                     {item.label}
-                    {active && (
-                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    )}
                   </Link>
                 );
               })}
@@ -143,43 +140,47 @@ export function Sidebar({ workspaceName, userEmail }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="border-t border-white/10 p-3 space-y-0.5">
+      {/* Bottom utilities */}
+      <div className="border-t border-white/[0.06] px-2 py-2 space-y-px">
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
+            "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-all",
             pathname.startsWith("/settings")
-              ? "bg-blue-600/20 text-white"
-              : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              ? "bg-white/[0.08] text-white"
+              : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
           )}
         >
-          <Settings className="h-4 w-4 text-slate-500" />
+          <Settings className="h-[15px] w-[15px] text-slate-500" />
           Settings
         </Link>
-
         <Link
           href="/notifications"
-          className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
+          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 transition-all"
         >
-          <Bell className="h-4 w-4 text-slate-500" />
+          <Bell className="h-[15px] w-[15px] text-slate-500" />
           Notifications
         </Link>
+      </div>
 
-        <button
-          onClick={handleSignOut}
-          disabled={signingOut}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-red-400 transition-colors"
-        >
-          <LogOut className="h-4 w-4 text-slate-500" />
-          {signingOut ? "Signing out…" : "Sign out"}
-        </button>
-
-        {userEmail && (
-          <div className="mt-2 px-2.5 py-2 rounded-md bg-white/5">
-            <p className="text-xs text-slate-500 truncate">{userEmail}</p>
+      {/* User footer */}
+      <div className="border-t border-white/[0.06] p-3">
+        <div className="flex items-center gap-2.5 group">
+          <div className="h-7 w-7 rounded-full bg-blue-600/80 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            {initial}
           </div>
-        )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] text-slate-400 truncate leading-tight">{userEmail ?? "—"}</p>
+          </div>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            title="Sign out"
+            className="text-slate-600 hover:text-red-400 transition-colors shrink-0"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </aside>
   );

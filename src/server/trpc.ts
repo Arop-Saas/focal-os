@@ -32,6 +32,26 @@ export async function createTRPCContext(opts: CreateContextOptions) {
       },
     });
 
+    // Auto-create Prisma user on first tRPC request after Supabase signup
+    if (!user && supabaseUser.email) {
+      user = await prisma.user.create({
+        data: {
+          supabaseId: supabaseUser.id,
+          email: supabaseUser.email,
+          fullName:
+            (supabaseUser.user_metadata?.full_name as string | undefined) ??
+            supabaseUser.email.split("@")[0],
+        },
+        include: {
+          workspaces: {
+            include: { workspace: true },
+            orderBy: { joinedAt: "asc" },
+            take: 1,
+          },
+        },
+      });
+    }
+
     if (user?.workspaces[0]) {
       workspace = user.workspaces[0].workspace;
     }
