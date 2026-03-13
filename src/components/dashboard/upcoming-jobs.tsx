@@ -75,10 +75,10 @@ export function UpcomingJobs({ jobs }: UpcomingJobsProps) {
               {/* Date pill */}
               <div className="flex flex-col items-center justify-center min-w-[38px] h-10 rounded-lg bg-gray-50 group-hover:bg-blue-50 transition-colors">
                 <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide group-hover:text-blue-400 transition-colors">
-                  {date ? date.toLocaleDateString("en-US", { month: "short" }) : "—"}
+                  {date ? date.toLocaleDateString("en-US", { month: "short" }) : "-"}
                 </span>
                 <span className="text-[17px] font-bold text-gray-800 leading-none group-hover:text-blue-700 transition-colors">
-                  {date ? date.getDate() : "—"}
+                  {date ? date.getDate() : "-"}
                 </span>
               </div>
 
@@ -103,12 +103,12 @@ export function UpcomingJobs({ jobs }: UpcomingJobsProps) {
                     {job.package && <span className="text-gray-300"> · {job.package.name}</span>}
                   </span>
                   {date && (
-                    <span class"name="flex items-center gap-1 text-[11px] text-gray-400 shrink-0">
+                    <span className="flex items-center gap-1 text-[11px] text-gray-400 shrink-0">
                       <Clock className="h-3 w-3" />
                       {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                     </span>
                   )}
-                   {photographer && (
+                  {photographer && (
                     <span className="flex items-center gap-1 text-[11px] text-gray-400 shrink-0">
                       <User className="h-3 w-3" />
                       {photographer.fullName.split(" ")[0]}
