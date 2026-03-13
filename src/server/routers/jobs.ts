@@ -2,6 +2,13 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber } from "@/lib/utils";
+import {
+  notifyJobBooked,
+  notifyJobConfirmed,
+  notifyJobAssigned,
+  notifyJobCancelled,
+  notifyJobDelivered,
+} from "@/lib/notify";
 
 const JobCreateSchema = z.object({
   clientId: z.string(),
@@ -325,6 +332,21 @@ export const jobsRouter = router({
         return newJob;
       });
 
+      // Fire-and-forget: booking confirmation email to client
+      if (job.client.email && job.scheduledAt) {
+        void notifyJobBooked({
+          workspaceId: ctx.workspace.id,
+          jobId: job.id,
+          userId: ctx.user.id,
+          clientEmail: job.client.email,
+          clientName: `${job.client.firstName} ${job.client.lastName}`,
+          jobNumber: job.jobNumber,
+          propertyAddress: job.propertyAddress,
+          scheduledAt: job.scheduledAt,
+          packageName: job.services[0]?.service?.name ?? "Photography",
+        });
+      }
+
       return job;
     }),
 
@@ -366,8 +388,18 @@ export const jobsRouter = router({
       });
       if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
 
-      return ctx.prisma.$transaction(async (tx) => {
-        const updated = await tx.job.update({
+      // Fetch full job for notification context
+      const fullJob = await ctx.prisma.job.findFirst({
+        where: { id, workspaceId: ctx.workspace.id },
+        include: {
+          client: true,
+          services: { include: { service: true } },
+        },
+      });
+      if (!fullJob) throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+
+      const updated = await ctx.prisma.$transaction(async (tx) => {
+        const result = await tx.job.update({
           where: { id },
           data: {
             ...data,
@@ -397,8 +429,41 @@ export const jobsRouter = router({
           },
         });
 
-        return updated;
+        return result;
       });
+
+      // Fire-and-forget notifications on status transitions
+      const clientEmail = fullJob.client.email;
+      const clientName = `${fullJob.client.firstName} ${fullJob.client.lastName}`;
+
+      if (status && status !== job.status && clientEmail) {
+        if (status === "CONFIRMED" && fullJob.scheduledAt) {
+          void notifyJobConfirmed({
+            workspaceId: ctx.workspace.id,
+            jobId: id,
+            userId: ctx.user.id,
+            clientEmail,
+            clientName,
+            jobNumber: fullJob.jobNumber,
+            propertyAddress: fullJob.propertyAddress,
+            scheduledAt: fullJob.scheduledAt,
+            packageName: fullJob.services[0]?.service?.name ?? "Photography",
+          });
+        } else if (status === "DELIVERED") {
+          void notifyJobDelivered({
+            workspaceId: ctx.workspace.id,
+            jobId: id,
+            userId: ctx.user.id,
+            clientEmail,
+            clientName,
+            jobNumber: fullJob.jobNumber,
+            propertyAddress: fullJob.propertyAddress,
+            galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app"}/gallery/${id}`,
+          });
+        }
+      }
+
+      return updated;
     }),
 
   // Assign photographer to job
@@ -420,6 +485,18 @@ export const jobsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Fetch job + staff details for notification
+      const [jobForNotify, staffForNotify] = await Promise.all([
+        ctx.prisma.job.findFirst({
+          where: { id: input.jobId, workspaceId: ctx.workspace.id },
+          include: { client: { select: { firstName: true, lastName: true } } },
+        }),
+        ctx.prisma.staffProfile.findFirst({
+          where: { id: input.staffId, workspaceId: ctx.workspace.id },
+          include: { member: { include: { user: { select: { id: true, fullName: true, email: true } } } } },
+        }),
+      ]);
+
       // Upsert assignment
       const assignment = await ctx.prisma.jobAssignment.upsert({
         where: {
@@ -444,6 +521,22 @@ export const jobsRouter = router({
           },
         },
       });
+
+      // Fire-and-forget: notify the photographer
+      if (jobForNotify && staffForNotify?.member.user.email && jobForNotify.scheduledAt) {
+        void notifyJobAssigned({
+          workspaceId: ctx.workspace.id,
+          jobId: input.jobId,
+          userId: staffForNotify.member.user.id,
+          photographerEmail: staffForNotify.member.user.email,
+          photographerName: staffForNotify.member.user.fullName,
+          jobNumber: jobForNotify.jobNumber,
+          propertyAddress: jobForNotify.propertyAddress,
+          scheduledAt: jobForNotify.scheduledAt,
+          clientName: `${jobForNotify.client.firstName} ${jobForNotify.client.lastName}`,
+          accessNotes: jobForNotify.accessNotes,
+        });
+      }
 
       return assignment;
     }),
@@ -480,10 +573,11 @@ export const jobsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const job = await ctx.prisma.job.findFirst({
         where: { id: input.id, workspaceId: ctx.workspace.id },
+        include: { client: { select: { email: true, firstName: true, lastName: true } } },
       });
       if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
 
-      return ctx.prisma.job.update({
+      const cancelled = await ctx.prisma.job.update({
         where: { id: input.id },
         data: {
           status: "CANCELLED",
@@ -495,5 +589,21 @@ export const jobsRouter = router({
           },
         },
       });
+
+      // Fire-and-forget: notify client
+      if (job.client.email) {
+        void notifyJobCancelled({
+          workspaceId: ctx.workspace.id,
+          jobId: input.id,
+          userId: ctx.user.id,
+          clientEmail: job.client.email,
+          clientName: `${job.client.firstName} ${job.client.lastName}`,
+          jobNumber: job.jobNumber,
+          propertyAddress: job.propertyAddress,
+          reason: input.reason,
+        });
+      }
+
+      return cancelled;
     }),
 });

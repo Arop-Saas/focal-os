@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, workspaceProcedure } from "../trpc";
 import { generateInvoiceNumber } from "@/lib/utils";
+import { notifyInvoiceSent, notifyInvoicePaid } from "@/lib/notify";
 
 export const invoicesRouter = router({
   list: workspaceProcedure
@@ -160,13 +161,31 @@ export const invoicesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invoice is already sent." });
       }
 
-      // TODO: Create Stripe payment link
-      // TODO: Send email via Resend
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+      // TODO: Replace with real Stripe payment link when payment portal is built
+      const paymentLink = `${APP_URL}/invoices/${invoice.id}/pay`;
 
-      return ctx.prisma.invoice.update({
+      const updated = await ctx.prisma.invoice.update({
         where: { id: input.id },
         data: { status: "SENT", issuedAt: new Date() },
       });
+
+      // Fire-and-forget: send invoice email to client
+      if (invoice.client.email) {
+        void notifyInvoiceSent({
+          workspaceId: ctx.workspace.id,
+          jobId: invoice.jobId ?? undefined,
+          userId: ctx.user.id,
+          clientEmail: invoice.client.email,
+          clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+          invoiceNumber: invoice.invoiceNumber,
+          amount: invoice.totalAmount,
+          dueDate: invoice.dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          paymentLink,
+        });
+      }
+
+      return updated;
     }),
 
   markPaid: workspaceProcedure
@@ -181,6 +200,7 @@ export const invoicesRouter = router({
     .mutation(async ({ ctx, input }) => {
       const invoice = await ctx.prisma.invoice.findFirst({
         where: { id: input.id, workspaceId: ctx.workspace.id },
+        include: { client: { select: { email: true, firstName: true, lastName: true } } },
       });
       if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -192,8 +212,9 @@ export const invoicesRouter = router({
           : newAmountPaid > 0
           ? "PARTIAL"
           : invoice.status;
+      const paidAt = new Date();
 
-      return ctx.prisma.$transaction(async (tx) => {
+      const updated = await ctx.prisma.$transaction(async (tx) => {
         await tx.payment.create({
           data: {
             invoiceId: input.id,
@@ -201,7 +222,7 @@ export const invoicesRouter = router({
             method: input.method,
             status: "SUCCEEDED",
             notes: input.notes,
-            paidAt: new Date(),
+            paidAt,
           },
         });
 
@@ -211,10 +232,26 @@ export const invoicesRouter = router({
             amountPaid: newAmountPaid,
             amountDue: Math.max(0, newAmountDue),
             status: newStatus,
-            paidAt: newStatus === "PAID" ? new Date() : null,
+            paidAt: newStatus === "PAID" ? paidAt : null,
           },
         });
       });
+
+      // Fire-and-forget: send receipt when fully paid
+      if (newStatus === "PAID" && invoice.client.email) {
+        void notifyInvoicePaid({
+          workspaceId: ctx.workspace.id,
+          jobId: invoice.jobId ?? undefined,
+          userId: ctx.user.id,
+          clientEmail: invoice.client.email,
+          clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+          invoiceNumber: invoice.invoiceNumber,
+          amount: newAmountPaid,
+          paidAt,
+        });
+      }
+
+      return updated;
     }),
 
   void: workspaceProcedure
