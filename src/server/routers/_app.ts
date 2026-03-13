@@ -5,6 +5,7 @@ import { clientsRouter } from "./clients";
 import { staffRouter } from "./staff";
 import { packagesRouter } from "./packages";
 import { invoicesRouter } from "./invoices";
+import { schedulingRouter } from "./scheduling";
 
 export const appRouter = router({
   workspace: workspaceRouter,
@@ -13,6 +14,7 @@ export const appRouter = router({
   staff: staffRouter,
   packages: packagesRouter,
   invoices: invoicesRouter,
+  scheduling: schedulingRouter,
 });
 
 export type AppRouter = typeof appRouter;
