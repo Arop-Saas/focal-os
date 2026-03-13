@@ -1,9 +1,8 @@
 "use client";
 
-import { Bell, Search, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,45 +18,42 @@ interface HeaderProps {
 
 export function Header({ title, description, actions }: HeaderProps) {
   return (
-    <header className="h-16 border-b bg-white flex items-center px-6 gap-4 shrink-0">
+    <header className="h-14 border-b border-gray-100 bg-white flex items-center px-6 gap-4 shrink-0">
       {/* Title */}
-      <div className="flex-1">
-        <h1 className="text-lg font-semibold text-gray-900 leading-tight">{title}</h1>
+      <div className="flex-1 min-w-0">
+        <h1 className="text-[15px] font-semibold text-gray-900 leading-tight truncate">{title}</h1>
         {description && (
-          <p className="text-xs text-muted-foreground leading-tight">{description}</p>
+          <p className="text-[11px] text-gray-400 leading-tight">{description}</p>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         {actions}
 
         {/* Quick add */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-1.5">
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 text-[13px] bg-blue-600 hover:bg-blue-700 text-white px-3 rounded-lg shadow-sm"
+            >
               <Plus className="h-3.5 w-3.5" />
               New
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="w-44 rounded-xl shadow-lg border-gray-100">
             <DropdownMenuItem asChild>
-              <Link href="/jobs/new">New Job</Link>
+              <Link href="/jobs/new" className="text-[13px]">New Job</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/clients?new=1">New Client</Link>
+              <Link href="/clients?new=1" className="text-[13px]">New Client</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/invoices?new=1">New Invoice</Link>
+              <Link href="/invoices?new=1" className="text-[13px]">New Invoice</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-        </Button>
       </div>
     </header>
   );
