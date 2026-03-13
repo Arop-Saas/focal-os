@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
@@ -39,6 +39,7 @@
     "@trpc/next": "^11.0.0-rc.446",
     "@trpc/react-query": "^11.0.0-rc.446",
     "@trpc/server": "^11.0.0-rc.446",
+    "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
@@ -47,6 +48,7 @@
     "lucide-react": "^0.441.0",
     "next": "14.2.13",
     "next-themes": "^0.3.0",
+    "postcss": "^8.4.47",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -57,6 +59,7 @@
     "stripe": "^16.9.0",
     "superjson": "^2.2.1",
     "tailwind-merge": "^2.5.2",
+    "tailwindcss": "^3.4.12",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.23.8",
     "zustand": "^5.0.0"
@@ -67,9 +70,7 @@
     "@types/react-dom": "^18.3.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.13",
-    "postcss": "^8.4.47",
     "prisma": "^5.18.0",
-    "tailwindcss": "^3.4.12",
     "tsx": "^4.19.0",
     "typescript": "^5.6.2"
   }
