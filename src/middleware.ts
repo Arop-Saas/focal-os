@@ -9,8 +9,10 @@ const publicRoutes = [
   "/reset-password",
   "/verify",
   "/api/webhooks",
-  "/gallery", // Public gallery share links
-  "/book",    // Public client booking form
+  "/gallery",     // Public gallery share links
+  "/book",        // Public client booking form
+  "/portal",      // Client portal (self-auth via magic link)
+  "/api/portal",  // Portal API routes (login, verify, logout)
 ];
 
 export async function middleware(request: NextRequest) {

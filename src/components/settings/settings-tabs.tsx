@@ -47,16 +47,29 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   const [activeTab, setActiveTab] = useState<"general" | "branding" | "billing" | "notifications">("general");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedPortal, setCopiedPortal] = useState(false);
 
   const bookingUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/book/${workspace.slug}`
       : `/book/${workspace.slug}`;
 
+  const portalUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/portal/${workspace.slug}`
+      : `/portal/${workspace.slug}`;
+
   const copyBookingLink = () => {
     navigator.clipboard.writeText(bookingUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const copyPortalLink = () => {
+    navigator.clipboard.writeText(portalUrl).then(() => {
+      setCopiedPortal(true);
+      setTimeout(() => setCopiedPortal(false), 2000);
     });
   };
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
@@ -258,6 +271,37 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
             >
               <Link className="h-3.5 w-3.5" />
               Preview booking page
+            </a>
+          </div>
+
+          {/* Client Portal Link Card */}
+          <div className="bg-white rounded-xl border p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Link className="h-5 w-5 text-purple-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Client Portal Link</h3>
+            </div>
+            <p className="text-sm text-gray-500">
+              Share this link with clients so they can view their orders, download galleries, pay invoices, and book new shoots — all in one place.
+            </p>
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              <span className="text-sm text-gray-700 flex-1 truncate">{portalUrl}</span>
+              <button
+                type="button"
+                onClick={copyPortalLink}
+                className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 transition-colors"
+              >
+                {copiedPortal ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedPortal ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <a
+              href={portalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:underline"
+            >
+              <Link className="h-3.5 w-3.5" />
+              Preview client portal
             </a>
           </div>
 
