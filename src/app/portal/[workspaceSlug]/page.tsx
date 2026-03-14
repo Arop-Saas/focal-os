@@ -10,7 +10,7 @@ import {
   LogIn, UserPlus, ClipboardList, ChevronLeft, User, Phone, Lock, Eye, EyeOff,
 } from "lucide-react";
 
-type View = "options" | "signin" | "no-account";
+type View = "options" | "signin" | "no-account" | "forgot";
 
 function PortalLanding() {
   const params = useParams();
@@ -25,6 +25,9 @@ function PortalLanding() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Forgot password fields
+  const [forgotEmail, setForgotEmail] = useState("");
 
   // Sign-up fields
   const [reqFirstName, setReqFirstName] = useState("");
@@ -68,6 +71,26 @@ function PortalLanding() {
         window.location.href = data.redirectUrl;
         return;
       }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/portal/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim(), workspaceSlug }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+      if (data.redirectUrl) window.location.href = data.redirectUrl;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -248,12 +271,69 @@ function PortalLanding() {
                 </button>
               </form>
 
-              <p className="mt-5 text-xs text-center text-gray-400">
+              <p className="mt-3 text-xs text-center text-gray-400">
+                <button onClick={() => { setView("forgot"); setForgotEmail(email); setError(null); }} className="text-blue-600 hover:underline font-medium">
+                  Forgot password?
+                </button>
+              </p>
+
+              <p className="mt-3 text-xs text-center text-gray-400">
                 Don&apos;t have an account?{" "}
                 <button onClick={() => { setView("no-account"); setError(null); }} className="text-blue-600 hover:underline font-medium">
                   Create one
                 </button>
               </p>
+            </>
+          )}
+
+          {/* ── FORGOT PASSWORD VIEW ── */}
+          {view === "forgot" && (
+            <>
+              <button
+                onClick={() => { setView("signin"); setError(null); }}
+                className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-6 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back to sign in
+              </button>
+
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Reset your password</h1>
+              <p className="text-sm text-gray-500 mb-8">Enter your email and we&apos;ll take you to a page to set a new password.</p>
+
+              {error && (
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-lg px-4 py-3 mb-5 text-sm text-red-600">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">Email address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      autoFocus
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !forgotEmail.trim()}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-60"
+                >
+                  {loading
+                    ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <>Continue <ArrowRight className="w-4 h-4" /></>
+                  }
+                </button>
+              </form>
             </>
           )}
 
