@@ -4,7 +4,7 @@ import { format } from "date-fns";
 export const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const EMAIL_FROM =
-  process.env.EMAIL_FROM ?? "Focal OS <noreply@focal-os.app>";
+  process.env.EMAIL_FROM ?? "Focal OS <onboarding@resend.dev>";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
 

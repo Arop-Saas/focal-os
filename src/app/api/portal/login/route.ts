@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const magicLink = `${baseUrl}/api/portal/verify?token=${encodeURIComponent(token)}&slug=${workspaceSlug}`;
 
     await resend.emails.send({
-      from: `${workspace.name} <${process.env.EMAIL_FROM ?? "noreply@focal-os.vercel.app"}>`,
+      from: process.env.EMAIL_FROM ?? `${workspace.name} <onboarding@resend.dev>`,
       to: client.email,
       subject: `Sign in to ${workspace.name} Client Portal`,
       html: `
