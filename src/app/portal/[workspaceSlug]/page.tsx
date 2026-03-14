@@ -7,10 +7,10 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import {
   Aperture, Mail, ArrowRight, CheckCircle, AlertCircle,
-  LogIn, UserPlus, ClipboardList, ChevronLeft,
+  LogIn, UserPlus, ClipboardList, ChevronLeft, User, Phone,
 } from "lucide-react";
 
-type View = "options" | "signin" | "no-account" | "sent";
+type View = "options" | "signin" | "no-account" | "sent" | "request-sent";
 
 function PortalLanding() {
   const params = useParams();
@@ -21,6 +21,12 @@ function PortalLanding() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Request access form fields
+  const [reqFirstName, setReqFirstName] = useState("");
+  const [reqLastName, setReqLastName] = useState("");
+  const [reqEmail, setReqEmail] = useState("");
+  const [reqPhone, setReqPhone] = useState("");
 
   const authError = searchParams?.get("error");
 
@@ -36,6 +42,30 @@ function PortalLanding() {
       setView("signin");
     }
   }, [authError]);
+
+  async function handleRequestAccess(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await fetch("/api/portal/request-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: reqFirstName.trim(),
+          lastName: reqLastName.trim(),
+          email: reqEmail.trim(),
+          phone: reqPhone.trim(),
+          workspaceSlug,
+        }),
+      });
+      setView("request-sent");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -194,23 +224,120 @@ function PortalLanding() {
                 <ChevronLeft className="w-4 h-4" /> Back
               </button>
 
-              <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-5">
-                <UserPlus className="w-6 h-6 text-blue-600" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">No account yet?</h1>
-              <p className="text-sm text-gray-500 mb-6">
-                Client accounts are created by your studio. Reach out to them and they&apos;ll get you set up — then you&apos;ll be able to sign in here.
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign up for an account</h1>
+              <p className="text-sm text-gray-500 mb-7">
+                Enter your info below and we&apos;ll notify the studio to get you set up.
               </p>
-              <p className="text-sm text-gray-500 mb-8">
-                Already placed an order? Your studio may have already created an account for you.
+
+              {error && (
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-lg px-4 py-3 mb-5 text-sm text-red-600">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleRequestAccess} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">First name</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={reqFirstName}
+                        onChange={(e) => setReqFirstName(e.target.value)}
+                        placeholder="Jane"
+                        required
+                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Last name</label>
+                    <input
+                      type="text"
+                      value={reqLastName}
+                      onChange={(e) => setReqLastName(e.target.value)}
+                      placeholder="Smith"
+                      required
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      value={reqEmail}
+                      onChange={(e) => setReqEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phone number <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="tel"
+                      value={reqPhone}
+                      onChange={(e) => setReqPhone(e.target.value)}
+                      placeholder="(555) 000-0000"
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !reqFirstName.trim() || !reqLastName.trim() || !reqEmail.trim()}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-60"
+                >
+                  {loading ? (
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>Request Access <ArrowRight className="w-4 h-4" /></>
+                  )}
+                </button>
+              </form>
+
+              <p className="mt-5 text-xs text-center text-gray-400">
+                Already have an account?{" "}
+                <button onClick={() => setView("signin")} className="text-blue-600 hover:underline font-medium">
+                  Sign in instead
+                </button>
+              </p>
+            </>
+          )}
+
+          {/* ── REQUEST SENT VIEW ── */}
+          {view === "request-sent" && (
+            <div className="text-center py-4">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-7 h-7 text-green-500" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Request sent!</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                We&apos;ve notified the studio. They&apos;ll create your account and you&apos;ll be able to sign in with your email.
+              </p>
+              <p className="text-xs text-gray-400">
+                Already set up? Check your inbox for a sign-in link.
               </p>
               <button
                 onClick={() => setView("signin")}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors"
+                className="mt-6 text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
-                Try signing in anyway <ArrowRight className="w-4 h-4" />
+                Try signing in
               </button>
-            </>
+            </div>
           )}
 
           {/* ── SENT VIEW ── */}
