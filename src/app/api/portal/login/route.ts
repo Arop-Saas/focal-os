@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { generatePortalToken, MAGIC_LINK_TTL_MS } from "@/lib/portal-auth";
 import { Resend } from "resend";
 
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    const workspace = await db.workspace.findUnique({
+    const workspace = await prisma.workspace.findUnique({
       where: { slug: workspaceSlug },
     });
 
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Studio not found" }, { status: 404 });
     }
 
-    const client = await db.client.findFirst({
+    const client = await prisma.client.findFirst({
       where: {
         workspaceId: workspace.id,
         email: email.toLowerCase().trim(),

@@ -1,5 +1,5 @@
 import { requirePortalSession } from "@/lib/portal-session";
-import { db } from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { PortalNav } from "@/components/portal/portal-nav";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -25,7 +25,7 @@ export default async function PortalInvoicesPage({
 }) {
   const { client, workspace } = await requirePortalSession(params.workspaceSlug);
 
-  const invoices = await db.invoice.findMany({
+  const invoices = await prisma.invoice.findMany({
     where: { workspaceId: workspace.id, clientId: client.id },
     orderBy: { createdAt: "desc" },
     include: { job: { select: { propertyAddress: true, jobNumber: true } } },

@@ -1,5 +1,5 @@
 import { requirePortalSession } from "@/lib/portal-session";
-import { db } from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { PortalNav } from "@/components/portal/portal-nav";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -40,7 +40,7 @@ export default async function PortalDashboardPage({
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const [todayJobs, recentJobs, openInvoices] = await Promise.all([
-    db.job.findMany({
+    prisma.job.findMany({
       where: {
         workspaceId: workspace.id,
         clientId: client.id,
@@ -48,13 +48,13 @@ export default async function PortalDashboardPage({
       },
       orderBy: { scheduledAt: "asc" },
     }),
-    db.job.findMany({
+    prisma.job.findMany({
       where: { workspaceId: workspace.id, clientId: client.id },
       orderBy: { createdAt: "desc" },
       take: 5,
       include: { package: true },
     }),
-    db.invoice.count({
+    prisma.invoice.count({
       where: {
         workspaceId: workspace.id,
         clientId: client.id,

@@ -1,5 +1,5 @@
 import { requirePortalSession } from "@/lib/portal-session";
-import { db } from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { PortalNav } from "@/components/portal/portal-nav";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -22,7 +22,7 @@ export default async function PortalGalleriesPage({
 }) {
   const { client, workspace } = await requirePortalSession(params.workspaceSlug);
 
-  const jobs = await db.job.findMany({
+  const jobs = await prisma.job.findMany({
     where: { workspaceId: workspace.id, clientId: client.id },
     include: {
       gallery: {

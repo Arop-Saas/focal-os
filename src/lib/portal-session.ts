@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyPortalToken, PORTAL_COOKIE, type PortalSession } from "./portal-auth";
-import { db } from "./db";
+import prisma from "./prisma";
 import type { Client, Workspace } from "@prisma/client";
 
 export async function getPortalSession(
@@ -15,8 +15,8 @@ export async function getPortalSession(
   if (!session || session.workspaceSlug !== workspaceSlug) return null;
 
   const [client, workspace] = await Promise.all([
-    db.client.findUnique({ where: { id: session.clientId } }),
-    db.workspace.findUnique({ where: { slug: workspaceSlug } }),
+    prisma.client.findUnique({ where: { id: session.clientId } }),
+    prisma.workspace.findUnique({ where: { slug: workspaceSlug } }),
   ]);
 
   if (!client || !workspace) return null;
