@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { scryptSync, timingSafeEqual } from "crypto";
 import prisma from "@/lib/prisma";
 import { generatePortalToken, MAGIC_LINK_TTL_MS } from "@/lib/portal-auth";
+
+function verifyPassword(password: string, stored: string): boolean {
+  try {
+    const [salt, hash] = stored.split(":");
+    const hashBuffer = Buffer.from(hash, "hex");
+    const suppliedHash = scryptSync(password, salt, 64);
+    return timingSafeEqual(hashBuffer, suppliedHash);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { email, workspaceSlug } = await req.json();
+    const { email, password, workspaceSlug } = await req.json();
 
     if (!email || !workspaceSlug) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -26,6 +39,16 @@ export async function POST(req: NextRequest) {
 
     if (!client) {
       return NextResponse.json({ error: "No account found with that email address." }, { status: 404 });
+    }
+
+    // If account has a password set, verify it
+    if (client.passwordHash) {
+      if (!password) {
+        return NextResponse.json({ error: "Password required." }, { status: 400 });
+      }
+      if (!verifyPassword(password, client.passwordHash)) {
+        return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
+      }
     }
 
     const token = generatePortalToken({

@@ -223,6 +223,7 @@ model Client {
 
   // Portal
   portalAccessedAt DateTime?
+  passwordHash     String?
 
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   jobs          Job[]
