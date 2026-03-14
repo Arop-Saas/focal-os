@@ -11,6 +11,7 @@ import {
   LogOut,
   Aperture,
   ShoppingCart,
+  UserCircle,
 } from "lucide-react";
 
 interface PortalNavProps {
@@ -34,6 +35,7 @@ export function PortalNav({
     { label: "Orders", href: `${base}/orders`, icon: Briefcase },
     { label: "Invoices", href: `${base}/invoices`, icon: Receipt },
     { label: "Galleries", href: `${base}/galleries`, icon: Image },
+    { label: "My Profile", href: `${base}/profile`, icon: UserCircle },
   ];
 
   return (

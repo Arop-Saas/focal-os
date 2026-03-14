@@ -221,6 +221,9 @@ model Client {
   totalRevenue  Float    @default(0)
   lastJobAt     DateTime?
 
+  // Portal
+  portalAccessedAt DateTime?
+
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   jobs          Job[]
   orders        Order[]

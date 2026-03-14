@@ -3,8 +3,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import { ArrowLeft, Mail, Phone, MapPin } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PortalInviteButton } from "@/components/clients/portal-invite-button";
 
 export const metadata = { title: "Client Details" };
 
@@ -55,7 +56,8 @@ export default async function ClientDetailPage({ params }: PageProps) {
     include: { workspaces: { include: { workspace: true }, take: 1 } },
   });
 
-  const workspaceId = user!.workspaces[0].workspace.id;
+  const workspace = user!.workspaces[0].workspace;
+  const workspaceId = workspace.id;
 
   const client = await prisma.client.findUnique({
     where: { id: params.id },
@@ -141,6 +143,29 @@ export default async function ClientDetailPage({ params }: PageProps) {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Portal Access Card */}
+          <div className="bg-white rounded-xl border p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900 mb-1">Client Portal Access</h2>
+                <p className="text-sm text-gray-500">
+                  Send {client.firstName} a magic link to access their dedicated portal — orders, invoices, and galleries in one place.
+                </p>
+                <Link
+                  href={`/portal/${workspace.slug}`}
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 mt-2 font-medium"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Preview portal
+                </Link>
+              </div>
+              <div className="shrink-0">
+                <PortalInviteButton clientId={client.id} />
+              </div>
             </div>
           </div>
 

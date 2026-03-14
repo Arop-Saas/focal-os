@@ -5,6 +5,7 @@ import {
   PORTAL_COOKIE,
   PORTAL_TOKEN_TTL_MS,
 } from "@/lib/portal-auth";
+import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -22,6 +23,14 @@ export async function GET(req: NextRequest) {
   if (!session || session.workspaceSlug !== slug) {
     return NextResponse.redirect(errorUrl("expired"));
   }
+
+  // Stamp portal access timestamp (fire-and-forget)
+  prisma.client
+    .update({
+      where: { id: session.clientId },
+      data: { portalAccessedAt: new Date() },
+    })
+    .catch(() => {});
 
   // Issue a 7-day session cookie
   const sessionToken = generatePortalToken({

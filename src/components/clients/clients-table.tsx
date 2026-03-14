@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 const CLIENT_TYPE_COLORS: Record<string, string> = {
   AGENT: "bg-blue-100 text-blue-800",
@@ -32,6 +33,7 @@ type Client = {
   totalJobs: number;
   totalRevenue: number;
   lastJobAt?: Date | null;
+  portalAccessedAt?: Date | null;
 };
 
 interface ClientsTableProps {
@@ -39,6 +41,50 @@ interface ClientsTableProps {
   total: number;
   page: number;
   limit: number;
+}
+
+function InlineInviteButton({ clientId }: { clientId: string }) {
+  const [state, setState] = useState<"idle" | "loading" | "sent">("idle");
+
+  async function send(e: React.MouseEvent) {
+    e.stopPropagation(); // don't navigate to client detail
+    setState("loading");
+    try {
+      const res = await fetch("/api/portal/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId }),
+      });
+      if (!res.ok) throw new Error();
+      setState("sent");
+    } catch {
+      setState("idle");
+    }
+  }
+
+  if (state === "sent") {
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-semibold text-green-700">
+        <CheckCircle2 className="w-3 h-3" />
+        Sent
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={send}
+      disabled={state === "loading"}
+      className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 transition-colors"
+    >
+      {state === "loading" ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : (
+        <Send className="w-3 h-3" />
+      )}
+      Invite
+    </button>
+  );
 }
 
 export function ClientsTable({ clients, total, page, limit }: ClientsTableProps) {
@@ -85,6 +131,7 @@ export function ClientsTable({ clients, total, page, limit }: ClientsTableProps)
               <th className="text-right px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Revenue</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Last Job</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Portal</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -138,6 +185,16 @@ export function ClientsTable({ clients, total, page, limit }: ClientsTableProps)
                   >
                     {client.status}
                   </span>
+                </td>
+                <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                  {client.portalAccessedAt ? (
+                    <span className="flex items-center gap-1 text-[10px] font-semibold text-green-700">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Active
+                    </span>
+                  ) : (
+                    <InlineInviteButton clientId={client.id} />
+                  )}
                 </td>
               </tr>
             ))}
