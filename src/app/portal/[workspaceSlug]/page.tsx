@@ -22,11 +22,12 @@ function PortalLanding() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Request access form fields
+  // Create account form fields
   const [reqFirstName, setReqFirstName] = useState("");
   const [reqLastName, setReqLastName] = useState("");
   const [reqEmail, setReqEmail] = useState("");
   const [reqPhone, setReqPhone] = useState("");
+  const [reqCompany, setReqCompany] = useState("");
 
   const authError = searchParams?.get("error");
 
@@ -56,6 +57,7 @@ function PortalLanding() {
           lastName: reqLastName.trim(),
           email: reqEmail.trim(),
           phone: reqPhone.trim(),
+          company: reqCompany.trim(),
           workspaceSlug,
         }),
       });
@@ -226,7 +228,7 @@ function PortalLanding() {
 
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign up for an account</h1>
               <p className="text-sm text-gray-500 mb-7">
-                Enter your info below and we&apos;ll notify the studio to get you set up.
+                Enter your information below to create your client portal account.
               </p>
 
               {error && (
@@ -296,6 +298,19 @@ function PortalLanding() {
                   </div>
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Brokerage, team, or office name <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={reqCompany}
+                    onChange={(e) => setReqCompany(e.target.value)}
+                    placeholder="e.g. RE/MAX Downtown"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-colors"
+                  />
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading || !reqFirstName.trim() || !reqLastName.trim() || !reqEmail.trim()}
@@ -304,7 +319,7 @@ function PortalLanding() {
                   {loading ? (
                     <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <>Request Access <ArrowRight className="w-4 h-4" /></>
+                    <>Create Account <ArrowRight className="w-4 h-4" /></>
                   )}
                 </button>
               </form>
@@ -324,18 +339,18 @@ function PortalLanding() {
               <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-7 h-7 text-green-500" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Request sent!</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Account created!</h2>
               <p className="text-sm text-gray-500 mb-4">
-                We&apos;ve notified the studio. They&apos;ll create your account and you&apos;ll be able to sign in with your email.
+                We sent a sign-in link to <strong>{reqEmail}</strong>. Click it to access your portal.
               </p>
               <p className="text-xs text-gray-400">
-                Already set up? Check your inbox for a sign-in link.
+                Link expires in 15 minutes. Check your spam folder if you don&apos;t see it.
               </p>
               <button
                 onClick={() => setView("signin")}
                 className="mt-6 text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
-                Try signing in
+                Sign in with a different email
               </button>
             </div>
           )}
