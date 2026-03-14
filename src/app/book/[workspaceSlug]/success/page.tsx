@@ -1,9 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 
-export default function BookingSuccessPage() {
+function SuccessContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const workspaceSlug = params?.workspaceSlug as string;
@@ -31,7 +32,7 @@ export default function BookingSuccessPage() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">You're booked!</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re booked!</h1>
         <p className="text-gray-500 text-sm mb-6">
           {clientName ? `Thanks, ${clientName.split(" ")[0]}!` : "Thanks!"} Your appointment has been confirmed. Check your inbox for a confirmation email.
         </p>
@@ -86,5 +87,13 @@ export default function BookingSuccessPage() {
 
       <p className="text-center text-xs text-gray-400 mt-6">Powered by FocalOS</p>
     </div>
+  );
+}
+
+export default function BookingSuccessPage() {
+  return (
+    <Suspense>
+      <SuccessContent />
+    </Suspense>
   );
 }
