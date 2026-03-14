@@ -91,6 +91,10 @@ model User {
   timezone      String   @default("America/New_York")
   onboardingCompleted Boolean @default(false)
 
+  // Google Calendar integration
+  googleRefreshToken  String?
+  googleCalendarId    String?   @default("primary")
+
   workspaces    WorkspaceMember[]
   activityLogs  ActivityLog[]
 

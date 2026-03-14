@@ -13,6 +13,7 @@ import {
   Image,
   CalendarDays,
   BarChart3,
+  DollarSign,
   Settings,
   Aperture,
   Bell,
@@ -55,6 +56,7 @@ const navGroups = [
     label: "Insights",
     items: [
       { label: "Reports", href: "/reports", icon: BarChart3 },
+      { label: "Payouts", href: "/reports/payouts", icon: DollarSign },
     ],
   },
 ];

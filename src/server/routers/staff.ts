@@ -256,4 +256,125 @@ export const staffRouter = router({
         (s) => s.jobAssignments.length < s.maxJobsPerDay
       );
     }),
+
+  // ── Payout Calculator ─────────────────────────────────────────────────────
+
+  payouts: workspaceProcedure
+    .input(
+      z.object({
+        dateFrom: z.date(),
+        dateTo: z.date(),
+        staffId: z.string().optional(), // filter to one photographer
+        statusFilter: z
+          .array(
+            z.enum([
+              "CONFIRMED", "ASSIGNED", "IN_PROGRESS", "EDITING",
+              "REVIEW", "DELIVERED", "COMPLETED",
+            ])
+          )
+          .default(["DELIVERED", "COMPLETED"]),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { dateFrom, dateTo, staffId, statusFilter } = input;
+
+      // Get all staff profiles with active assignments in range
+      const staffProfiles = await ctx.prisma.staffProfile.findMany({
+        where: {
+          workspaceId: ctx.workspace.id,
+          isActive: true,
+          ...(staffId && { id: staffId }),
+          jobAssignments: {
+            some: {
+              job: {
+                scheduledAt: { gte: dateFrom, lte: dateTo },
+                status: { in: statusFilter },
+              },
+            },
+          },
+        },
+        include: {
+          member: { include: { user: { select: { fullName: true, email: true } } } },
+          jobAssignments: {
+            where: {
+              job: {
+                scheduledAt: { gte: dateFrom, lte: dateTo },
+                status: { in: statusFilter },
+              },
+            },
+            include: {
+              job: {
+                select: {
+                  id: true,
+                  jobNumber: true,
+                  propertyAddress: true,
+                  scheduledAt: true,
+                  totalAmount: true,
+                  estimatedDurationMins: true,
+                  status: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { member: { user: { fullName: "asc" } } },
+      });
+
+      // Calculate payout per photographer
+      const payouts = staffProfiles.map((sp) => {
+        const jobs = sp.jobAssignments.map((a) => a.job);
+        const jobCount = jobs.length;
+        const totalRevenue = jobs.reduce((sum, j) => sum + (j.totalAmount ?? 0), 0);
+        const totalMins = jobs.reduce((sum, j) => sum + (j.estimatedDurationMins ?? 90), 0);
+        const totalHours = totalMins / 60;
+
+        let payoutAmount = 0;
+        let payoutBreakdown = "";
+
+        switch (sp.payType) {
+          case "PER_JOB":
+            payoutAmount = (sp.payRate ?? 0) * jobCount;
+            payoutBreakdown = `$${sp.payRate ?? 0}/job × ${jobCount} jobs`;
+            break;
+          case "HOURLY":
+            payoutAmount = (sp.payRate ?? 0) * totalHours;
+            payoutBreakdown = `$${sp.payRate ?? 0}/hr × ${totalHours.toFixed(1)} hrs`;
+            break;
+          case "COMMISSION":
+            payoutAmount = ((sp.commissionRate ?? 0) / 100) * totalRevenue;
+            payoutBreakdown = `${sp.commissionRate ?? 0}% × $${totalRevenue.toFixed(2)} revenue`;
+            break;
+          case "SALARY":
+            payoutAmount = sp.payRate ?? 0;
+            payoutBreakdown = `Salary (fixed)`;
+            break;
+        }
+
+        return {
+          staffId: sp.id,
+          name: sp.member.user.fullName,
+          email: sp.member.user.email,
+          payType: sp.payType,
+          payRate: sp.payRate,
+          commissionRate: sp.commissionRate,
+          jobCount,
+          totalRevenue,
+          totalHours: Math.round(totalHours * 10) / 10,
+          payoutAmount: Math.round(payoutAmount * 100) / 100,
+          payoutBreakdown,
+          jobs: jobs.map((j) => ({
+            jobNumber: j.jobNumber,
+            propertyAddress: j.propertyAddress,
+            scheduledAt: j.scheduledAt,
+            totalAmount: j.totalAmount,
+            estimatedDurationMins: j.estimatedDurationMins,
+            status: j.status,
+          })),
+        };
+      });
+
+      const grandTotal = payouts.reduce((sum, p) => sum + p.payoutAmount, 0);
+
+      return { payouts, grandTotal: Math.round(grandTotal * 100) / 100 };
+    }),
 });

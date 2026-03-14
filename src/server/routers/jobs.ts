@@ -9,6 +9,7 @@ import {
   notifyJobCancelled,
   notifyJobDelivered,
 } from "@/lib/notify";
+import { createCalendarEvent } from "@/lib/gcal";
 
 const JobCreateSchema = z.object({
   clientId: z.string(),
@@ -485,11 +486,12 @@ export const jobsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Fetch job + staff details for notification
+      // Fetch job + staff details for notification and calendar
       const [jobForNotify, staffForNotify] = await Promise.all([
         ctx.prisma.job.findFirst({
           where: { id: input.jobId, workspaceId: ctx.workspace.id },
           include: { client: { select: { firstName: true, lastName: true } } },
+          // estimatedDurationMins, accessNotes, propertyAddress already on Job
         }),
         ctx.prisma.staffProfile.findFirst({
           where: { id: input.staffId, workspaceId: ctx.workspace.id },
@@ -521,6 +523,34 @@ export const jobsRouter = router({
           },
         },
       });
+
+      // Fire-and-forget: push to Google Calendar if photographer has connected
+      if (jobForNotify?.scheduledAt && staffForNotify) {
+        const photographerUser = await ctx.prisma.user.findUnique({
+          where: { id: staffForNotify.member.user.id },
+          select: { googleRefreshToken: true, googleCalendarId: true },
+        });
+        if (photographerUser?.googleRefreshToken) {
+          const startAt = jobForNotify.scheduledAt;
+          const endAt = new Date(
+            startAt.getTime() + (jobForNotify.estimatedDurationMins ?? 90) * 60_000
+          );
+          createCalendarEvent(photographerUser.googleRefreshToken, {
+            title: `📷 Shoot — ${jobForNotify.propertyAddress}`,
+            description: [
+              `Job #${jobForNotify.jobNumber}`,
+              `Client: ${jobForNotify.client.firstName} ${jobForNotify.client.lastName}`,
+              jobForNotify.accessNotes ? `Access: ${jobForNotify.accessNotes}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            location: jobForNotify.propertyAddress,
+            startAt,
+            endAt,
+            calendarId: photographerUser.googleCalendarId ?? "primary",
+          }).catch(console.error);
+        }
+      }
 
       // Fire-and-forget: notify the photographer
       if (jobForNotify && staffForNotify?.member.user.email && jobForNotify.scheduledAt) {
