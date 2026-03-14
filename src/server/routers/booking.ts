@@ -123,7 +123,7 @@ export const bookingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const workspace = await ctx.prisma.workspace.findUnique({
         where: { slug: input.slug },
-        select: { id: true, name: true, timezone: true, invoiceNextNumber: true },
+        select: { id: true, name: true, timezone: true, invoiceNextNumber: true, invoicePrefix: true },
       });
 
       if (!workspace) {
@@ -163,8 +163,15 @@ export const bookingRouter = router({
           });
         }
 
-        // Generate job number
-        const jobNumber = generateJobNumber(workspace.invoiceNextNumber);
+        // Generate job number and increment counter
+        await tx.workspace.update({
+          where: { id: workspace.id },
+          data: { invoiceNextNumber: { increment: 1 } },
+        });
+        const jobNumber = generateJobNumber(
+          workspace.invoicePrefix ?? "JOB",
+          workspace.invoiceNextNumber
+        );
 
         // Determine financials from package
         const subtotal = pkg?.price ?? 0;
