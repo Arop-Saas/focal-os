@@ -49,7 +49,7 @@ function PortalLanding() {
     setLoading(true);
     setError(null);
     try {
-      await fetch("/api/portal/request-access", {
+      const res = await fetch("/api/portal/request-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -61,9 +61,15 @@ function PortalLanding() {
           workspaceSlug,
         }),
       });
-      setView("request-sent");
-    } catch {
-      setError("Something went wrong. Please try again.");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      } else {
+        setView("request-sent");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -82,11 +88,13 @@ function PortalLanding() {
         body: JSON.stringify({ email: email.trim(), workspaceSlug }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Something went wrong");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
 
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+        return;
+      }
       setView("sent");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -126,7 +134,7 @@ function PortalLanding() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">I have an account</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Log in with your email address.</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Access your portal instantly with your email.</p>
                   </div>
                   <ArrowRight className="w-4 h-4 text-gray-300 ml-auto group-hover:text-blue-400 transition-colors" />
                 </button>
@@ -174,7 +182,7 @@ function PortalLanding() {
 
               <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in</h1>
               <p className="text-sm text-gray-500 mb-8">
-                Enter your email and we&apos;ll send you a sign-in link.
+                Enter your email address to access your portal.
               </p>
 
               {error && (
@@ -209,7 +217,7 @@ function PortalLanding() {
                   {loading ? (
                     <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <>Send sign-in link <ArrowRight className="w-4 h-4" /></>
+                    <>Sign in <ArrowRight className="w-4 h-4" /></>
                   )}
                 </button>
               </form>

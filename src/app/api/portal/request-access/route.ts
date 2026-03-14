@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { generatePortalToken, MAGIC_LINK_TTL_MS } from "@/lib/portal-auth";
-import { resend, EMAIL_FROM } from "@/lib/resend";
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,29 +59,7 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
     const magicLink = `${baseUrl}/api/portal/verify?token=${encodeURIComponent(token)}&slug=${workspaceSlug}`;
 
-    // Email the client their sign-in link
-    await resend.emails.send({
-      from: EMAIL_FROM,
-      to: normalizedEmail,
-      subject: `Welcome to the ${workspace.name} Client Portal`,
-      html: `
-        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;background:#ffffff;">
-          <div style="margin-bottom:32px;">
-            <div style="width:40px;height:40px;background:${workspace.brandColor ?? "#1B4F9E"};border-radius:10px;display:inline-flex;align-items:center;justify-content:center;">
-              <span style="color:white;font-size:20px;">📷</span>
-            </div>
-          </div>
-          <h2 style="color:#0f172a;font-size:22px;font-weight:700;margin:0 0 8px;">Welcome, ${firstName}!</h2>
-          <p style="color:#64748b;margin:0 0 24px;">Your account has been created for the <strong>${workspace.name}</strong> client portal. Click below to sign in and get started.</p>
-          <a href="${magicLink}" style="display:inline-block;background:${workspace.brandColor ?? "#1B4F9E"};color:white;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;margin-bottom:24px;">
-            Access your portal →
-          </a>
-          <p style="color:#94a3b8;font-size:13px;margin:0;">This link expires in 15 minutes. You can always request a new one from the portal sign-in page.</p>
-        </div>
-      `,
-    });
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, redirectUrl: magicLink });
   } catch (err) {
     console.error("[portal/request-access]", err);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
