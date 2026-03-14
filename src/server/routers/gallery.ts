@@ -257,7 +257,7 @@ export const galleryRouter = router({
       });
 
       // Fire delivery notification (fire-and-forget)
-      const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/gallery/${gallery.slug}`;
+      const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/g/${gallery.slug}`;
       notifyJobDelivered({
         workspaceId: ctx.workspace.id,
         jobId: gallery.jobId,

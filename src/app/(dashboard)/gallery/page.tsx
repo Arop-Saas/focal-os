@@ -24,7 +24,7 @@ export default function GalleryPage() {
   const filtered = galleries.filter((g) => filter === "all" || g.status === filter);
 
   const copyLink = (slug: string, id: string) => {
-    const url = `${window.location.origin}/gallery/${slug}`;
+    const url = `${window.location.origin}/g/${slug}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);

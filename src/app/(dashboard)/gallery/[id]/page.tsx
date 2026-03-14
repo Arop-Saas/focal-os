@@ -156,8 +156,8 @@ export default function GalleryDetailPage() {
 
   const shareUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/gallery/${gallery?.slug}`
-      : `/gallery/${gallery?.slug}`;
+      ? `${window.location.origin}/g/${gallery?.slug}`
+      : `/g/${gallery?.slug}`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(shareUrl).then(() => {

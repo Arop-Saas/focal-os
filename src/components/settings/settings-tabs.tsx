@@ -122,6 +122,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
       <div className="max-w-2xl">
         {/* GENERAL TAB */}
         {activeTab === "general" && (
+          <div className="space-y-6">
           <form onSubmit={handleGeneralSave} className="space-y-6">
             <div className="bg-white rounded-xl border p-6 space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Workspace Information</h3>
@@ -299,6 +300,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
             <p className="text-xs text-gray-400">
               You&apos;ll be redirected to Google to authorize access to your calendar. We only request permission to create and manage events.
             </p>
+          </div>
           </div>
         )}
 
