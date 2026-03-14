@@ -280,7 +280,7 @@ function GalleryView({
 
 export default function GalleryPage() {
   const params = useParams();
-  const slug = params?.slug as string;
+  const slug = params?.id as string;
   const [password, setPassword] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
 
