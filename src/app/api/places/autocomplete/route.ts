@@ -35,5 +35,10 @@ export async function GET(req: NextRequest) {
     secondaryText: p.structured_formatting?.secondary_text ?? "",
   }));
 
+  // Temporary debug: expose Google status (never exposes the key)
+  if (req.nextUrl.searchParams.get("debug") === "1") {
+    return NextResponse.json({ status: data.status, error_message: data.error_message, predictions });
+  }
+
   return NextResponse.json({ predictions });
 }
