@@ -7,9 +7,10 @@ import { format } from "date-fns";
 import { formatCurrency, JOB_STATUS_COLORS, JOB_STATUS_LABELS, cn } from "@/lib/utils";
 import {
   MapPin, Calendar, Package, User, Clock, FileText,
-  ArrowLeft, Receipt, Images, Phone, Mail, Building2,
+  ArrowLeft, Receipt, Phone, Mail, Building2,
 } from "lucide-react";
 import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
+import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
 
 export const dynamic = "force-dynamic";
 
@@ -297,34 +298,11 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               </div>
 
               {/* Gallery */}
-              <div className="bg-white rounded-xl border p-5">
-                <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Images className="w-4 h-4 text-gray-400" /> Gallery
-                </h2>
-                {job.gallery ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={cn(
-                        "text-xs font-semibold px-2 py-0.5 rounded-full",
-                        job.gallery.status === "DELIVERED" ? "bg-green-100 text-green-700" :
-                        job.gallery.status === "READY" ? "bg-blue-100 text-blue-700" :
-                        "bg-yellow-100 text-yellow-700"
-                      )}>
-                        {job.gallery.status}
-                      </span>
-                      <span className="text-xs text-gray-500">{job.gallery.mediaCount} files</span>
-                    </div>
-                    <Link
-                      href={`/gallery/${job.gallery.slug}`}
-                      className="mt-2 block text-center text-xs font-semibold text-blue-600 hover:text-blue-700 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors"
-                    >
-                      View Gallery
-                    </Link>
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-400 text-center py-3">No gallery yet</p>
-                )}
-              </div>
+              <JobGalleryCard
+                jobId={job.id}
+                propertyAddress={job.propertyAddress}
+                gallery={job.gallery}
+              />
 
               {/* Status history */}
               {job.statusHistory.length > 0 && (
