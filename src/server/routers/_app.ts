@@ -8,6 +8,7 @@ import { invoicesRouter } from "./invoices";
 import { schedulingRouter } from "./scheduling";
 import { bookingRouter } from "./booking";
 import { galleryRouter } from "./gallery";
+import { notificationsRouter } from "./notifications";
 
 export const appRouter = router({
   workspace: workspaceRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   scheduling: schedulingRouter,
   booking: bookingRouter,
   gallery: galleryRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

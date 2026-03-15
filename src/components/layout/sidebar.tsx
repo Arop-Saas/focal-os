@@ -16,10 +16,10 @@ import {
   DollarSign,
   Settings,
   Aperture,
-  Bell,
   LogOut,
   ShieldAlert,
 } from "lucide-react";
+import { NotificationBell } from "./notification-bell";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -158,13 +158,7 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
           <Settings className="h-[15px] w-[15px] text-slate-500" />
           Settings
         </Link>
-        <Link
-          href="/notifications"
-          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 transition-all"
-        >
-          <Bell className="h-[15px] w-[15px] text-slate-500" />
-          Notifications
-        </Link>
+        <NotificationBell />
       </div>
 
       {/* Operator Console — superAdmin only */}

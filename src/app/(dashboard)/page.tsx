@@ -85,7 +85,7 @@ export default async function DashboardPage() {
       _sum: { amountPaid: true },
     }),
     prisma.invoice.aggregate({
-      where: { workspaceId: workspace.id, status: { in: ["SENT", "VIEWED", "PARTIAL"] } },
+      where: { workspaceId: workspace.id, status: { in: ["SENT", "VIEWED", "PARTIAL", "OVERDUE"] } },
       _sum: { amountDue: true },
     }),
     prisma.client.count({ where: { workspaceId: workspace.id, status: "ACTIVE" } }),

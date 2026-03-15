@@ -14,8 +14,11 @@ import {
   Edit3,
   Bell,
   ArrowUpRight,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { MarkReadOnMount } from "@/components/notifications/mark-read-on-mount";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Notifications" };
@@ -101,6 +104,24 @@ const ACTION_MAP: Record<string, ActionMeta> = {
     label: (m) => `Invoice voided · ${m.invoiceNumber ?? ""}`,
     href: (id) => `/invoices/${id}`,
   },
+  "invoice.overdue": {
+    icon: AlertTriangle,
+    color: "bg-red-100 text-red-600",
+    label: (m) =>
+      `Invoice overdue · ${m.invoiceNumber ?? ""}${
+        m.amountDue != null
+          ? ` · ${formatCurrency(m.amountDue as number)} past due`
+          : ""
+      }`,
+    href: (id) => `/invoices/${id}`,
+  },
+  "invoice.resent": {
+    icon: RefreshCw,
+    color: "bg-blue-100 text-blue-600",
+    label: (m) =>
+      `Invoice resent to ${m.clientName ?? "client"} · ${m.invoiceNumber ?? ""}`,
+    href: (id) => `/invoices/${id}`,
+  },
 };
 
 const FALLBACK: ActionMeta = {
@@ -154,6 +175,7 @@ export default async function NotificationsPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
+      <MarkReadOnMount />
       <Header
         title="Activity Feed"
         description={`${logs.length} recent event${logs.length !== 1 ? "s" : ""}`}
