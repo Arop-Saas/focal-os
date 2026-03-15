@@ -20,7 +20,7 @@ export default async function SettingsPage() {
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header title="Settings" description="Manage workspace settings and preferences" />
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-gray-50">
         <SettingsTabs workspace={workspace} />
       </div>
     </div>
