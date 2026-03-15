@@ -45,7 +45,10 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
     }),
   };
 
-  const [invoices, total] = await Promise.all([
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [invoices, total, statsOutstanding, statsOverdue, statsPaidThisMonth] = await Promise.all([
     prisma.invoice.findMany({
       where,
       include: {
@@ -57,6 +60,27 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
       take: limit,
     }),
     prisma.invoice.count({ where }),
+    // Outstanding: sum of amountDue for unpaid invoices (all, not filtered)
+    prisma.invoice.aggregate({
+      where: {
+        workspaceId,
+        status: { in: ["DRAFT", "SENT", "VIEWED", "PARTIAL", "OVERDUE"] },
+      },
+      _sum: { amountDue: true },
+    }),
+    // Overdue count
+    prisma.invoice.count({
+      where: { workspaceId, status: "OVERDUE" },
+    }),
+    // Paid this month
+    prisma.invoice.aggregate({
+      where: {
+        workspaceId,
+        status: "PAID",
+        paidAt: { gte: startOfMonth },
+      },
+      _sum: { totalAmount: true },
+    }),
   ]);
 
   return (
@@ -78,6 +102,9 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
           total={total}
           page={page}
           limit={limit}
+          statsOutstanding={statsOutstanding._sum.amountDue ?? 0}
+          statsOverdue={statsOverdue}
+          statsPaidThisMonth={statsPaidThisMonth._sum.totalAmount ?? 0}
         />
       </div>
     </div>

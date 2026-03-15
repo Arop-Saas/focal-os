@@ -323,6 +323,8 @@ model Package {
   price         Float
   isActive      Boolean  @default(true)
   isPopular     Boolean  @default(false)
+  photoCount    Int?
+  turnaroundDays Int?
   sortOrder     Int      @default(0)
 
   workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

@@ -397,7 +397,7 @@ function Step2Package({
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-gray-900">{pkg.name}</span>
                         {pkg.isPopular && (
                           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
@@ -407,6 +407,21 @@ function Step2Package({
                       </div>
                       {pkg.description && (
                         <p className="text-sm text-gray-500 mt-1">{pkg.description}</p>
+                      )}
+                      {/* Meta: photo count + turnaround */}
+                      {(pkg.photoCount || pkg.turnaroundDays) && (
+                        <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
+                          {pkg.photoCount && (
+                            <span className="flex items-center gap-1">
+                              📷 {pkg.photoCount} photos
+                            </span>
+                          )}
+                          {pkg.turnaroundDays && (
+                            <span className="flex items-center gap-1">
+                              ⏱ {pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery
+                            </span>
+                          )}
+                        </div>
                       )}
                       {pkg.items?.length > 0 && (
                         <ul className="mt-2 flex flex-wrap gap-1">

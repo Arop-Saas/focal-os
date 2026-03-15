@@ -91,6 +91,8 @@ export const packagesRouter = router({
         price: z.number().min(0),
         isActive: z.boolean().default(true),
         isPopular: z.boolean().default(false),
+        photoCount: z.number().int().positive().optional(),
+        turnaroundDays: z.number().int().positive().optional(),
         items: z.array(
           z.object({
             serviceId: z.string(),
@@ -126,6 +128,8 @@ export const packagesRouter = router({
         price: z.number().min(0).optional(),
         isActive: z.boolean().optional(),
         isPopular: z.boolean().optional(),
+        photoCount: z.number().int().positive().nullable().optional(),
+        turnaroundDays: z.number().int().positive().nullable().optional(),
         items: z
           .array(
             z.object({

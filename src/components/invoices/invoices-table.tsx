@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { cn, formatCurrency, formatDate, INVOICE_STATUS_COLORS } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Eye, Send, Check, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Send, Check, Trash2, RefreshCw, Search, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/trpc/client";
 
@@ -44,37 +44,30 @@ interface InvoicesTableProps {
   total: number;
   page: number;
   limit: number;
+  statsOutstanding?: number;
+  statsOverdue?: number;
+  statsPaidThisMonth?: number;
 }
 
-export function InvoicesTable({ invoices, total, page, limit }: InvoicesTableProps) {
+export function InvoicesTable({ invoices, total, page, limit, statsOutstanding, statsOverdue, statsPaidThisMonth }: InvoicesTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const totalPages = Math.ceil(total / limit);
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
 
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
+
   const sendMutation = api.invoices.send.useMutation();
+  const resendMutation = api.invoices.resend.useMutation();
   const markPaidMutation = api.invoices.markPaid.useMutation();
   const voidMutation = api.invoices.void.useMutation();
 
-  // Calculate stats
-  const stats = useMemo(() => {
-    const outstanding = invoices
-      .filter(inv => ["DRAFT", "SENT", "VIEWED", "PARTIAL", "OVERDUE"].includes(inv.status))
-      .reduce((sum, inv) => sum + inv.amountDue, 0);
-
-    const overdue = invoices.filter(inv => inv.status === "OVERDUE").length;
-    const paidThisMonth = invoices
-      .filter(inv => {
-        if (inv.status !== "PAID") return false;
-        const now = new Date();
-        const invoiceDate = new Date(inv.createdAt);
-        return invoiceDate.getMonth() === now.getMonth() &&
-          invoiceDate.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, inv) => sum + inv.totalAmount, 0);
-
-    return { outstanding, overdue, paidThisMonth };
-  }, [invoices]);
+  // Use server-side stats (accurate across all invoices, not just current page)
+  const stats = {
+    outstanding: statsOutstanding ?? 0,
+    overdue: statsOverdue ?? 0,
+    paidThisMonth: statsPaidThisMonth ?? 0,
+  };
 
   function changePage(newPage: number) {
     const params = new URLSearchParams(searchParams.toString());
@@ -124,6 +117,35 @@ export function InvoicesTable({ invoices, total, page, limit }: InvoicesTablePro
     }
   }
 
+  async function handleResend(invoiceId: string) {
+    try {
+      await resendMutation.mutateAsync({ id: invoiceId });
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to resend invoice:", error);
+    }
+  }
+
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const params = new URLSearchParams(searchParams.toString());
+    if (searchInput.trim()) {
+      params.set("search", searchInput.trim());
+    } else {
+      params.delete("search");
+    }
+    params.delete("page");
+    router.push(`?${params.toString()}`);
+  }
+
+  function clearSearch() {
+    setSearchInput("");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("search");
+    params.delete("page");
+    router.push(`?${params.toString()}`);
+  }
+
   if (invoices.length === 0) {
     return (
       <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-16 text-center">
@@ -160,8 +182,30 @@ export function InvoicesTable({ invoices, total, page, limit }: InvoicesTablePro
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Search + Filter Row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <form onSubmit={submitSearch} className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search invoices…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </form>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 flex-wrap">
         {[
           { value: "", label: "All" },
           { value: "DRAFT", label: "Draft" },
@@ -182,6 +226,7 @@ export function InvoicesTable({ invoices, total, page, limit }: InvoicesTablePro
             {tab.label}
           </button>
         ))}
+        </div>
       </div>
 
       {/* Table */}
@@ -251,20 +296,31 @@ export function InvoicesTable({ invoices, total, page, limit }: InvoicesTablePro
                   </td>
                   <td className="px-4 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button
+                      <Link
+                        href={`/invoices/${invoice.id}`}
                         title="View"
                         className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors"
                       >
                         <Eye className="h-4 w-4" />
-                      </button>
+                      </Link>
                       {invoice.status === "DRAFT" && (
                         <button
                           onClick={() => handleSend(invoice.id)}
-                          title="Send"
+                          title="Send Invoice"
                           disabled={sendMutation.isPending}
                           className="p-1.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-900 transition-colors disabled:opacity-50"
                         >
                           <Send className="h-4 w-4" />
+                        </button>
+                      )}
+                      {["SENT", "VIEWED", "PARTIAL", "OVERDUE"].includes(invoice.status) && (
+                        <button
+                          onClick={() => handleResend(invoice.id)}
+                          title="Resend Invoice"
+                          disabled={resendMutation.isPending}
+                          className="p-1.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-900 transition-colors disabled:opacity-50"
+                        >
+                          <RefreshCw className="h-4 w-4" />
                         </button>
                       )}
                       {invoice.amountDue > 0 && invoice.status !== "VOID" && (

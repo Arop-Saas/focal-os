@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, Briefcase, TrendingUp, Receipt } from "lucide-react";
+import { DollarSign, Briefcase, TrendingUp, Receipt, CheckCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface StatsOverviewProps {
@@ -8,6 +8,7 @@ interface StatsOverviewProps {
   jobsCompleted: number;
   avgJobValue: number;
   outstandingInvoices: number;
+  collectionRate?: number;
 }
 
 interface StatCardProps {
@@ -40,9 +41,10 @@ export function StatsOverview({
   jobsCompleted,
   avgJobValue,
   outstandingInvoices,
+  collectionRate,
 }: StatsOverviewProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
       <StatCard
         title="Total Revenue (YTD)"
         value={formatCurrency(totalRevenueYTD)}
@@ -65,12 +67,21 @@ export function StatsOverview({
         iconBg="bg-purple-50"
       />
       <StatCard
-        title="Outstanding Invoices"
+        title="Outstanding"
         value={formatCurrency(outstandingInvoices)}
         icon={Receipt}
         iconColor="text-orange-600"
         iconBg="bg-orange-50"
       />
+      {collectionRate !== undefined && (
+        <StatCard
+          title="Collection Rate"
+          value={`${collectionRate}%`}
+          icon={CheckCircle}
+          iconColor="text-teal-600"
+          iconBg="bg-teal-50"
+        />
+      )}
     </div>
   );
 }

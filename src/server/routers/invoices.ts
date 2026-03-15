@@ -179,8 +179,7 @@ export const invoicesRouter = router({
       }
 
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
-      // TODO: Replace with real Stripe payment link when payment portal is built
-      const paymentLink = `${APP_URL}/invoices/${invoice.id}/pay`;
+      const paymentLink = `${APP_URL}/portal/${ctx.workspace.slug}/invoices`;
 
       const updated = await ctx.prisma.invoice.update({
         where: { id: input.id },
@@ -212,12 +211,60 @@ export const invoicesRouter = router({
           clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
           invoiceNumber: invoice.invoiceNumber,
           amount: invoice.totalAmount,
-          dueDate: invoice.dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          dueDate: invoice.dueAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           paymentLink,
         });
       }
 
       return updated;
+    }),
+
+  resend: workspaceProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const invoice = await ctx.prisma.invoice.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspace.id },
+        include: { client: true },
+      });
+      if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!["SENT", "VIEWED", "PARTIAL", "OVERDUE"].includes(invoice.status)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invoice cannot be resent in its current status." });
+      }
+
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+      const paymentLink = `${APP_URL}/portal/${ctx.workspace.slug}/invoices`;
+
+      void ctx.prisma.activityLog.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          userId: ctx.user.id,
+          action: "invoice.sent",
+          entityType: "invoice",
+          entityId: input.id,
+          metadata: {
+            invoiceNumber: invoice.invoiceNumber,
+            totalAmount: invoice.totalAmount,
+            clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+            resent: true,
+          },
+        },
+      });
+
+      if (invoice.client.email) {
+        void notifyInvoiceSent({
+          workspaceId: ctx.workspace.id,
+          jobId: invoice.jobId ?? undefined,
+          userId: ctx.user.id,
+          clientEmail: invoice.client.email,
+          clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+          invoiceNumber: invoice.invoiceNumber,
+          amount: invoice.totalAmount,
+          dueDate: invoice.dueAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          paymentLink,
+        });
+      }
+
+      return invoice;
     }),
 
   markPaid: workspaceProcedure

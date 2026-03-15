@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Plus, X, ToggleRight, ToggleLeft } from "lucide-react";
+import { Plus, X, ToggleRight, ToggleLeft, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -49,6 +49,9 @@ type Package = {
   price: number;
   description?: string | null;
   isActive: boolean;
+  isPopular: boolean;
+  photoCount?: number | null;
+  turnaroundDays?: number | null;
   items: Array<{
     serviceId: string;
     quantity: number;
@@ -74,6 +77,9 @@ export function PackagesView() {
   const [packageName, setPackageName] = useState("");
   const [packagePrice, setPackagePrice] = useState("");
   const [packageDescription, setPackageDescription] = useState("");
+  const [packageIsPopular, setPackageIsPopular] = useState(false);
+  const [packagePhotoCount, setPackagePhotoCount] = useState("");
+  const [packageTurnaroundDays, setPackageTurnaroundDays] = useState("");
   const [packageServices, setPackageServices] = useState<Array<{ serviceId: string; quantity: number }>>([]);
 
   // Queries
@@ -135,12 +141,18 @@ export function PackagesView() {
         price: parseFloat(packagePrice),
         description: packageDescription || undefined,
         isActive: true,
+        isPopular: packageIsPopular,
+        photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : undefined,
+        turnaroundDays: packageTurnaroundDays ? parseInt(packageTurnaroundDays) : undefined,
         items: packageServices,
       });
       setShowPackageModal(false);
       setPackageName("");
       setPackagePrice("");
       setPackageDescription("");
+      setPackageIsPopular(false);
+      setPackagePhotoCount("");
+      setPackageTurnaroundDays("");
       setPackageServices([]);
       await refetchPackages();
     } finally {
@@ -270,8 +282,23 @@ export function PackagesView() {
                 <div key={pkg.id} className="bg-white rounded-lg border p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{pkg.name}</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">{pkg.description}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-gray-900">{pkg.name}</h3>
+                        {pkg.isPopular && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                            <Star className="h-2.5 w-2.5" /> Most Popular
+                          </span>
+                        )}
+                      </div>
+                      {pkg.description && (
+                        <p className="text-xs text-gray-500 mt-0.5">{pkg.description}</p>
+                      )}
+                      {(pkg.photoCount || pkg.turnaroundDays) && (
+                        <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
+                          {pkg.photoCount && <span>📷 {pkg.photoCount} photos</span>}
+                          {pkg.turnaroundDays && <span>⏱ {pkg.turnaroundDays}d delivery</span>}
+                        </div>
+                      )}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
                         {pkg.items.map((item) => (
                           <span
@@ -446,6 +473,45 @@ export function PackagesView() {
                   disabled={isSubmitting}
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Photos Delivered</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={packagePhotoCount}
+                    onChange={(e) => setPackagePhotoCount(e.target.value)}
+                    placeholder="e.g. 25"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Turnaround (days)</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={packageTurnaroundDays}
+                    onChange={(e) => setPackageTurnaroundDays(e.target.value)}
+                    placeholder="e.g. 2"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={packageIsPopular}
+                  onChange={(e) => setPackageIsPopular(e.target.checked)}
+                  disabled={isSubmitting}
+                  className="rounded"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Mark as Most Popular</span>
+                  <p className="text-xs text-gray-400">Shows a "Most Popular" badge on the booking page</p>
+                </div>
+              </label>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Include Services</label>
