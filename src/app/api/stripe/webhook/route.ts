@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import prisma from "@/lib/prisma";
+import { notifyInvoicePaid } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,19 +48,39 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      // Mark invoice as paid
-      await prisma.invoice.update({
+      const amountPaid = (session.amount_total ?? 0) / 100;
+      const paidAt = new Date();
+
+      // Mark invoice as paid and fetch related data for notifications
+      const updatedInvoice = await prisma.invoice.update({
         where: { id: invoiceId },
         data: {
           status: "PAID",
-          amountPaid: { increment: (session.amount_total ?? 0) / 100 },
+          amountPaid: { increment: amountPaid },
           amountDue: 0,
-          paidAt: new Date(),
+          paidAt,
           stripePaymentIntentId: session.payment_intent as string ?? null,
+        },
+        include: {
+          client: { select: { firstName: true, lastName: true, email: true } },
+          job: { select: { id: true, jobNumber: true, propertyAddress: true } },
         },
       });
 
       console.log(`Invoice ${invoiceId} marked PAID via Stripe checkout`);
+
+      // Send payment receipt email + in-app notification
+      if (updatedInvoice.client?.email) {
+        void notifyInvoicePaid({
+          workspaceId: updatedInvoice.workspaceId,
+          jobId: updatedInvoice.jobId ?? undefined,
+          clientEmail: updatedInvoice.client.email,
+          clientName: `${updatedInvoice.client.firstName} ${updatedInvoice.client.lastName}`,
+          invoiceNumber: updatedInvoice.invoiceNumber,
+          amount: amountPaid,
+          paidAt,
+        });
+      }
 
       // Also update job status to COMPLETED if gallery is delivered
       if (gallerySlug) {

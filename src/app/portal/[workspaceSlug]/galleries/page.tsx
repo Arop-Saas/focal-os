@@ -144,7 +144,7 @@ export default async function PortalGalleriesPage({
                       <div className="mt-auto pt-4">
                         {gallery.isPublic ? (
                           <a
-                            href={`/gallery/${gallery.slug}`}
+                            href={`/g/${gallery.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-white py-2 rounded-lg transition-colors"
