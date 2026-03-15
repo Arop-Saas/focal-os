@@ -18,6 +18,7 @@ import {
   Aperture,
   Bell,
   LogOut,
+  ShieldAlert,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -65,9 +66,10 @@ interface SidebarProps {
   workspaceName?: string;
   userEmail?: string;
   userAvatar?: string;
+  isSuperAdmin?: boolean;
 }
 
-export function Sidebar({ workspaceName, userEmail }: SidebarProps) {
+export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -164,6 +166,24 @@ export function Sidebar({ workspaceName, userEmail }: SidebarProps) {
           Notifications
         </Link>
       </div>
+
+      {/* Operator Console — superAdmin only */}
+      {isSuperAdmin && (
+        <div className="px-2 pb-2">
+          <Link
+            href="/admin"
+            className="group relative flex items-center gap-2.5 w-full px-2.5 py-2 rounded-md text-[12px] font-semibold transition-all duration-200 overflow-hidden
+              bg-violet-950/60 border border-violet-500/30 text-violet-300
+              hover:bg-violet-900/70 hover:border-violet-400/50 hover:text-violet-100"
+          >
+            {/* subtle pulse glow */}
+            <span className="absolute inset-0 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-violet-500/10" />
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-violet-400 group-hover:text-violet-200 transition-colors relative z-10" />
+            <span className="relative z-10 tracking-wide uppercase text-[10px]">Operator Console</span>
+            <span className="ml-auto relative z-10 h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+          </Link>
+        </div>
+      )}
 
       {/* User footer */}
       <div className="border-t border-white/[0.06] p-3">

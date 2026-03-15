@@ -44,6 +44,7 @@ export default async function DashboardLayout({
       <Sidebar
         workspaceName={workspace.name}
         userEmail={user.email}
+        isSuperAdmin={user.isSuperAdmin}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         {children}
