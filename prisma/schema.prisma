@@ -44,6 +44,15 @@ model Workspace {
   subscriptionEndsAt    DateTime?
   trialEndsAt           DateTime?
 
+  // Stripe Connect (for collecting client payments)
+  stripePublishableKey  String?
+  stripeSecretKey       String?
+  stripeWebhookSecret   String?
+
+  // Google Calendar (workspace-level OAuth)
+  googleCalendarConnected Boolean @default(false)
+  googleCalendarEmail     String?
+
   // Settings
   defaultTaxRate        Float    @default(0)
   invoicePrefix         String   @default("INV")

@@ -246,4 +246,74 @@ export const workspaceRouter = router({
       upcomingJobs,
     };
   }),
+
+  // ── Integrations ─────────────────────────────────────────────────────────
+
+  // Get integration status (masked keys)
+  getIntegrations: workspaceProcedure.query(async ({ ctx }) => {
+    const ws = await ctx.prisma.workspace.findUnique({
+      where: { id: ctx.workspace.id },
+      select: {
+        stripePublishableKey: true,
+        stripeSecretKey: true,
+        googleCalendarConnected: true,
+        googleCalendarEmail: true,
+      },
+    });
+    if (!ws) throw new TRPCError({ code: "NOT_FOUND" });
+    return {
+      stripe: {
+        connected: !!(ws.stripePublishableKey && ws.stripeSecretKey),
+        publishableKey: ws.stripePublishableKey ?? null,
+        // never return the secret key to the client — just presence
+        hasSecretKey: !!ws.stripeSecretKey,
+      },
+      googleCalendar: {
+        connected: ws.googleCalendarConnected,
+        email: ws.googleCalendarEmail ?? null,
+      },
+    };
+  }),
+
+  saveStripeKeys: workspaceProcedure
+    .input(
+      z.object({
+        publishableKey: z.string().min(1).startsWith("pk_"),
+        // secretKey is optional when editing — blank = keep existing
+        secretKey: z.string().optional(),
+        webhookSecret: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Validate secret key format only when provided
+      if (input.secretKey && !input.secretKey.startsWith("sk_")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Secret key must start with sk_" });
+      }
+
+      const data: Record<string, string | null> = {
+        stripePublishableKey: input.publishableKey,
+      };
+      if (input.secretKey) data.stripeSecretKey = input.secretKey;
+      if (input.webhookSecret !== undefined) {
+        data.stripeWebhookSecret = input.webhookSecret || null;
+      }
+
+      await ctx.prisma.workspace.update({
+        where: { id: ctx.workspace.id },
+        data,
+      });
+      return { ok: true };
+    }),
+
+  disconnectStripe: workspaceProcedure.mutation(async ({ ctx }) => {
+    await ctx.prisma.workspace.update({
+      where: { id: ctx.workspace.id },
+      data: {
+        stripePublishableKey: null,
+        stripeSecretKey: null,
+        stripeWebhookSecret: null,
+      },
+    });
+    return { ok: true };
+  }),
 });

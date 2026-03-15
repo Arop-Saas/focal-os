@@ -14,7 +14,9 @@ import {
   Copy,
   Check,
   Calendar,
+  Puzzle,
 } from "lucide-react";
+import { IntegrationsTab } from "./integrations-tab";
 
 const TIMEZONES = [
   "America/New_York",
@@ -44,7 +46,7 @@ interface NotificationPreferences {
 }
 
 export function SettingsTabs({ workspace }: SettingsTabsProps) {
-  const [activeTab, setActiveTab] = useState<"general" | "branding" | "billing" | "notifications">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "branding" | "billing" | "notifications" | "integrations">("general");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedPortal, setCopiedPortal] = useState(false);
@@ -105,6 +107,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
     { id: "branding", label: "Branding", icon: Palette },
     { id: "billing", label: "Billing", icon: CreditCard },
     { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "integrations", label: "Integrations", icon: Puzzle },
   ] as const;
 
   return (
@@ -586,6 +589,11 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
               </Button>
             </div>
           </div>
+        )}
+
+        {/* INTEGRATIONS TAB */}
+        {activeTab === "integrations" && (
+          <IntegrationsTab />
         )}
       </div>
     </div>
