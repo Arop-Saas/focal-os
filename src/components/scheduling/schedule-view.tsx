@@ -16,6 +16,11 @@ import {
   LayoutGrid,
   List,
   Layers,
+  Camera,
+  Package,
+  DollarSign,
+  FileText,
+  Zap,
 } from "lucide-react";
 import {
   format,
@@ -62,12 +67,23 @@ type BaseJob = {
   propertyAddress: string;
   propertyCity: string;
   propertyState: string;
+  propertyType?: string;
   scheduledAt: Date;
   estimatedDurationMins: number;
   status: string;
-  client: { firstName: string; lastName: string };
+  totalAmount?: number;
+  isRush?: boolean;
+  internalNotes?: string | null;
+  priority?: string;
+  client: {
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string | null;
+  };
+  package?: { name: string } | null;
   assignments: Array<{
-    staff: { member: { user: { fullName: string } } };
+    staff: { member: { user: { fullName: string; avatarUrl?: string | null } } };
   }>;
 };
 
@@ -363,121 +379,231 @@ function DispatchTimeline() {
 }
 
 // ---------------------------------------------------------------------------
-// Job detail sheet
+// Job side panel
 // ---------------------------------------------------------------------------
 
-function JobDetailSheet({
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  RESIDENTIAL:      "Residential",
+  COMMERCIAL:       "Commercial",
+  LAND:             "Land",
+  MULTI_FAMILY:     "Multi-Family",
+  RENTAL:           "Rental",
+  NEW_CONSTRUCTION: "New Construction",
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  LOW:    "text-gray-500 bg-gray-50 border-gray-200",
+  NORMAL: "text-blue-600 bg-blue-50 border-blue-200",
+  HIGH:   "text-orange-600 bg-orange-50 border-orange-200",
+  URGENT: "text-red-600 bg-red-50 border-red-200",
+};
+
+function PanelRow({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
+      <div className="h-7 w-7 rounded-lg bg-gray-50 flex items-center justify-center shrink-0 mt-0.5">
+        <Icon className="h-3.5 w-3.5 text-gray-400" />
+      </div>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
+
+function JobSidePanel({
   job,
   onClose,
 }: {
-  job: DispatchJob | BaseJob;
+  job: DispatchJob | BaseJob | null;
   onClose: () => void;
 }) {
-  const statusColor = JOB_STATUS_COLORS[(job as DispatchJob).status] ?? "bg-gray-100 border-gray-300 text-gray-700";
-  const dispatchJob = job as DispatchJob;
+  const isOpen = !!job;
+  const dispatchJob = job as DispatchJob | null;
+  const baseJob = job as BaseJob | null;
+
+  const statusColor = job ? (JOB_STATUS_COLORS[job.status] ?? "bg-gray-100 border-gray-300 text-gray-700") : "";
+  const startTime  = job ? new Date(job.scheduledAt) : null;
+  const endTime    = job && startTime ? addMinutes(startTime, job.estimatedDurationMins) : null;
+  const photographer = baseJob?.assignments?.[0]?.staff?.member?.user;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/40 flex items-end sm:items-center sm:justify-end p-4 z-50"
-      onClick={onClose}
-    >
+    <>
+      {/* Backdrop */}
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-sm"
-        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "fixed inset-0 bg-black/25 z-40 transition-opacity duration-200",
+          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onClose}
+      />
+
+      {/* Side panel */}
+      <div
+        className={cn(
+          "fixed top-0 right-0 h-full w-[400px] bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col transition-transform duration-200 ease-out",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
       >
-        <div className="p-5">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                {job.jobNumber}
-              </span>
-              <h3 className="text-base font-semibold text-gray-900 mt-0.5">
-                {job.client.firstName} {job.client.lastName}
-              </h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors text-lg leading-none"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Status badge */}
-          <span className={cn("inline-block text-xs font-semibold px-2 py-0.5 rounded border mb-4", statusColor)}>
-            {job.status.replace("_", " ")}
-          </span>
-
-          {/* Details */}
-          <div className="space-y-3">
-            <div className="flex items-start gap-2.5">
-              <MapPin className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-gray-800">{job.propertyAddress}</p>
-                <p className="text-xs text-gray-500">{job.propertyCity}, {job.propertyState}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5">
-              <Clock className="h-4 w-4 text-gray-400 shrink-0" />
-              <div>
-                <p className="text-sm text-gray-800">
-                  {format(new Date(job.scheduledAt), "h:mm a")}
-                  {" · "}
-                  {format(
-                    addMinutes(new Date(job.scheduledAt), job.estimatedDurationMins),
-                    "h:mm a"
+        {job && (
+          <>
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest font-mono">
+                    #{job.jobNumber}
+                  </span>
+                  {baseJob?.isRush && (
+                    <span className="flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                      <Zap className="h-2.5 w-2.5" /> RUSH
+                    </span>
                   )}
-                </p>
-                <p className="text-xs text-gray-500">{job.estimatedDurationMins} min</p>
+                  {baseJob?.priority && baseJob.priority !== "NORMAL" && (
+                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border uppercase tracking-wide", PRIORITY_COLORS[baseJob.priority] ?? "")}>
+                      {baseJob.priority}
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-[15px] font-semibold text-gray-900 leading-tight">
+                  {job.client.firstName} {job.client.lastName}
+                </h3>
+                <span className={cn("inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wide", statusColor)}>
+                  {job.status.replace(/_/g, " ")}
+                </span>
               </div>
+              <button
+                onClick={onClose}
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0 mt-0.5"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
-            {"assignments" in job && (job as BaseJob).assignments?.length > 0 && (
-              <div className="flex items-center gap-2.5">
-                <User className="h-4 w-4 text-gray-400 shrink-0" />
-                <p className="text-sm text-gray-800">
-                  {(job as BaseJob).assignments[0].staff.member.user.fullName}
-                </p>
-              </div>
-            )}
-
-            {/* Travel info if from dispatch view */}
-            {dispatchJob.travelFromPreviousMins !== undefined && (
-              <div className="flex items-center gap-2.5">
-                <Car className="h-4 w-4 text-gray-400 shrink-0" />
-                <p className="text-sm text-gray-800">
-                  {dispatchJob.travelFromPreviousMins} min drive from previous job
-                </p>
-              </div>
-            )}
-
-            {dispatchJob.hasConflict && (
-              <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-lg p-3">
+            {/* Conflict warning */}
+            {dispatchJob?.hasConflict && (
+              <div className="mx-5 mt-3 flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-red-700">Travel conflict</p>
-                  <p className="text-xs text-red-600 mt-0.5">
-                    Not enough time between consecutive jobs.
-                  </p>
+                  <p className="text-xs font-semibold text-red-700">Travel conflict detected</p>
+                  <p className="text-[11px] text-red-500 mt-0.5">Not enough travel time between consecutive jobs.</p>
                 </div>
               </div>
             )}
-          </div>
 
-          <div className="mt-5">
-            <Link
-              href={`/jobs/${job.id}`}
-              onClick={onClose}
-              className="block w-full text-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
-            >
-              Open Job
-            </Link>
-          </div>
-        </div>
+            {/* Details */}
+            <div className="flex-1 overflow-y-auto px-5 py-2">
+
+              {/* Property */}
+              <PanelRow icon={MapPin}>
+                <p className="text-[13px] font-semibold text-gray-900">{job.propertyAddress}</p>
+                <p className="text-[12px] text-gray-500 mt-0.5">{job.propertyCity}, {job.propertyState}</p>
+                {baseJob?.propertyType && (
+                  <span className="inline-block mt-1 text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                    {PROPERTY_TYPE_LABELS[baseJob.propertyType] ?? baseJob.propertyType}
+                  </span>
+                )}
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(job.propertyAddress + " " + job.propertyCity + " " + job.propertyState)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-1.5 text-[11px] text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  Open in Maps →
+                </a>
+              </PanelRow>
+
+              {/* Date & Time */}
+              <PanelRow icon={Clock}>
+                <p className="text-[13px] font-semibold text-gray-900">
+                  {startTime && format(startTime, "EEEE, MMMM d, yyyy")}
+                </p>
+                <p className="text-[12px] text-gray-600 mt-0.5">
+                  {startTime && format(startTime, "h:mm a")}
+                  {endTime && <span className="text-gray-400"> → {format(endTime, "h:mm a")}</span>}
+                  <span className="text-gray-400 ml-2">· {job.estimatedDurationMins} min</span>
+                </p>
+                {dispatchJob?.travelFromPreviousMins !== undefined && (
+                  <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
+                    <Car className="h-3 w-3" />
+                    {dispatchJob.travelFromPreviousMins} min drive from previous job
+                  </p>
+                )}
+              </PanelRow>
+
+              {/* Client */}
+              <PanelRow icon={User}>
+                <p className="text-[13px] font-semibold text-gray-900">
+                  {job.client.firstName} {job.client.lastName}
+                </p>
+                {job.client.phone && (
+                  <a href={`tel:${job.client.phone}`} className="block text-[12px] text-blue-600 hover:underline mt-0.5">
+                    {job.client.phone}
+                  </a>
+                )}
+                {(job.client as BaseJob["client"]).email && (
+                  <a href={`mailto:${(job.client as BaseJob["client"]).email}`} className="block text-[12px] text-blue-600 hover:underline mt-0.5 truncate">
+                    {(job.client as BaseJob["client"]).email}
+                  </a>
+                )}
+              </PanelRow>
+
+              {/* Photographer */}
+              {photographer && (
+                <PanelRow icon={Camera}>
+                  <p className="text-[13px] font-semibold text-gray-900">{photographer.fullName}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Primary photographer</p>
+                </PanelRow>
+              )}
+
+              {/* Package */}
+              {baseJob?.package && (
+                <PanelRow icon={Package}>
+                  <p className="text-[13px] font-semibold text-gray-900">{baseJob.package.name}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Package</p>
+                </PanelRow>
+              )}
+
+              {/* Financials */}
+              {(baseJob?.totalAmount ?? 0) > 0 && (
+                <PanelRow icon={DollarSign}>
+                  <p className="text-[15px] font-bold text-gray-900">
+                    ${baseJob!.totalAmount!.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Job total</p>
+                </PanelRow>
+              )}
+
+              {/* Notes */}
+              {baseJob?.internalNotes && (
+                <PanelRow icon={FileText}>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Internal Notes</p>
+                  <p className="text-[12px] text-gray-700 leading-relaxed">{baseJob.internalNotes}</p>
+                </PanelRow>
+              )}
+            </div>
+
+            {/* Footer actions */}
+            <div className="border-t border-gray-100 p-4 space-y-2">
+              <Link
+                href={`/jobs/${job.id}`}
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold rounded-xl transition-colors"
+              >
+                Open Full Job
+              </Link>
+              <Link
+                href={`/invoices/new?jobId=${job.id}`}
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-[13px] font-semibold rounded-xl transition-colors border border-gray-200"
+              >
+                Create Invoice
+              </Link>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -823,13 +949,11 @@ export function ScheduleView({ jobs }: ScheduleViewProps) {
         )}
       </div>
 
-      {/* Job detail sheet */}
-      {selectedJob && (
-        <JobDetailSheet
-          job={selectedJob}
-          onClose={() => setSelectedJob(null)}
-        />
-      )}
+      {/* Job side panel */}
+      <JobSidePanel
+        job={selectedJob}
+        onClose={() => setSelectedJob(null)}
+      />
     </div>
   );
 }

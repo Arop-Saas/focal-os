@@ -40,8 +40,10 @@ export default async function SchedulingPage() {
           firstName: true,
           lastName: true,
           email: true,
+          phone: true,
         },
       },
+      package: { select: { name: true } },
       assignments: {
         where: { isPrimary: true },
         include: {
