@@ -8,6 +8,7 @@ import { z } from "zod";
 import { trpc } from "@/lib/trpc/client";
 import { formatCurrency } from "@/lib/utils";
 import { Loader2, ChevronDown } from "lucide-react";
+import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
 
 const schema = z.object({
   clientId: z.string().min(1, "Select a client"),
@@ -206,10 +207,16 @@ export function NewJobForm({ clients, packages, services, staff }: NewJobFormPro
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
             Street address <span className="text-red-500">*</span>
           </label>
-          <input
-            {...register("propertyAddress")}
+          <AddressAutocomplete
+            value={watch("propertyAddress") ?? ""}
+            onChange={(v) => setValue("propertyAddress", v, { shouldValidate: true })}
+            onSelect={(result) => {
+              if (result.streetAddress) setValue("propertyAddress", result.streetAddress, { shouldValidate: true });
+              if (result.city) setValue("propertyCity", result.city, { shouldValidate: true });
+              if (result.state) setValue("propertyState", result.state, { shouldValidate: true });
+              if (result.zip) setValue("propertyZip", result.zip);
+            }}
             placeholder="123 Oak Street"
-            className="w-full rounded-lg border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {errors.propertyAddress && <p className="mt-1 text-xs text-red-600">{errors.propertyAddress.message}</p>}
         </div>

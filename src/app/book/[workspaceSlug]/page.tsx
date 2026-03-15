@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
+import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -218,7 +219,21 @@ function Step1Property({ form, setForm }: { form: FormData; setForm: (f: FormDat
         <p className="text-sm text-gray-500 mt-1">Tell us about the property we'll be photographing.</p>
       </div>
       <Field label="Property Address" required>
-        <Input value={form.propertyAddress} onChange={set("propertyAddress")} placeholder="123 Main St" required />
+        <AddressAutocomplete
+          value={form.propertyAddress}
+          onChange={set("propertyAddress")}
+          onSelect={(result) =>
+            setForm({
+              ...form,
+              propertyAddress: result.streetAddress || form.propertyAddress,
+              propertyCity: result.city || form.propertyCity,
+              propertyState: result.state || form.propertyState,
+              propertyZip: result.zip || form.propertyZip,
+            })
+          }
+          placeholder="123 Main St"
+          required
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="City" required>
