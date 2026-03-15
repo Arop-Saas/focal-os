@@ -119,6 +119,7 @@ export const workspaceRouter = router({
         defaultTaxRate: z.number().min(0).max(100).optional(),
         invoicePrefix: z.string().max(10).optional(),
         brandColor: z.string().optional(),
+        logoUrl: z.string().url().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
