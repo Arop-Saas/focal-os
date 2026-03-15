@@ -1,8 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
-import { format, subDays } from "date-fns";
+import { format, subDays, subWeeks, startOfWeek, addDays } from "date-fns";
 import Link from "next/link";
-import { ArrowUpRight, TrendingUp, Zap, Users, Building2, DollarSign, Clock, Activity } from "lucide-react";
+import {
+  ArrowUpRight,
+  TrendingUp,
+  Zap,
+  Users,
+  Building2,
+  DollarSign,
+  Clock,
+  Activity,
+  AlertTriangle,
+  XCircle,
+  TimerReset,
+} from "lucide-react";
+import { WorkspaceGrowthChart, RevenueChart } from "@/components/admin/growth-chart";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +34,13 @@ function StatCard({
 }) {
   const colors = {
     violet: { border: "border-violet-500/20", glow: "shadow-violet-500/10", icon: "text-violet-400", val: "text-violet-100" },
-    cyan: { border: "border-cyan-500/20", glow: "shadow-cyan-500/10", icon: "text-cyan-400", val: "text-cyan-100" },
-    green: { border: "border-emerald-500/20", glow: "shadow-emerald-500/10", icon: "text-emerald-400", val: "text-emerald-100" },
-    amber: { border: "border-amber-500/20", glow: "shadow-amber-500/10", icon: "text-amber-400", val: "text-amber-100" },
+    cyan:   { border: "border-cyan-500/20",   glow: "shadow-cyan-500/10",   icon: "text-cyan-400",   val: "text-cyan-100"   },
+    green:  { border: "border-emerald-500/20", glow: "shadow-emerald-500/10", icon: "text-emerald-400", val: "text-emerald-100" },
+    amber:  { border: "border-amber-500/20",  glow: "shadow-amber-500/10",  icon: "text-amber-400",  val: "text-amber-100"  },
   }[accent];
 
   return (
     <div className={`relative bg-[#0d0d1a] rounded-xl border ${colors.border} p-5 shadow-lg ${colors.glow} overflow-hidden`}>
-      {/* Background grid */}
       <div className="absolute inset-0 opacity-[0.03]"
         style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "20px 20px" }}
       />
@@ -47,12 +59,14 @@ function StatCard({
 export default async function AdminPage() {
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
-  const sevenDaysAgo = subDays(now, 7);
+  const sevenDaysAgo  = subDays(now, 7);
+  const twelveWeeksAgo = subWeeks(now, 12);
 
   const [
     totalWorkspaces,
     activeWorkspaces,
     trialingWorkspaces,
+    pastDueWorkspaces,
     newLast30,
     newLast7,
     totalUsers,
@@ -60,10 +74,18 @@ export default async function AdminPage() {
     totalInvoices,
     recentWorkspaces,
     revenueResult,
+    // Growth chart data
+    workspacesForChart,
+    paidInvoicesForChart,
+    // At-risk
+    expiringTrials,
+    pastDueList,
+    dormantWorkspaces,
   ] = await Promise.all([
     prisma.workspace.count(),
     prisma.workspace.count({ where: { subscriptionStatus: "ACTIVE" } }),
     prisma.workspace.count({ where: { subscriptionStatus: "TRIALING" } }),
+    prisma.workspace.count({ where: { subscriptionStatus: "PAST_DUE" } }),
     prisma.workspace.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     prisma.workspace.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.user.count(),
@@ -85,16 +107,81 @@ export default async function AdminPage() {
       _sum: { amountPaid: true },
       where: { status: "PAID" },
     }),
+    // chart: workspace createdAt for last 12 weeks
+    prisma.workspace.findMany({
+      where: { createdAt: { gte: twelveWeeksAgo } },
+      select: { createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    // chart: paid invoice amounts for last 12 weeks
+    prisma.invoice.findMany({
+      where: { status: "PAID", paidAt: { gte: twelveWeeksAgo } },
+      select: { paidAt: true, amountPaid: true },
+    }),
+    // alerts: trials expiring in next 7 days
+    prisma.workspace.findMany({
+      where: {
+        subscriptionStatus: "TRIALING",
+        trialEndsAt: { gte: now, lte: addDays(now, 7) },
+      },
+      select: { id: true, name: true, trialEndsAt: true },
+      orderBy: { trialEndsAt: "asc" },
+      take: 10,
+    }),
+    // alerts: past due
+    prisma.workspace.findMany({
+      where: { subscriptionStatus: "PAST_DUE" },
+      select: { id: true, name: true, subscriptionEndsAt: true },
+      orderBy: { subscriptionEndsAt: "asc" },
+      take: 10,
+    }),
+    // alerts: dormant — created > 14 days ago, zero jobs
+    prisma.workspace.findMany({
+      where: {
+        createdAt: { lte: subDays(now, 14) },
+        jobs: { none: {} },
+        subscriptionStatus: { not: "CANCELED" },
+      },
+      select: { id: true, name: true, createdAt: true, subscriptionStatus: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
   ]);
 
   const totalRevenue = revenueResult._sum.amountPaid ?? 0;
 
+  // Build 12-week growth buckets
+  const weekSlots: { date: string; key: string }[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const ws = startOfWeek(subWeeks(now, i));
+    weekSlots.push({ date: format(ws, "MMM d"), key: format(ws, "yyyy-MM-dd") });
+  }
+
+  const signupBuckets: Record<string, number> = {};
+  const revenueBuckets: Record<string, number> = {};
+  weekSlots.forEach(({ key }) => { signupBuckets[key] = 0; revenueBuckets[key] = 0; });
+
+  workspacesForChart.forEach((ws) => {
+    const key = format(startOfWeek(ws.createdAt), "yyyy-MM-dd");
+    if (key in signupBuckets) signupBuckets[key]++;
+  });
+  paidInvoicesForChart.forEach((inv) => {
+    if (!inv.paidAt) return;
+    const key = format(startOfWeek(inv.paidAt), "yyyy-MM-dd");
+    if (key in revenueBuckets) revenueBuckets[key] += inv.amountPaid;
+  });
+
+  const growthData  = weekSlots.map(({ date, key }) => ({ date, signups: signupBuckets[key] }));
+  const revenueData = weekSlots.map(({ date, key }) => ({ date, revenue: Math.round(revenueBuckets[key]) }));
+
+  const totalAlerts = expiringTrials.length + pastDueList.length + dormantWorkspaces.length;
+
   const statusColor: Record<string, string> = {
-    ACTIVE: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    ACTIVE:   "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
     TRIALING: "text-violet-400 bg-violet-500/10 border-violet-500/20",
     PAST_DUE: "text-amber-400 bg-amber-500/10 border-amber-500/20",
     CANCELED: "text-red-400 bg-red-500/10 border-red-500/20",
-    PAUSED: "text-slate-400 bg-slate-500/10 border-slate-500/20",
+    PAUSED:   "text-slate-400 bg-slate-500/10 border-slate-500/20",
   };
 
   return (
@@ -111,19 +198,162 @@ export default async function AdminPage() {
             {format(now, "EEEE, MMMM d yyyy · HH:mm:ss 'UTC'")}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold tracking-widest uppercase bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          All Systems Nominal
+        <div className="flex items-center gap-3">
+          {totalAlerts > 0 && (
+            <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-bold tracking-widest uppercase bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded">
+              <AlertTriangle className="h-3 w-3" />
+              {totalAlerts} Alert{totalAlerts !== 1 ? "s" : ""}
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold tracking-widest uppercase bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            All Systems Nominal
+          </div>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-4 gap-4">
         <StatCard label="Total Workspaces" value={totalWorkspaces} sub={`+${newLast30} this month`} icon={Building2} accent="violet" />
-        <StatCard label="Active Subscribers" value={activeWorkspaces} sub={`${trialingWorkspaces} in trial`} icon={Zap} accent="cyan" />
+        <StatCard label="Active Subscribers" value={activeWorkspaces} sub={`${trialingWorkspaces} in trial · ${pastDueWorkspaces} past due`} icon={Zap} accent="cyan" />
         <StatCard label="Total Users" value={totalUsers} sub="across all workspaces" icon={Users} accent="green" />
         <StatCard label="Platform Revenue" value={`$${totalRevenue.toLocaleString()}`} sub="total invoiced & paid" icon={DollarSign} accent="amber" />
       </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-[#0d0d1a] rounded-xl border border-[#ffffff08] p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500 flex items-center gap-2">
+              <TrendingUp className="h-3 w-3 text-violet-500" /> Workspace Growth
+            </p>
+            <span className="text-[9px] text-slate-600 font-mono">last 12 weeks</span>
+          </div>
+          <WorkspaceGrowthChart data={growthData} />
+          <div className="mt-3 flex gap-4">
+            <div>
+              <p className="text-[9px] text-slate-600 uppercase tracking-widest">Last 7d</p>
+              <p className="text-sm font-bold text-violet-300">+{newLast7}</p>
+            </div>
+            <div>
+              <p className="text-[9px] text-slate-600 uppercase tracking-widest">Last 30d</p>
+              <p className="text-sm font-bold text-violet-300">+{newLast30}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#0d0d1a] rounded-xl border border-[#ffffff08] p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500 flex items-center gap-2">
+              <DollarSign className="h-3 w-3 text-emerald-500" /> Revenue Collected
+            </p>
+            <span className="text-[9px] text-slate-600 font-mono">last 12 weeks</span>
+          </div>
+          <RevenueChart data={revenueData} />
+          <div className="mt-3">
+            <p className="text-[9px] text-slate-600 uppercase tracking-widest">All time</p>
+            <p className="text-sm font-bold text-emerald-300">${totalRevenue.toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* At-Risk Alerts */}
+      {totalAlerts > 0 && (
+        <div className="bg-[#0d0d1a] rounded-xl border border-amber-500/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-[#ffffff08]">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+            <p className="text-[10px] font-bold tracking-widest uppercase text-amber-400">
+              Attention Required — {totalAlerts} Workspace{totalAlerts !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-[#ffffff06]">
+
+            {/* Expiring trials */}
+            <div className="p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <TimerReset className="h-3 w-3 text-violet-400" />
+                <p className="text-[9px] font-bold tracking-widest uppercase text-violet-400">
+                  Trials Expiring ({expiringTrials.length})
+                </p>
+              </div>
+              {expiringTrials.length === 0 ? (
+                <p className="text-[10px] text-slate-600">None this week</p>
+              ) : (
+                <div className="space-y-2">
+                  {expiringTrials.map((ws) => (
+                    <Link key={ws.id} href={`/admin/workspaces/${ws.id}`}
+                      className="flex items-center justify-between group">
+                      <p className="text-[11px] text-slate-300 group-hover:text-violet-300 transition-colors truncate max-w-[140px]">
+                        {ws.name}
+                      </p>
+                      <span className="text-[9px] text-slate-600 font-mono shrink-0 ml-2">
+                        {ws.trialEndsAt ? format(new Date(ws.trialEndsAt), "MMM d") : "—"}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Past due */}
+            <div className="p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <XCircle className="h-3 w-3 text-amber-400" />
+                <p className="text-[9px] font-bold tracking-widest uppercase text-amber-400">
+                  Past Due ({pastDueList.length})
+                </p>
+              </div>
+              {pastDueList.length === 0 ? (
+                <p className="text-[10px] text-slate-600">None</p>
+              ) : (
+                <div className="space-y-2">
+                  {pastDueList.map((ws) => (
+                    <Link key={ws.id} href={`/admin/workspaces/${ws.id}`}
+                      className="flex items-center justify-between group">
+                      <p className="text-[11px] text-slate-300 group-hover:text-amber-300 transition-colors truncate max-w-[140px]">
+                        {ws.name}
+                      </p>
+                      {ws.subscriptionEndsAt && (
+                        <span className="text-[9px] text-slate-600 font-mono shrink-0 ml-2">
+                          {format(new Date(ws.subscriptionEndsAt), "MMM d")}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Dormant */}
+            <div className="p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Clock className="h-3 w-3 text-slate-500" />
+                <p className="text-[9px] font-bold tracking-widest uppercase text-slate-500">
+                  No Activity ({dormantWorkspaces.length})
+                </p>
+              </div>
+              {dormantWorkspaces.length === 0 ? (
+                <p className="text-[10px] text-slate-600">None</p>
+              ) : (
+                <div className="space-y-2">
+                  {dormantWorkspaces.map((ws) => (
+                    <Link key={ws.id} href={`/admin/workspaces/${ws.id}`}
+                      className="flex items-center justify-between group">
+                      <p className="text-[11px] text-slate-300 group-hover:text-slate-200 transition-colors truncate max-w-[120px]">
+                        {ws.name}
+                      </p>
+                      <span className={`text-[8px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded border shrink-0 ml-1 ${statusColor[ws.subscriptionStatus] ?? statusColor.PAUSED}`}>
+                        {ws.subscriptionStatus}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Secondary stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -152,7 +382,7 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* Recent workspaces */}
+      {/* Recent workspaces table */}
       <div className="bg-[#0d0d1a] rounded-xl border border-[#ffffff08] overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#ffffff08]">
           <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500 flex items-center gap-2">
@@ -202,6 +432,7 @@ export default async function AdminPage() {
           </tbody>
         </table>
       </div>
+
     </div>
   );
 }

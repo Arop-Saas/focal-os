@@ -4,6 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowLeft, Briefcase, Users, Receipt, Image, CreditCard, Globe, Mail, Phone } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { WorkspaceAdminActions } from "@/components/admin/workspace-admin-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +206,12 @@ export default async function AdminWorkspaceDetailPage({ params }: { params: { i
               ))}
             </div>
           </div>
+
+          {/* Operator Controls */}
+          <WorkspaceAdminActions
+            workspaceId={workspace.id}
+            currentStatus={workspace.subscriptionStatus as "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "PAUSED"}
+          />
 
           {/* Activity */}
           {recentActivity.length > 0 && (
