@@ -352,8 +352,13 @@ export const galleryRouter = router({
       const gallery = await ctx.prisma.gallery.findUnique({
         where: { slug: input.slug },
         include: {
-          workspace: { select: { name: true, logoUrl: true, brandColor: true } },
-          job: { select: { propertyAddress: true, propertyCity: true, propertyState: true } },
+          workspace: { select: { name: true, logoUrl: true, brandColor: true, stripeSecretKey: true } },
+          job: {
+            select: {
+              propertyAddress: true, propertyCity: true, propertyState: true,
+              invoice: { select: { id: true, status: true, totalAmount: true, amountDue: true } },
+            },
+          },
           media: {
             orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }],
             select: {
@@ -397,14 +402,29 @@ export const galleryRouter = router({
         }
       }
 
+      // Check invoice payment gate
+      const invoice = gallery.job.invoice;
+      const isPaid = !invoice || invoice.status === "PAID";
+      const requiresPayment = !isPaid;
+
       // Increment view count (fire-and-forget)
       ctx.prisma.gallery.update({
         where: { slug: input.slug },
         data: { viewCount: { increment: 1 } },
       }).catch(() => {});
 
+      // Strip secret key from workspace before returning
+      const { stripeSecretKey: _secret, ...workspacePublic } = gallery.workspace;
+
       return {
         requiresPassword: false as const,
+        requiresPayment,
+        paymentInfo: requiresPayment && invoice ? {
+          invoiceId: invoice.id,
+          amountDue: invoice.amountDue,
+          totalAmount: invoice.totalAmount,
+          hasStripe: !!_secret,
+        } : null,
         gallery: {
           id: gallery.id,
           name: gallery.name,
@@ -416,7 +436,8 @@ export const galleryRouter = router({
           propertyAddress: gallery.job.propertyAddress,
           propertyCity: gallery.job.propertyCity,
           propertyState: gallery.job.propertyState,
-          workspace: gallery.workspace,
+          workspace: workspacePublic,
+          // If unpaid: return media for blur preview but flag them
           media: gallery.media,
         },
       };
