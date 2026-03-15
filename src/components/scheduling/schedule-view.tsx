@@ -898,15 +898,15 @@ const STATUS_DOT_COLOR: Record<string, string> = {
 };
 
 const STATUS_PILL_COLOR: Record<string, string> = {
-  PENDING:      "bg-yellow-50 border-yellow-200 text-yellow-800",
-  CONFIRMED:    "bg-blue-50 border-blue-200 text-blue-800",
-  ASSIGNED:     "bg-indigo-50 border-indigo-200 text-indigo-800",
-  IN_PROGRESS:  "bg-green-50 border-green-200 text-green-800",
-  EDITING:      "bg-purple-50 border-purple-200 text-purple-800",
-  REVIEW:       "bg-orange-50 border-orange-200 text-orange-800",
-  DELIVERED:    "bg-teal-50 border-teal-200 text-teal-800",
-  COMPLETED:    "bg-gray-50 border-gray-200 text-gray-600",
-  ON_HOLD:      "bg-orange-50 border-orange-200 text-orange-800",
+  PENDING:      "bg-yellow-100 border-l-yellow-400 text-yellow-900",
+  CONFIRMED:    "bg-blue-100 border-l-blue-500 text-blue-900",
+  ASSIGNED:     "bg-indigo-100 border-l-indigo-500 text-indigo-900",
+  IN_PROGRESS:  "bg-green-100 border-l-green-500 text-green-900",
+  EDITING:      "bg-purple-100 border-l-purple-500 text-purple-900",
+  REVIEW:       "bg-orange-100 border-l-orange-500 text-orange-900",
+  DELIVERED:    "bg-teal-100 border-l-teal-500 text-teal-900",
+  COMPLETED:    "bg-gray-100 border-l-gray-400 text-gray-700",
+  ON_HOLD:      "bg-orange-100 border-l-orange-400 text-orange-900",
 };
 
 function MonthGridView({
@@ -952,9 +952,9 @@ function MonthGridView({
   return (
     <div className="bg-white rounded-xl border overflow-hidden">
       {/* Day-of-week header */}
-      <div className="grid grid-cols-7 border-b">
+      <div className="grid grid-cols-7 border-b bg-gray-50">
         {DAY_LABELS.map((label) => (
-          <div key={label} className="py-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          <div key={label} className="py-2.5 text-center text-xs font-bold text-gray-500 uppercase tracking-widest">
             {label}
           </div>
         ))}
@@ -974,18 +974,18 @@ function MonthGridView({
             <div
               key={dayKey}
               className={cn(
-                "min-h-[110px] p-1.5 border-b border-r",
-                !isCurrentMonth && "bg-gray-50/60"
+                "min-h-[140px] p-2 border-b border-r",
+                !isCurrentMonth && "bg-gray-50/70"
               )}
             >
               {/* Day number */}
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <button
                   onClick={() => onDayClick(day)}
                   className={cn(
-                    "h-6 w-6 rounded-full flex items-center justify-center text-[12px] font-semibold transition-colors",
+                    "h-7 w-7 rounded-full flex items-center justify-center text-sm font-bold transition-colors",
                     isToday
-                      ? "bg-blue-600 text-white"
+                      ? "bg-blue-600 text-white shadow-sm"
                       : isCurrentMonth
                       ? "text-gray-800 hover:bg-gray-100"
                       : "text-gray-300 hover:bg-gray-100"
@@ -994,37 +994,44 @@ function MonthGridView({
                   {format(day, "d")}
                 </button>
                 {dayJobs.length > 0 && (
-                  <span className="text-[10px] text-gray-400 font-medium">
-                    {dayJobs.length} job{dayJobs.length !== 1 ? "s" : ""}
+                  <span className={cn(
+                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                    isCurrentMonth ? "bg-gray-100 text-gray-500" : "text-gray-300"
+                  )}>
+                    {dayJobs.length}
                   </span>
                 )}
               </div>
 
               {/* Job pills */}
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {visibleJobs.map((job) => (
                   <button
                     key={job.id}
                     onClick={() => onJobClick(job)}
                     className={cn(
-                      "flex items-center gap-1 w-full text-left px-1.5 py-0.5 rounded text-[10px] border leading-tight hover:opacity-80 transition-opacity truncate",
-                      STATUS_PILL_COLOR[job.status] ?? "bg-gray-50 border-gray-200 text-gray-700"
+                      "w-full text-left px-2 py-1.5 rounded-md border-l-[3px] leading-tight hover:brightness-95 transition-all group",
+                      STATUS_PILL_COLOR[job.status] ?? "bg-gray-100 border-l-gray-400 text-gray-700"
                     )}
                   >
-                    <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", STATUS_DOT_COLOR[job.status] ?? "bg-gray-400")} />
-                    <span className="font-semibold shrink-0">
-                      {format(new Date(job.scheduledAt), "h:mma")}
-                    </span>
-                    <span className="truncate text-[9px] opacity-75">
-                      {job.client.firstName} {job.client.lastName}
-                    </span>
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-[11px] font-bold shrink-0 tabular-nums">
+                        {format(new Date(job.scheduledAt), "h:mma")}
+                      </span>
+                      <span className="truncate text-[11px] font-medium opacity-80">
+                        {job.client.firstName} {job.client.lastName}
+                      </span>
+                    </div>
+                    <div className="text-[10px] opacity-60 truncate mt-0.5">
+                      {job.propertyAddress}
+                    </div>
                   </button>
                 ))}
 
                 {overflow > 0 && (
                   <button
                     onClick={() => onDayClick(day)}
-                    className="w-full text-left px-1.5 py-0.5 text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                    className="w-full text-left px-2 py-1 text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors hover:bg-blue-50 rounded-md"
                   >
                     +{overflow} more
                   </button>
