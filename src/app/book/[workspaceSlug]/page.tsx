@@ -149,7 +149,7 @@ const STATES_PROVINCES: { value: string; label: string; group: string }[] = [
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ current, total }: { current: Step; total: number }) {
+function StepIndicator({ current, total, brandColor }: { current: Step; total: number; brandColor: string }) {
   const labels = ["Property", "Package", "Date & Time", "Your Info", "Review"];
   return (
     <div className="flex items-center gap-2 mb-8">
@@ -162,26 +162,29 @@ function StepIndicator({ current, total }: { current: Step; total: number }) {
             <div className="flex flex-col items-center gap-1">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-                  done
-                    ? "bg-green-500 text-white"
-                    : active
-                    ? "bg-blue-600 text-white ring-4 ring-blue-100"
-                    : "bg-gray-100 text-gray-400"
+                  !done && !active ? "bg-gray-100 text-gray-400" : "text-white"
                 }`}
+                style={
+                  done
+                    ? { backgroundColor: brandColor }
+                    : active
+                    ? { backgroundColor: brandColor, boxShadow: `0 0 0 4px ${brandColor}33` }
+                    : undefined
+                }
               >
                 {done ? "✓" : stepNum}
               </div>
               <span
-                className={`text-xs hidden sm:block ${
-                  active ? "text-blue-600 font-medium" : "text-gray-400"
-                }`}
+                className="text-xs hidden sm:block"
+                style={active ? { color: brandColor, fontWeight: 500 } : { color: "#9ca3af" }}
               >
                 {label}
               </span>
             </div>
             {i < total - 1 && (
               <div
-                className={`flex-1 h-0.5 mb-4 ${done ? "bg-green-400" : "bg-gray-200"}`}
+                className="flex-1 h-0.5 mb-4"
+                style={{ backgroundColor: done ? brandColor : "#e5e7eb" }}
               />
             )}
           </div>
@@ -364,11 +367,13 @@ function Step2Package({
   form,
   setForm,
   packages,
+  brandColor,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   packages: any[];
+  brandColor: string;
 }) {
   return (
     <div className="space-y-4">
@@ -390,10 +395,9 @@ function Step2Package({
                   type="button"
                   onClick={() => setForm({ ...form, packageId: pkg.id })}
                   className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                    selected
-                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
-                      : "border-gray-200 hover:border-gray-300 bg-white"
+                    selected ? "bg-white" : "border-gray-200 hover:border-gray-300 bg-white"
                   }`}
+                  style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 3px ${brandColor}22` } : undefined}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -442,9 +446,8 @@ function Step2Package({
                         ${pkg.price.toLocaleString()}
                       </div>
                       <div
-                        className={`w-5 h-5 mt-2 ml-auto rounded-full border-2 flex items-center justify-center ${
-                          selected ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                        }`}
+                        className="w-5 h-5 mt-2 ml-auto rounded-full border-2 flex items-center justify-center"
+                        style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
                       >
                         {selected && (
                           <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
@@ -470,10 +473,12 @@ function Step3DateTime({
   form,
   setForm,
   workspaceSlug,
+  brandColor,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   workspaceSlug: string;
+  brandColor: string;
 }) {
   // Show a 4-week rolling calendar
   const today = startOfDay(new Date());
@@ -528,19 +533,18 @@ function Step3DateTime({
                 type="button"
                 disabled={past}
                 onClick={() => setForm({ ...form, scheduledDate: iso, scheduledTime: "" })}
-                className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm transition-all ${
+                className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-medium transition-all ${
                   selected
-                    ? "bg-blue-600 text-white font-semibold"
+                    ? "text-white font-semibold"
                     : past
                     ? "text-gray-200 cursor-not-allowed"
-                    : isWeekend
-                    ? "text-blue-700 hover:bg-blue-50"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
+                style={selected ? { backgroundColor: brandColor } : undefined}
               >
                 <span>{day.getDate()}</span>
                 {isToday(day) && !selected && (
-                  <span className="w-1 h-1 rounded-full bg-blue-400 mt-0.5" />
+                  <span className="w-1 h-1 rounded-full mt-0.5" style={{ backgroundColor: brandColor }} />
                 )}
               </button>
             );
@@ -566,11 +570,12 @@ function Step3DateTime({
                   onClick={() => setForm({ ...form, scheduledTime: slot.value })}
                   className={`py-2 px-3 rounded-lg text-sm border transition-all ${
                     selected
-                      ? "bg-blue-600 border-blue-600 text-white font-medium"
+                      ? "text-white font-medium"
                       : blocked
                       ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed line-through"
-                      : "border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-700"
+                      : "border-gray-200 text-gray-700 hover:border-gray-300"
                   }`}
+                  style={selected ? { backgroundColor: brandColor, borderColor: brandColor } : undefined}
                 >
                   {slot.label}
                 </button>
@@ -804,29 +809,37 @@ export default function BookingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-10">
+      {/* Brand accent bar + Header */}
+      <div className="h-1 sticky top-0 z-20" style={{ backgroundColor: brandColor }} />
+      <header className="bg-white border-b border-gray-100 py-4 px-6 sticky top-1 z-10 shadow-sm">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          {workspace.logoUrl && (
+          {workspace.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={workspace.logoUrl} alt={workspace.name} className="h-8 w-auto" />
+            <img src={workspace.logoUrl} alt={workspace.name} className="h-8 w-auto object-contain" />
+          ) : (
+            <div
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
+              style={{ backgroundColor: brandColor }}
+            >
+              {workspace.name?.[0]?.toUpperCase() ?? "?"}
+            </div>
           )}
           <div>
-            <h1 className="font-semibold text-gray-900 text-sm sm:text-base">{workspace.name}</h1>
-            <p className="text-xs text-gray-400">Real Estate Photography</p>
+            <h1 className="font-semibold text-gray-900 text-sm sm:text-base leading-tight">{workspace.name}</h1>
+            <p className="text-xs text-gray-400 leading-tight">Book a shoot</p>
           </div>
         </div>
       </header>
 
       {/* Content */}
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <StepIndicator current={step} total={5} />
+        <StepIndicator current={step} total={5} brandColor={brandColor} />
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
           {step === 1 && <Step1Property form={form} setForm={setForm} />}
-          {step === 2 && <Step2Package form={form} setForm={setForm} packages={packages} />}
+          {step === 2 && <Step2Package form={form} setForm={setForm} packages={packages} brandColor={brandColor} />}
           {step === 3 && (
-            <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} />
+            <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} />
           )}
           {step === 4 && <Step4Contact form={form} setForm={setForm} />}
           {step === 5 && <Step5Review form={form} packages={packages} />}
@@ -883,11 +896,9 @@ export default function BookingPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 mt-6">
-          Powered by FocalOS · Questions?{" "}
+          {workspace.name}
           {workspace.email && (
-            <a href={`mailto:${workspace.email}`} className="underline">
-              {workspace.email}
-            </a>
+            <> · <a href={`mailto:${workspace.email}`} className="underline hover:text-gray-600 transition-colors">{workspace.email}</a></>
           )}
         </p>
       </main>

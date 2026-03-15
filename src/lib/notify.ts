@@ -141,7 +141,7 @@ export async function notifyJobAssigned({
       : []),
     // Email to photographer
     sendJobAssignedEmail({
-      to: photographerEmail, photographerName, jobNumber,
+      to: photographerEmail, photographerName, jobId, jobNumber,
       propertyAddress, scheduledAt, clientName, accessNotes,
     }).then(() =>
       prisma.notification.create({

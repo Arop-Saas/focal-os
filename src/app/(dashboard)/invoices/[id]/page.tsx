@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 import { Header } from "@/components/layout/header";
 import { format } from "date-fns";
 import { formatCurrency, INVOICE_STATUS_COLORS, cn } from "@/lib/utils";
-import { ArrowLeft, User, MapPin, Clock, Receipt } from "lucide-react";
+import { ArrowLeft, User, MapPin, Clock, Receipt, Download } from "lucide-react";
 import { InvoiceActions } from "@/components/invoices/invoice-actions";
 
 export const dynamic = "force-dynamic";
@@ -57,12 +57,22 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         title={invoice.invoiceNumber}
         description={`${invoice.client.firstName} ${invoice.client.lastName}`}
         actions={
-          <Link
-            href="/invoices"
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to invoices
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/invoices/${params.id}/print`}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-200 hover:border-gray-300 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" /> Download PDF
+            </Link>
+            <Link
+              href="/invoices"
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to invoices
+            </Link>
+          </div>
         }
       />
 

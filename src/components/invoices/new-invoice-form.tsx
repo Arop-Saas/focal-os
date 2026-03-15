@@ -224,7 +224,7 @@ export function NewInvoiceForm({
       </div>
 
       {/* Totals + Extras */}
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
         {/* Left: tax, discount, due date, notes */}
         <div className="bg-white rounded-xl border p-5 space-y-4">

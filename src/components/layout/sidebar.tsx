@@ -108,9 +108,19 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
         {navGroups.map((group) => (
           <div key={group.label ?? "main"}>
             {group.label && (
-              <p className="px-2.5 mb-1 text-[9px] font-semibold uppercase tracking-widest text-slate-600">
-                {group.label}
-              </p>
+              <div className="px-2 mb-2 mt-1">
+                <span
+                  className="inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md"
+                  style={{
+                    color: "#e0f2fe",
+                    background: "rgba(56,189,248,0.18)",
+                    border: "1px solid rgba(56,189,248,0.35)",
+                    boxShadow: "0 0 8px rgba(56,189,248,0.4), inset 0 0 6px rgba(56,189,248,0.1)",
+                  }}
+                >
+                  {group.label}
+                </span>
+              </div>
             )}
             <div className="space-y-px">
               {group.items.map((item) => {

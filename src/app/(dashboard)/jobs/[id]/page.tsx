@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
+import { JobAssignmentPicker } from "@/components/jobs/job-assignment-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,9 @@ export default async function JobDetailPage({ params }: { params: { id: string }
 
   if (!job) notFound();
 
-  const primaryPhotographer = job.assignments.find((a) => a.isPrimary)?.staff.member.user;
+  const primaryAssignment = job.assignments.find((a) => a.isPrimary);
+  const primaryPhotographer = primaryAssignment?.staff.member.user;
+  const primaryStaffProfileId = primaryAssignment?.staff.id;
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -140,10 +143,12 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                     <p className="text-gray-700">{job.estimatedDurationMins} min estimated</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Photographer</p>
-                    {primaryPhotographer
-                      ? <p className="font-medium text-gray-900">{primaryPhotographer.fullName}</p>
-                      : <p className="text-gray-400 italic text-xs">Unassigned</p>}
+                    <p className="text-xs text-gray-400 mb-1.5">Photographer</p>
+                    <JobAssignmentPicker
+                      jobId={job.id}
+                      currentStaffProfileId={primaryStaffProfileId}
+                      currentAssigneeName={primaryPhotographer?.fullName}
+                    />
                   </div>
                   <div>
                     <p className="text-xs text-gray-400 mb-0.5">Created</p>

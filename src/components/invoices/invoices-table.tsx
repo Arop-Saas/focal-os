@@ -167,7 +167,7 @@ export function InvoicesTable({ invoices, total, page, limit, statsOutstanding, 
   return (
     <div className="space-y-4">
       {/* Stats Bar */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white rounded-lg border p-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Outstanding</p>
           <p className="text-xl font-semibold text-gray-900">{formatCurrency(stats.outstanding)}</p>

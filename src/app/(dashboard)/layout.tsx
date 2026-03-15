@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
-import { Sidebar } from "@/components/layout/sidebar";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 
 export default async function DashboardLayout({
   children,
@@ -40,15 +40,12 @@ export default async function DashboardLayout({
   const workspace = user.workspaces[0].workspace;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar
-        workspaceName={workspace.name}
-        userEmail={user.email}
-        isSuperAdmin={user.isSuperAdmin}
-      />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {children}
-      </main>
-    </div>
+    <DashboardShell
+      workspaceName={workspace.name}
+      userEmail={user.email}
+      isSuperAdmin={user.isSuperAdmin}
+    >
+      {children}
+    </DashboardShell>
   );
 }
