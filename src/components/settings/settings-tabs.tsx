@@ -417,15 +417,16 @@ function BrandingTab({ workspace }: { workspace: Workspace }) {
     setLogoUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("type", "logo");
     try {
-      const res = await fetch("/api/gallery/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/workspace/logo-upload", { method: "POST", body: formData });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
-        setLogoUrl(data.cdnUrl);
+        setLogoUrl(data.logoUrl);
+      } else {
+        console.error("Logo upload failed:", data.error);
       }
-    } catch {
-      // silently fail — user can retry
+    } catch (err) {
+      console.error("Logo upload error:", err);
     } finally {
       setLogoUploading(false);
     }
