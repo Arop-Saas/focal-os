@@ -8,6 +8,35 @@ interface DashboardStatsProps {
   revenueDelta: number;
   pendingInvoicesTotal: number;
   activeClients: number;
+  weeklyRevenue?: number[];
+}
+
+// Inline SVG sparkline — server-rendered, zero client JS
+function Sparkline({ data }: { data: number[] }) {
+  if (!data.length || data.every((v) => v === 0)) {
+    return <div className="h-8 w-20 border-b border-emerald-200 opacity-30 shrink-0" />;
+  }
+  const max = Math.max(...data, 1);
+  const W = 80; const H = 32;
+  const pts = data.map((v, i) => {
+    const x = ((i / (data.length - 1)) * W).toFixed(1);
+    const y = (H - (v / max) * H).toFixed(1);
+    return `${x},${y}`;
+  });
+  const line = `M ${pts.join(" L ")}`;
+  const fill = `${line} L ${W},${H} L 0,${H} Z`;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible shrink-0">
+      <defs>
+        <linearGradient id="spk-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={fill} fill="url(#spk-fill)" />
+      <path d={line} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 interface StatCardProps {
@@ -17,10 +46,10 @@ interface StatCardProps {
   deltaLabel?: string;
   icon: React.ElementType;
   accentColor: string;
-  prefix?: string;
+  children?: React.ReactNode;
 }
 
-function StatCard({ title, value, delta, deltaLabel, icon: Icon, accentColor, prefix }: StatCardProps) {
+function StatCard({ title, value, delta, deltaLabel, icon: Icon, accentColor, children }: StatCardProps) {
   const isPositive = (delta ?? 0) >= 0;
   const TrendIcon = delta === undefined || delta === 0 ? Minus : isPositive ? TrendingUp : TrendingDown;
 
@@ -33,26 +62,23 @@ function StatCard({ title, value, delta, deltaLabel, icon: Icon, accentColor, pr
         </div>
       </div>
 
-      <div>
-        <p className="text-[26px] font-bold text-gray-900 tabular-nums leading-none tracking-tight">
-          {prefix}{value}
-        </p>
-        {deltaLabel && (
-          <p className="text-[11px] text-gray-400 mt-1.5">{deltaLabel}</p>
-        )}
+      <div className="flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[26px] font-bold text-gray-900 tabular-nums leading-none tracking-tight">
+            {value}
+          </p>
+          {deltaLabel && (
+            <p className="text-[11px] text-gray-400 mt-1.5">{deltaLabel}</p>
+          )}
+        </div>
+        {children}
       </div>
 
       {delta !== undefined && (
         <div className="flex items-center gap-1.5 pt-0.5 border-t border-gray-50">
-          <div
-            className={`flex items-center gap-1 text-[11px] font-semibold ${
-              delta === 0
-                ? "text-gray-400"
-                : isPositive
-                ? "text-emerald-600"
-                : "text-red-500"
-            }`}
-          >
+          <div className={`flex items-center gap-1 text-[11px] font-semibold ${
+            delta === 0 ? "text-gray-400" : isPositive ? "text-emerald-600" : "text-red-500"
+          }`}>
             <TrendIcon className="h-3 w-3" />
             {Math.abs(delta)}%
           </div>
@@ -70,6 +96,7 @@ export function DashboardStats({
   revenueDelta,
   pendingInvoicesTotal,
   activeClients,
+  weeklyRevenue = [],
 }: DashboardStatsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -86,7 +113,9 @@ export function DashboardStats({
         delta={revenueDelta}
         icon={DollarSign}
         accentColor="bg-emerald-500"
-      />
+      >
+        {weeklyRevenue.length > 0 && <Sparkline data={weeklyRevenue} />}
+      </StatCard>
       <StatCard
         title="Outstanding"
         value={formatCurrency(pendingInvoicesTotal)}
