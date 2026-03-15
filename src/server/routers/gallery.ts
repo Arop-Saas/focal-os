@@ -129,7 +129,7 @@ export const galleryRouter = router({
         storageKey: z.string(),
         cdnUrl: z.string(),
         mediaType: z
-          .enum(["PHOTO", "VIDEO", "DRONE_PHOTO", "DRONE_VIDEO", "FLOOR_PLAN"])
+          .enum(["PHOTO", "VIDEO", "DRONE_PHOTO", "DRONE_VIDEO", "FLOOR_PLAN", "VIRTUAL_TOUR"])
           .default("PHOTO"),
         isCover: z.boolean().default(false),
       })
@@ -199,6 +199,59 @@ export const galleryRouter = router({
       });
 
       return { success: true };
+    }),
+
+  // Add a virtual tour link (Matterport, iGuide, or any iframe-embeddable URL)
+  addVirtualTour: workspaceProcedure
+    .input(
+      z.object({
+        galleryId: z.string(),
+        url: z.string().url("Please enter a valid URL."),
+        label: z.string().optional(), // e.g. "Matterport Tour", "iGuide Tour"
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const gallery = await ctx.prisma.gallery.findFirst({
+        where: { id: input.galleryId, workspaceId: ctx.workspace.id },
+      });
+      if (!gallery) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Detect provider from URL for a friendly label
+      let autoLabel = input.label ?? "Virtual Tour";
+      const lower = input.url.toLowerCase();
+      if (lower.includes("matterport.com")) autoLabel = input.label ?? "Matterport 3D Tour";
+      else if (lower.includes("iguide.ca") || lower.includes("iguide.com")) autoLabel = input.label ?? "iGuide Tour";
+      else if (lower.includes("kuula.co")) autoLabel = input.label ?? "Kuula Tour";
+      else if (lower.includes("my.tour") || lower.includes("360.com")) autoLabel = input.label ?? "360° Tour";
+
+      const count = await ctx.prisma.galleryMedia.count({
+        where: { galleryId: input.galleryId },
+      });
+
+      const media = await ctx.prisma.galleryMedia.create({
+        data: {
+          galleryId: input.galleryId,
+          fileName: `virtual-tour-${Date.now()}`,
+          originalName: autoLabel,
+          mimeType: "text/html",
+          fileSize: 0,
+          storageKey: "",
+          cdnUrl: input.url,
+          mediaType: "VIRTUAL_TOUR",
+          sortOrder: count,
+          isCover: false,
+        },
+      });
+
+      await ctx.prisma.gallery.update({
+        where: { id: input.galleryId },
+        data: {
+          mediaCount: { increment: 1 },
+          status: gallery.status === "PROCESSING" ? "READY" : gallery.status,
+        },
+      });
+
+      return media;
     }),
 
   // Set cover photo

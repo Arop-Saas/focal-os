@@ -5,10 +5,7 @@ import prisma from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Max file size: 25MB
-const MAX_FILE_SIZE = 25 * 1024 * 1024;
-
-const ALLOWED_TYPES = new Set([
+const IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
   "image/png",
@@ -16,6 +13,23 @@ const ALLOWED_TYPES = new Set([
   "image/heic",
   "image/tiff",
 ]);
+
+const VIDEO_TYPES = new Set([
+  "video/mp4",
+  "video/quicktime",   // .mov
+  "video/x-msvideo",  // .avi
+  "video/x-matroska", // .mkv
+  "video/webm",
+]);
+
+const MAX_IMAGE_SIZE = 25 * 1024 * 1024;   // 25 MB
+const MAX_VIDEO_SIZE = 500 * 1024 * 1024;  // 500 MB
+
+function getMediaType(mimeType: string): { mediaType: "PHOTO" | "VIDEO"; maxSize: number } {
+  if (IMAGE_TYPES.has(mimeType)) return { mediaType: "PHOTO", maxSize: MAX_IMAGE_SIZE };
+  if (VIDEO_TYPES.has(mimeType)) return { mediaType: "VIDEO", maxSize: MAX_VIDEO_SIZE };
+  return { mediaType: "PHOTO", maxSize: MAX_IMAGE_SIZE }; // fallback (rejected below)
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,17 +68,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate file type
-    if (!ALLOWED_TYPES.has(file.type)) {
+    const isImage = IMAGE_TYPES.has(file.type);
+    const isVideo = VIDEO_TYPES.has(file.type);
+    if (!isImage && !isVideo) {
       return NextResponse.json(
-        { error: `File type not allowed: ${file.type}. Use JPEG, PNG, WebP, HEIC, or TIFF.` },
+        { error: `File type not allowed: ${file.type}. Photos: JPEG, PNG, WebP, HEIC, TIFF · Videos: MP4, MOV, AVI, MKV, WebM.` },
         { status: 400 }
       );
     }
 
     // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
+    const { mediaType, maxSize } = getMediaType(file.type);
+    if (file.size > maxSize) {
+      const limitLabel = isVideo ? "500MB" : "25MB";
       return NextResponse.json(
-        { error: `File too large. Maximum size is 25MB.` },
+        { error: `File too large. Maximum size is ${limitLabel}.` },
         { status: 400 }
       );
     }
@@ -108,6 +126,7 @@ export async function POST(req: NextRequest) {
       originalName: file.name,
       mimeType: file.type,
       fileSize: file.size,
+      mediaType,
     });
   } catch (err) {
     console.error("Upload route error:", err);
