@@ -78,11 +78,73 @@ const PROPERTY_TYPES = [
   { value: "NEW_CONSTRUCTION", label: "New Construction" },
 ];
 
-const US_STATES = [
-  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
-  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
-  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
-  "VA","WA","WV","WI","WY","DC",
+const STATES_PROVINCES: { value: string; label: string; group: string }[] = [
+  // US States
+  { value: "AL", label: "Alabama", group: "US" },
+  { value: "AK", label: "Alaska", group: "US" },
+  { value: "AZ", label: "Arizona", group: "US" },
+  { value: "AR", label: "Arkansas", group: "US" },
+  { value: "CA", label: "California", group: "US" },
+  { value: "CO", label: "Colorado", group: "US" },
+  { value: "CT", label: "Connecticut", group: "US" },
+  { value: "DE", label: "Delaware", group: "US" },
+  { value: "FL", label: "Florida", group: "US" },
+  { value: "GA", label: "Georgia", group: "US" },
+  { value: "HI", label: "Hawaii", group: "US" },
+  { value: "ID", label: "Idaho", group: "US" },
+  { value: "IL", label: "Illinois", group: "US" },
+  { value: "IN", label: "Indiana", group: "US" },
+  { value: "IA", label: "Iowa", group: "US" },
+  { value: "KS", label: "Kansas", group: "US" },
+  { value: "KY", label: "Kentucky", group: "US" },
+  { value: "LA", label: "Louisiana", group: "US" },
+  { value: "ME", label: "Maine", group: "US" },
+  { value: "MD", label: "Maryland", group: "US" },
+  { value: "MA", label: "Massachusetts", group: "US" },
+  { value: "MI", label: "Michigan", group: "US" },
+  { value: "MN", label: "Minnesota", group: "US" },
+  { value: "MS", label: "Mississippi", group: "US" },
+  { value: "MO", label: "Missouri", group: "US" },
+  { value: "MT", label: "Montana", group: "US" },
+  { value: "NE", label: "Nebraska", group: "US" },
+  { value: "NV", label: "Nevada", group: "US" },
+  { value: "NH", label: "New Hampshire", group: "US" },
+  { value: "NJ", label: "New Jersey", group: "US" },
+  { value: "NM", label: "New Mexico", group: "US" },
+  { value: "NY", label: "New York", group: "US" },
+  { value: "NC", label: "North Carolina", group: "US" },
+  { value: "ND", label: "North Dakota", group: "US" },
+  { value: "OH", label: "Ohio", group: "US" },
+  { value: "OK", label: "Oklahoma", group: "US" },
+  { value: "OR", label: "Oregon", group: "US" },
+  { value: "PA", label: "Pennsylvania", group: "US" },
+  { value: "RI", label: "Rhode Island", group: "US" },
+  { value: "SC", label: "South Carolina", group: "US" },
+  { value: "SD", label: "South Dakota", group: "US" },
+  { value: "TN", label: "Tennessee", group: "US" },
+  { value: "TX", label: "Texas", group: "US" },
+  { value: "UT", label: "Utah", group: "US" },
+  { value: "VT", label: "Vermont", group: "US" },
+  { value: "VA", label: "Virginia", group: "US" },
+  { value: "WA", label: "Washington", group: "US" },
+  { value: "WV", label: "West Virginia", group: "US" },
+  { value: "WI", label: "Wisconsin", group: "US" },
+  { value: "WY", label: "Wyoming", group: "US" },
+  { value: "DC", label: "Washington DC", group: "US" },
+  // Canadian Provinces & Territories
+  { value: "AB", label: "Alberta", group: "CA" },
+  { value: "BC", label: "British Columbia", group: "CA" },
+  { value: "MB", label: "Manitoba", group: "CA" },
+  { value: "NB", label: "New Brunswick", group: "CA" },
+  { value: "NL", label: "Newfoundland & Labrador", group: "CA" },
+  { value: "NS", label: "Nova Scotia", group: "CA" },
+  { value: "NT", label: "Northwest Territories", group: "CA" },
+  { value: "NU", label: "Nunavut", group: "CA" },
+  { value: "ON", label: "Ontario", group: "CA" },
+  { value: "PE", label: "Prince Edward Island", group: "CA" },
+  { value: "QC", label: "Quebec", group: "CA" },
+  { value: "SK", label: "Saskatchewan", group: "CA" },
+  { value: "YT", label: "Yukon", group: "CA" },
 ];
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
@@ -189,9 +251,15 @@ function Select({
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; group?: string }[];
   placeholder?: string;
 }) {
+  // Group options if any have a `group` field
+  const hasGroups = options.some((o) => o.group);
+  const groups = hasGroups
+    ? Array.from(new Set(options.map((o) => o.group ?? ""))).filter(Boolean)
+    : [];
+
   return (
     <select
       value={value}
@@ -199,11 +267,18 @@ function Select({
       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
     >
       {placeholder && <option value="">{placeholder}</option>}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
+      {hasGroups
+        ? groups.map((g) => (
+            <optgroup key={g} label={g === "US" ? "🇺🇸 United States" : g === "CA" ? "🇨🇦 Canada" : g}>
+              {options.filter((o) => o.group === g).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </optgroup>
+          ))
+        : options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))
+      }
     </select>
   );
 }
@@ -237,19 +312,19 @@ function Step1Property({ form, setForm }: { form: FormData; setForm: (f: FormDat
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="City" required>
-          <Input value={form.propertyCity} onChange={set("propertyCity")} placeholder="Austin" required />
+          <Input value={form.propertyCity} onChange={set("propertyCity")} placeholder="e.g. Toronto" required />
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="State" required>
+          <Field label="State / Province" required>
             <Select
               value={form.propertyState}
               onChange={set("propertyState")}
-              options={US_STATES.map((s) => ({ value: s, label: s }))}
-              placeholder="State"
+              options={STATES_PROVINCES}
+              placeholder="Select…"
             />
           </Field>
-          <Field label="ZIP">
-            <Input value={form.propertyZip} onChange={set("propertyZip")} placeholder="78701" />
+          <Field label="ZIP / Postal Code">
+            <Input value={form.propertyZip} onChange={set("propertyZip")} placeholder="78701 or A1A 1A1" />
           </Field>
         </div>
       </div>
@@ -632,7 +707,7 @@ export default function BookingPage() {
     if (step === 1) {
       if (!form.propertyAddress.trim()) return !!setError("Property address is required.");
       if (!form.propertyCity.trim()) return !!setError("City is required.");
-      if (!form.propertyState) return !!setError("State is required.");
+      if (!form.propertyState) return !!setError("State / Province is required.");
       return true;
     }
     if (step === 2) {

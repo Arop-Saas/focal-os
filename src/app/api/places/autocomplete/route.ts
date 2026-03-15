@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
   url.searchParams.set("input", query);
   url.searchParams.set("types", "address");
-  url.searchParams.set("components", "country:us");
+  url.searchParams.set("components", "country:us|country:ca");
   url.searchParams.set("key", key);
 
   const res = await fetch(url.toString());
