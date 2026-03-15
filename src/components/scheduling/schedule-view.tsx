@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  CalendarDays,
   Car,
   AlertTriangle,
   Clock,
@@ -26,8 +27,12 @@ import {
   format,
   startOfWeek,
   endOfWeek,
+  startOfMonth,
+  endOfMonth,
   addDays,
+  addMonths,
   isSameDay,
+  isSameMonth,
   addMinutes,
 } from "date-fns";
 import { trpc } from "@/lib/trpc/client";
@@ -148,10 +153,11 @@ function ViewToggle({
   view,
   setView,
 }: {
-  view: "week" | "dispatch" | "list";
-  setView: (v: "week" | "dispatch" | "list") => void;
+  view: "month" | "week" | "dispatch" | "list";
+  setView: (v: "month" | "week" | "dispatch" | "list") => void;
 }) {
-  const buttons: { label: string; value: "week" | "dispatch" | "list"; icon: React.ReactNode }[] = [
+  const buttons: { label: string; value: "month" | "week" | "dispatch" | "list"; icon: React.ReactNode }[] = [
+    { label: "Month",    value: "month",    icon: <CalendarDays className="h-3.5 w-3.5" /> },
     { label: "Week",     value: "week",     icon: <LayoutGrid className="h-3.5 w-3.5" /> },
     { label: "Dispatch", value: "dispatch", icon: <Layers className="h-3.5 w-3.5" /> },
     { label: "List",     value: "list",     icon: <List className="h-3.5 w-3.5" /> },
@@ -876,12 +882,169 @@ function ListView({ jobs, onJobClick }: { jobs: BaseJob[]; onJobClick: (job: Bas
 }
 
 // ---------------------------------------------------------------------------
+// Month Grid View
+// ---------------------------------------------------------------------------
+
+const STATUS_DOT_COLOR: Record<string, string> = {
+  PENDING:      "bg-yellow-400",
+  CONFIRMED:    "bg-blue-500",
+  ASSIGNED:     "bg-indigo-500",
+  IN_PROGRESS:  "bg-green-500",
+  EDITING:      "bg-purple-500",
+  REVIEW:       "bg-orange-500",
+  DELIVERED:    "bg-teal-500",
+  COMPLETED:    "bg-gray-400",
+  ON_HOLD:      "bg-orange-400",
+};
+
+const STATUS_PILL_COLOR: Record<string, string> = {
+  PENDING:      "bg-yellow-50 border-yellow-200 text-yellow-800",
+  CONFIRMED:    "bg-blue-50 border-blue-200 text-blue-800",
+  ASSIGNED:     "bg-indigo-50 border-indigo-200 text-indigo-800",
+  IN_PROGRESS:  "bg-green-50 border-green-200 text-green-800",
+  EDITING:      "bg-purple-50 border-purple-200 text-purple-800",
+  REVIEW:       "bg-orange-50 border-orange-200 text-orange-800",
+  DELIVERED:    "bg-teal-50 border-teal-200 text-teal-800",
+  COMPLETED:    "bg-gray-50 border-gray-200 text-gray-600",
+  ON_HOLD:      "bg-orange-50 border-orange-200 text-orange-800",
+};
+
+function MonthGridView({
+  jobs,
+  currentDate,
+  onJobClick,
+  onDayClick,
+}: {
+  jobs: BaseJob[];
+  currentDate: Date;
+  onJobClick: (job: BaseJob) => void;
+  onDayClick: (date: Date) => void;
+}) {
+  const today = new Date();
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  // Grid: from start of week of monthStart to end of week of monthEnd
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+
+  // Build array of all days in grid
+  const gridDays: Date[] = [];
+  let d = gridStart;
+  while (d <= gridEnd) {
+    gridDays.push(d);
+    d = addDays(d, 1);
+  }
+
+  // Map jobs by day key
+  const jobsByDay = useMemo(() => {
+    const map: Record<string, BaseJob[]> = {};
+    jobs.forEach((job) => {
+      const key = format(new Date(job.scheduledAt), "yyyy-MM-dd");
+      if (!map[key]) map[key] = [];
+      map[key].push(job);
+    });
+    return map;
+  }, [jobs]);
+
+  const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const MAX_VISIBLE = 3;
+
+  return (
+    <div className="bg-white rounded-xl border overflow-hidden">
+      {/* Day-of-week header */}
+      <div className="grid grid-cols-7 border-b">
+        {DAY_LABELS.map((label) => (
+          <div key={label} className="py-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            {label}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 divide-x divide-y border-l border-t">
+        {gridDays.map((day) => {
+          const dayKey = format(day, "yyyy-MM-dd");
+          const dayJobs = jobsByDay[dayKey] ?? [];
+          const isToday = isSameDay(day, today);
+          const isCurrentMonth = isSameMonth(day, currentDate);
+          const overflow = dayJobs.length > MAX_VISIBLE ? dayJobs.length - MAX_VISIBLE : 0;
+          const visibleJobs = dayJobs.slice(0, MAX_VISIBLE);
+
+          return (
+            <div
+              key={dayKey}
+              className={cn(
+                "min-h-[110px] p-1.5 border-b border-r",
+                !isCurrentMonth && "bg-gray-50/60"
+              )}
+            >
+              {/* Day number */}
+              <div className="flex items-center justify-between mb-1">
+                <button
+                  onClick={() => onDayClick(day)}
+                  className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center text-[12px] font-semibold transition-colors",
+                    isToday
+                      ? "bg-blue-600 text-white"
+                      : isCurrentMonth
+                      ? "text-gray-800 hover:bg-gray-100"
+                      : "text-gray-300 hover:bg-gray-100"
+                  )}
+                >
+                  {format(day, "d")}
+                </button>
+                {dayJobs.length > 0 && (
+                  <span className="text-[10px] text-gray-400 font-medium">
+                    {dayJobs.length} job{dayJobs.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+
+              {/* Job pills */}
+              <div className="space-y-0.5">
+                {visibleJobs.map((job) => (
+                  <button
+                    key={job.id}
+                    onClick={() => onJobClick(job)}
+                    className={cn(
+                      "flex items-center gap-1 w-full text-left px-1.5 py-0.5 rounded text-[10px] border leading-tight hover:opacity-80 transition-opacity truncate",
+                      STATUS_PILL_COLOR[job.status] ?? "bg-gray-50 border-gray-200 text-gray-700"
+                    )}
+                  >
+                    <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", STATUS_DOT_COLOR[job.status] ?? "bg-gray-400")} />
+                    <span className="font-semibold shrink-0">
+                      {format(new Date(job.scheduledAt), "h:mma")}
+                    </span>
+                    <span className="truncate text-[9px] opacity-75">
+                      {job.client.firstName} {job.client.lastName}
+                    </span>
+                  </button>
+                ))}
+
+                {overflow > 0 && (
+                  <button
+                    onClick={() => onDayClick(day)}
+                    className="w-full text-left px-1.5 py-0.5 text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  >
+                    +{overflow} more
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main ScheduleView
 // ---------------------------------------------------------------------------
 
 export function ScheduleView({ jobs }: ScheduleViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<"week" | "dispatch" | "list">("dispatch");
+  const [view, setView] = useState<"month" | "week" | "dispatch" | "list">("dispatch");
   const [selectedJob, setSelectedJob] = useState<BaseJob | DispatchJob | null>(null);
 
   // Week helpers
@@ -898,16 +1061,22 @@ export function ScheduleView({ jobs }: ScheduleViewProps) {
   );
 
   function prevPeriod() {
-    setCurrentDate((d) => addDays(d, view === "dispatch" ? -1 : -7));
+    if (view === "dispatch") setCurrentDate((d) => addDays(d, -1));
+    else if (view === "month") setCurrentDate((d) => addMonths(d, -1));
+    else setCurrentDate((d) => addDays(d, -7));
   }
   function nextPeriod() {
-    setCurrentDate((d) => addDays(d, view === "dispatch" ? 1 : 7));
+    if (view === "dispatch") setCurrentDate((d) => addDays(d, 1));
+    else if (view === "month") setCurrentDate((d) => addMonths(d, 1));
+    else setCurrentDate((d) => addDays(d, 7));
   }
   function goToday() { setCurrentDate(new Date()); }
 
   const dateLabel =
     view === "dispatch"
       ? format(currentDate, "EEEE, MMMM d, yyyy")
+      : view === "month"
+      ? format(currentDate, "MMMM yyyy")
       : `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d, yyyy")}`;
 
   return (
@@ -926,6 +1095,18 @@ export function ScheduleView({ jobs }: ScheduleViewProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
+        {view === "month" && (
+          <MonthGridView
+            jobs={jobs}
+            currentDate={currentDate}
+            onJobClick={(job) => setSelectedJob(job)}
+            onDayClick={(date) => {
+              setCurrentDate(date);
+              setView("dispatch");
+            }}
+          />
+        )}
+
         {view === "dispatch" && (
           <DispatchDayView
             date={currentDate}

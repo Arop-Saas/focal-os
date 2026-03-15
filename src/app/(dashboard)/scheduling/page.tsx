@@ -20,16 +20,21 @@ export default async function SchedulingPage() {
 
   const workspaceId = user!.workspaces[0].workspace.id;
 
-  // Fetch jobs for the next 30 days
-  const now = new Date();
-  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  // Fetch jobs for a 4-month window (1 month back, 3 months forward)
+  // so month/week views work when navigating around today
+  const rangeStart = new Date();
+  rangeStart.setDate(1);
+  rangeStart.setMonth(rangeStart.getMonth() - 1);
+  const rangeEnd = new Date();
+  rangeEnd.setDate(1);
+  rangeEnd.setMonth(rangeEnd.getMonth() + 3);
 
   const jobs = await prisma.job.findMany({
     where: {
       workspaceId,
       scheduledAt: {
-        gte: now,
-        lte: thirtyDaysFromNow,
+        gte: rangeStart,
+        lte: rangeEnd,
       },
       status: { notIn: ["CANCELLED"] },
     },
