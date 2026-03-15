@@ -99,6 +99,7 @@ model User {
   phone         String?
   timezone      String   @default("America/New_York")
   onboardingCompleted Boolean @default(false)
+  isSuperAdmin        Boolean @default(false)
 
   // Google Calendar integration
   googleRefreshToken  String?
