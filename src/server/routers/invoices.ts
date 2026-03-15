@@ -120,7 +120,7 @@ export const invoicesRouter = router({
         data: { invoiceNextNumber: { increment: 1 } },
       });
 
-      return ctx.prisma.invoice.create({
+      const invoice = await ctx.prisma.invoice.create({
         data: {
           workspaceId: ctx.workspace.id,
           invoiceNumber,
@@ -147,6 +147,23 @@ export const invoicesRouter = router({
         },
         include: { lineItems: true, client: true },
       });
+
+      await ctx.prisma.activityLog.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          userId: ctx.user.id,
+          action: "invoice.created",
+          entityType: "invoice",
+          entityId: invoice.id,
+          metadata: {
+            invoiceNumber,
+            totalAmount,
+            clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+          },
+        },
+      });
+
+      return invoice;
     }),
 
   send: workspaceProcedure
@@ -168,6 +185,21 @@ export const invoicesRouter = router({
       const updated = await ctx.prisma.invoice.update({
         where: { id: input.id },
         data: { status: "SENT", issuedAt: new Date() },
+      });
+
+      void ctx.prisma.activityLog.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          userId: ctx.user.id,
+          action: "invoice.sent",
+          entityType: "invoice",
+          entityId: input.id,
+          metadata: {
+            invoiceNumber: invoice.invoiceNumber,
+            totalAmount: invoice.totalAmount,
+            clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+          },
+        },
       });
 
       // Fire-and-forget: send invoice email to client
@@ -237,6 +269,23 @@ export const invoicesRouter = router({
         });
       });
 
+      void ctx.prisma.activityLog.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          userId: ctx.user.id,
+          action: newStatus === "PAID" ? "invoice.paid" : "invoice.partial",
+          entityType: "invoice",
+          entityId: input.id,
+          metadata: {
+            invoiceNumber: invoice.invoiceNumber,
+            amount: input.amount,
+            amountPaid: newAmountPaid,
+            totalAmount: invoice.totalAmount,
+            clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+          },
+        },
+      });
+
       // Fire-and-forget: send receipt when fully paid
       if (newStatus === "PAID" && invoice.client.email) {
         void notifyInvoicePaid({
@@ -264,9 +313,22 @@ export const invoicesRouter = router({
       if (invoice.status === "PAID") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot void a paid invoice." });
       }
-      return ctx.prisma.invoice.update({
+      const voided = await ctx.prisma.invoice.update({
         where: { id: input.id },
         data: { status: "VOID" },
       });
+
+      void ctx.prisma.activityLog.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          userId: ctx.user.id,
+          action: "invoice.voided",
+          entityType: "invoice",
+          entityId: input.id,
+          metadata: { invoiceNumber: invoice.invoiceNumber },
+        },
+      });
+
+      return voided;
     }),
 });
