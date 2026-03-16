@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatDate, getInitials } from "@/lib/utils";
+import { useCurrentRole } from "@/hooks/use-current-role";
 import { Mail, MoreVertical, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ type StaffMember = {
 };
 
 export function StaffTable() {
+  const { can } = useCurrentRole();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteFullName, setInviteFullName] = useState("");
@@ -244,12 +246,14 @@ export function StaffTable() {
         </div>
       )}
 
-      {/* Invite Button */}
-      <div className="mt-4">
-        <Button size="sm" onClick={() => setShowInviteModal(true)}>
-          <Mail className="h-3.5 w-3.5 mr-1.5" /> Invite Member
-        </Button>
-      </div>
+      {/* Invite Button — ADMIN+ only */}
+      {can("ADMIN") && (
+        <div className="mt-4">
+          <Button size="sm" onClick={() => setShowInviteModal(true)}>
+            <Mail className="h-3.5 w-3.5 mr-1.5" /> Invite Member
+          </Button>
+        </div>
+      )}
     </>
   );
 }

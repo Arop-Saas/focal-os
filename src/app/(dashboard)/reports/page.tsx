@@ -6,6 +6,7 @@ import { StatsOverview } from "@/components/reports/stats-overview";
 import { JobsBreakdown } from "@/components/reports/jobs-breakdown";
 import { TopClients } from "@/components/reports/top-clients";
 import { RevenueByPackage } from "@/components/reports/revenue-by-package";
+import { StaffPerformance } from "@/components/reports/staff-performance";
 
 export const metadata = { title: "Reports" };
 
@@ -34,6 +35,7 @@ export default async function ReportsPage() {
     totalJobs,
     topClientsRaw,
     paidInvoicesWithPackage,
+    staffJobsRaw,
   ] = await Promise.all([
     // Monthly revenue last 6 months (group by date — we process in JS)
     prisma.invoice.findMany({
@@ -83,6 +85,27 @@ export default async function ReportsPage() {
         job: {
           select: {
             package: { select: { id: true, name: true } },
+          },
+        },
+      },
+    }),
+    // Staff performance: all job assignments with invoice amounts
+    prisma.jobAssignment.findMany({
+      where: { job: { workspaceId } },
+      include: {
+        job: {
+          select: {
+            status: true,
+            invoice: { select: { totalAmount: true, status: true } },
+          },
+        },
+        staff: {
+          include: {
+            member: {
+              include: {
+                user: { select: { fullName: true, email: true } },
+              },
+            },
           },
         },
       },
@@ -157,6 +180,42 @@ export default async function ReportsPage() {
   const totalBilled = totalInvoiced._sum.totalAmount ?? 0;
   const collectionRate = totalBilled > 0 ? Math.round((totalPaid / totalBilled) * 100) : 0;
 
+  // Staff performance
+  type StaffAgg = { name: string; initials: string; total: number; completed: number; revenue: number };
+  const staffMap = new Map<string, StaffAgg>();
+  for (const asgn of staffJobsRaw) {
+    const fullName = asgn.staff.member.user.fullName ?? asgn.staff.member.user.email ?? "Staff";
+    const initials = fullName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+    const existing = staffMap.get(asgn.staffId);
+    const invoiceAmount = asgn.job.invoice?.status === "PAID" ? (asgn.job.invoice.totalAmount ?? 0) : 0;
+    const isCompleted = ["COMPLETED", "DELIVERED"].includes(asgn.job.status);
+    if (existing) {
+      existing.total += 1;
+      if (isCompleted) existing.completed += 1;
+      existing.revenue += invoiceAmount;
+    } else {
+      staffMap.set(asgn.staffId, {
+        name: fullName,
+        initials,
+        total: 1,
+        completed: isCompleted ? 1 : 0,
+        revenue: invoiceAmount,
+      });
+    }
+  }
+  const staffPerformanceData = Array.from(staffMap.entries())
+    .map(([staffId, s]) => ({
+      staffId,
+      name: s.name,
+      avatarInitials: s.initials,
+      totalJobs: s.total,
+      completedJobs: s.completed,
+      revenue: s.revenue,
+      completionRate: s.total > 0 ? Math.round((s.completed / s.total) * 100) : 0,
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 10);
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header title="Reports" description="Business analytics and performance metrics" />
@@ -189,10 +248,16 @@ export default async function ReportsPage() {
           </div>
         </div>
 
-        {/* Jobs Breakdown */}
-        <div className="bg-white rounded-xl border p-6">
-          <h2 className="text-[15px] font-semibold text-gray-900 mb-4">Jobs by Status</h2>
-          <JobsBreakdown data={jobsBreakdownData} />
+        {/* Staff Performance + Jobs Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl border p-6">
+            <h2 className="text-[15px] font-semibold text-gray-900 mb-4">Staff Performance</h2>
+            <StaffPerformance data={staffPerformanceData} />
+          </div>
+          <div className="bg-white rounded-xl border p-6">
+            <h2 className="text-[15px] font-semibold text-gray-900 mb-4">Jobs by Status</h2>
+            <JobsBreakdown data={jobsBreakdownData} />
+          </div>
         </div>
       </div>
     </div>

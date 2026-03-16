@@ -19,8 +19,10 @@ import {
   LogOut,
   ShieldAlert,
   Clock,
+  MessageCircle,
 } from "lucide-react";
 import { NotificationBell } from "./notification-bell";
+import { MessagesUnreadBadge } from "@/components/messages/messages-unread-badge";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -38,6 +40,7 @@ const navGroups = [
       { label: "Jobs", href: "/jobs", icon: Briefcase },
       { label: "Schedule", href: "/scheduling", icon: CalendarDays },
       { label: "Clients", href: "/clients", icon: Users },
+      { label: "Messages", href: "/messages", icon: MessageCircle },
     ],
   },
   {
@@ -148,6 +151,7 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
                       )}
                     />
                     {item.label}
+                    {item.href === "/messages" && <MessagesUnreadBadge />}
                   </Link>
                 );
               })}

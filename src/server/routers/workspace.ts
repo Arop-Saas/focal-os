@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, workspaceProcedure } from "../trpc";
+import { router, protectedProcedure, workspaceProcedure, adminProcedure, ownerProcedure } from "../trpc";
 import { slugify } from "@/lib/utils";
 
 export const workspaceRouter = router({
@@ -101,8 +101,17 @@ export const workspaceRouter = router({
       return workspace;
     }),
 
-  // Update workspace settings
-  update: workspaceProcedure
+  // Returns the current user's WorkspaceMember record (role, id, isOwner)
+  getMyMembership: workspaceProcedure.query(async ({ ctx }) => {
+    const member = await ctx.prisma.workspaceMember.findFirst({
+      where: { workspaceId: ctx.workspace.id, userId: ctx.user.id },
+      select: { id: true, role: true, isOwner: true },
+    });
+    return member;
+  }),
+
+  // Update workspace settings (ADMIN+ only)
+  update: adminProcedure
     .input(
       z.object({
         name: z.string().min(2).max(100).optional(),
@@ -276,7 +285,7 @@ export const workspaceRouter = router({
     };
   }),
 
-  saveStripeKeys: workspaceProcedure
+  saveStripeKeys: ownerProcedure
     .input(
       z.object({
         publishableKey: z.string().min(1).startsWith("pk_"),
@@ -306,7 +315,7 @@ export const workspaceRouter = router({
       return { ok: true };
     }),
 
-  disconnectStripe: workspaceProcedure.mutation(async ({ ctx }) => {
+  disconnectStripe: ownerProcedure.mutation(async ({ ctx }) => {
     await ctx.prisma.workspace.update({
       where: { id: ctx.workspace.id },
       data: {

@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focal OS — Studio Management Software for Real Estate Photographers</title>
+  <meta name="description" content="The all-in-one platform built for real estate photography studios. Manage jobs, clients, invoices, galleries, and your whole team from one place." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    html { scroll-behavior: smooth; }
+
+    /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(135deg, #1B4F9E 0%, #3B82F6 50%, #60A5FA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Hero background */
+    .hero-bg {
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(27,79,158,0.12) 0%, transparent 70%),
+                  linear-gradient(180deg, #f8faff 0%, #ffffff 60%);
+    }
+
+    /* Feature card hover */
+    .feature-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .feature-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px rgba(27,79,158,0.1);
+    }
+
+    /* Pricing card */
+    .pricing-popular {
+      background: linear-gradient(135deg, #1B4F9E 0%, #2563EB 100%);
+      box-shadow: 0 20px 60px rgba(27,79,158,0.35);
+    }
+
+    /* Nav blur */
+    .nav-blur {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* FAQ accordion */
+    details summary { cursor: pointer; list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    details[open] .faq-icon { transform: rotate(45deg); }
+    .faq-icon { transition: transform 0.2s ease; }
+
+    /* Animated gradient border on popular badge */
+    @keyframes shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+  </style>
+</head>
+<body class="bg-white text-gray-900 antialiased">
+
+  <!-- ─── NAV ─────────────────────────────────────────────────────────────── -->
+  <nav class="fixed top-0 left-0 right-0 z-50 nav-blur bg-white/80 border-b border-gray-100">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <!-- Logo -->
+      <a href="#" class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-[#1B4F9E] flex items-center justify-center">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="4" fill="white" />
+            <path d="M9 1v3M9 14v3M1 9h3M14 9h3" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="text-lg font-bold text-gray-900 tracking-tight">Focal OS</span>
+      </a>
+
+      <!-- Links -->
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#features" class="text-sm text-gray-500 hover:text-gray-900 transition-colors font-medium">Features</a>
+        <a href="#pricing" class="text-sm text-gray-500 hover:text-gray-900 transition-colors font-medium">Pricing</a>
+        <a href="#faq" class="text-sm text-gray-500 hover:text-gray-900 transition-colors font-medium">FAQ</a>
+      </div>
+
+      <!-- CTAs -->
+      <div class="flex items-center gap-3">
+        <a href="#" class="hidden md:block text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">Sign in</a>
+        <a href="#pricing" class="text-sm font-semibold bg-[#1B4F9E] hover:bg-[#163f7e] text-white px-4 py-2 rounded-lg transition-colors">
+          Start free trial
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── HERO ─────────────────────────────────────────────────────────────── -->
+  <section class="hero-bg pt-32 pb-24 px-6">
+    <div class="max-w-4xl mx-auto text-center">
+      <!-- Badge -->
+      <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-8">
+        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+        Built for real estate photography studios
+      </div>
+
+      <!-- Headline -->
+      <h1 class="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-gray-900 leading-[1.05] mb-6">
+        Run your studio.<br/>
+        <span class="gradient-text">Not your inbox.</span>
+      </h1>
+
+      <!-- Sub -->
+      <p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
+        Focal OS is the all-in-one platform real estate photography studios use to manage bookings, jobs, clients,
+        galleries, invoices, and their entire team — from one dashboard.
+      </p>
+
+      <!-- CTA row -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="#pricing" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#1B4F9E] hover:bg-[#163f7e] text-white font-bold text-base px-8 py-4 rounded-xl transition-colors shadow-lg shadow-blue-200">
+          Start your free trial
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a href="#features" class="w-full sm:w-auto flex items-center justify-center gap-2 border border-gray-200 hover:border-gray-300 text-gray-700 font-semibold text-base px-8 py-4 rounded-xl transition-colors bg-white">
+          See how it works
+        </a>
+      </div>
+
+      <!-- Trust line -->
+      <p class="mt-8 text-sm text-gray-400">No credit card required · 14-day free trial · Cancel anytime</p>
+    </div>
+
+    <!-- Hero visual — mock dashboard card -->
+    <div class="max-w-5xl mx-auto mt-16 px-4">
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-2xl shadow-blue-50 overflow-hidden">
+        <!-- Fake browser bar -->
+        <div class="flex items-center gap-1.5 px-4 py-3 bg-gray-50 border-b border-gray-100">
+          <div class="w-3 h-3 rounded-full bg-red-300"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-300"></div>
+          <div class="w-3 h-3 rounded-full bg-green-300"></div>
+          <div class="flex-1 mx-4 bg-gray-100 rounded-full h-5 flex items-center px-3">
+            <span class="text-[10px] text-gray-400 font-mono">app.focal-os.com/dashboard</span>
+          </div>
+        </div>
+
+        <!-- Mock dashboard content -->
+        <div class="flex h-[340px] text-xs">
+          <!-- Sidebar -->
+          <div class="w-48 bg-gray-50 border-r border-gray-100 p-4 shrink-0 flex flex-col gap-1">
+            <div class="flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-gray-100 shadow-sm mb-2">
+              <div class="w-5 h-5 rounded bg-[#1B4F9E] flex items-center justify-center">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="2.5" fill="white"/></svg>
+              </div>
+              <span class="font-bold text-gray-800 text-[11px]">Focal OS</span>
+            </div>
+            {[['Dashboard','#3B82F6',true],['Jobs','',''],['Clients','',''],['Invoices','',''],['Gallery','',''],['Messages','',''],['Staff','',''],['Reports','','']].map(([l,c,a]) => `
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded-md ${a?'bg-blue-50':'hover:bg-gray-100'} cursor-pointer">
+              <div class="w-1.5 h-1.5 rounded-full ${a?'bg-[#1B4F9E]':'bg-gray-300'}"></div>
+              <span class="${a?'text-[#1B4F9E] font-semibold':'text-gray-500'} text-[11px]">${l}</span>
+              ${l==='Messages'?'<span class="ml-auto bg-blue-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">3</span>':''}
+            </div>`).join('')}
+          </div>
+
+          <!-- Main content -->
+          <div class="flex-1 p-5 overflow-hidden bg-gray-50">
+            <!-- Stat cards -->
+            <div class="grid grid-cols-4 gap-3 mb-4">
+              <div class="bg-white rounded-xl border border-gray-100 p-3">
+                <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Jobs This Month</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">47</p>
+                <p class="text-[9px] text-green-600 mt-0.5">↑ 12% vs last month</p>
+              </div>
+              <div class="bg-white rounded-xl border border-gray-100 p-3">
+                <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Revenue</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">$9,840</p>
+                <p class="text-[9px] text-green-600 mt-0.5">↑ 8% vs last month</p>
+              </div>
+              <div class="bg-white rounded-xl border border-gray-100 p-3">
+                <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Open Invoices</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">$2,450</p>
+                <p class="text-[9px] text-amber-500 mt-0.5">4 outstanding</p>
+              </div>
+              <div class="bg-white rounded-xl border border-gray-100 p-3">
+                <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Active Clients</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">128</p>
+                <p class="text-[9px] text-blue-600 mt-0.5">+6 this week</p>
+              </div>
+            </div>
+
+            <!-- Jobs table -->
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <div class="px-4 py-2.5 border-b border-gray-50 flex items-center justify-between">
+                <p class="text-[11px] font-semibold text-gray-700">Upcoming Jobs</p>
+                <span class="text-[9px] text-blue-600 font-semibold">View all →</span>
+              </div>
+              <div class="divide-y divide-gray-50">
+                <div class="flex items-center gap-3 px-4 py-2">
+                  <div class="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[7px] font-bold text-blue-700">JR</div>
+                  <div class="flex-1"><p class="font-medium text-gray-800 text-[10px]">142 Maple Drive</p><p class="text-[9px] text-gray-400">Today · 10:00 AM</p></div>
+                  <span class="text-[8px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">CONFIRMED</span>
+                </div>
+                <div class="flex items-center gap-3 px-4 py-2">
+                  <div class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-[7px] font-bold text-purple-700">SL</div>
+                  <div class="flex-1"><p class="font-medium text-gray-800 text-[10px]">78 Birchwood Crescent</p><p class="text-[9px] text-gray-400">Today · 2:30 PM</p></div>
+                  <span class="text-[8px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">ASSIGNED</span>
+                </div>
+                <div class="flex items-center gap-3 px-4 py-2">
+                  <div class="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-[7px] font-bold text-green-700">MK</div>
+                  <div class="flex-1"><p class="font-medium text-gray-800 text-[10px]">55 Lakeview Boulevard</p><p class="text-[9px] text-gray-400">Tomorrow · 9:00 AM</p></div>
+                  <span class="text-[8px] font-bold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">PENDING</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FEATURES ──────────────────────────────────────────────────────────── -->
+  <section id="features" class="py-24 px-6 bg-white">
+    <div class="max-w-6xl mx-auto">
+      <!-- Heading -->
+      <div class="text-center mb-16">
+        <p class="text-sm font-bold text-[#1B4F9E] uppercase tracking-widest mb-3">Everything in one platform</p>
+        <h2 class="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">
+          Every tool your studio needs.<br/>
+          <span class="gradient-text">Nothing you don't.</span>
+        </h2>
+        <p class="text-lg text-gray-500 mt-4 max-w-2xl mx-auto">
+          Stop juggling spreadsheets, Google Calendar, and five different apps. Focal OS replaces them all.
+        </p>
+      </div>
+
+      <!-- Feature grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- 1 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><rect x="3" y="4" width="16" height="15" rx="2" stroke="#1B4F9E" stroke-width="1.6"/><path d="M3 8h16M8 2v4M14 2v4" stroke="#1B4F9E" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Smart Scheduling & Booking</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Online booking page, territory management, and automated scheduling. Clients book themselves — you just show up.</p>
+        </div>
+
+        <!-- 2 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" rx="2" stroke="#6366F1" stroke-width="1.6"/><path d="M7 7h8M7 11h5M7 15h3" stroke="#6366F1" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Job Management</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Track every shoot from booking to delivery. Custom checklists, status updates, staff assignments, and a full audit trail.</p>
+        </div>
+
+        <!-- 3 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-green-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><path d="M4 6h14M4 10h10M4 14h7" stroke="#16A34A" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="3" width="16" height="16" rx="2" stroke="#16A34A" stroke-width="1.6"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Invoicing & Payments</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Auto-generate invoices from jobs, send them with one click, and collect payment via Stripe — right inside the client portal.</p>
+        </div>
+
+        <!-- 4 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><rect x="2" y="5" width="18" height="12" rx="2" stroke="#7C3AED" stroke-width="1.6"/><path d="M6 10l3 3 7-6" stroke="#7C3AED" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Gallery Delivery</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Deliver stunning photo galleries with a download gate — clients pay their invoice before accessing files. No more chasing payment.</p>
+        </div>
+
+        <!-- 5 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-teal-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><circle cx="8" cy="8" r="3" stroke="#0D9488" stroke-width="1.6"/><circle cx="15" cy="8" r="3" stroke="#0D9488" stroke-width="1.6"/><path d="M2 19c0-3 2.7-5 6-5h6c3.3 0 6 2 6 5" stroke="#0D9488" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Team & Role Management</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Invite photographers, editors, and VAs with role-based access. Everyone sees exactly what they need — nothing more.</p>
+        </div>
+
+        <!-- 6 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><path d="M4 17V9a1 1 0 011-1h3V5a1 1 0 011-1h4a1 1 0 011 1v3h3a1 1 0 011 1v8" stroke="#EA580C" stroke-width="1.6" stroke-linecap="round"/><path d="M3 17h16" stroke="#EA580C" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Client Portal</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">White-label portal with your logo and brand colors. Clients track orders, view galleries, download photos, and pay invoices themselves.</p>
+        </div>
+
+        <!-- 7 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-pink-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><path d="M4 4h14a1 1 0 011 1v9a1 1 0 01-1 1H7l-4 3V5a1 1 0 011-1z" stroke="#DB2777" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Unified Messaging</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">All client conversations in one inbox. Real-time threads per job with unread badges, so nothing slips through the cracks.</p>
+        </div>
+
+        <!-- 8 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><path d="M4 16V10M8 16V6M12 16v-4M16 16v-8" stroke="#D97706" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Reports & Analytics</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Revenue trends, job breakdowns, and photographer performance — all the numbers you need to run your studio smarter.</p>
+        </div>
+
+        <!-- 9 -->
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-cyan-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" viewBox="0 0 22 22"><path d="M6 3h10l3 4-9 12L2 7l4-4z" stroke="#0891B2" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 7h18M9 7l2 12M13 7l-2 12" stroke="#0891B2" stroke-width="1.6"/></svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 mb-2">Brokerage Pricing Groups</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Set custom discount rates for RE/MAX, Coldwell Banker, or any group. Discounts apply automatically when you generate invoices.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── PRICING ────────────────────────────────────────────────────────────── -->
+  <section id="pricing" class="py-24 px-6 bg-gray-50">
+    <div class="max-w-6xl mx-auto">
+      <!-- Heading -->
+      <div class="text-center mb-14">
+        <p class="text-sm font-bold text-[#1B4F9E] uppercase tracking-widest mb-3">Pricing</p>
+        <h2 class="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">
+          Simple, honest pricing.
+        </h2>
+        <p class="text-lg text-gray-500 mt-4">Start free. Upgrade as your studio grows. No hidden fees.</p>
+
+        <!-- Toggle (visual only) -->
+        <div class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1 mt-6">
+          <button onclick="setMonthly(true)" id="btn-monthly" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-[#1B4F9E] text-white">Monthly</button>
+          <button onclick="setMonthly(false)" id="btn-annual" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-gray-500">Annual <span class="text-green-600 font-bold">–20%</span></button>
+        </div>
+      </div>
+
+      <!-- Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+
+        <!-- Starter -->
+        <div class="bg-white border border-gray-200 rounded-2xl p-8">
+          <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Starter</p>
+          <div class="flex items-end gap-1 mb-1">
+            <span id="price-starter" class="text-5xl font-black text-gray-900">$49</span>
+            <span class="text-gray-400 mb-2 text-sm font-medium">/mo</span>
+          </div>
+          <p class="text-sm text-gray-400 mb-8">Perfect for solo photographers just getting started.</p>
+
+          <a href="#" class="block w-full text-center border-2 border-[#1B4F9E] text-[#1B4F9E] hover:bg-blue-50 font-bold py-3 rounded-xl transition-colors mb-8">
+            Start free trial
+          </a>
+
+          <ul class="space-y-3">
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>1 photographer seat</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Up to 40 jobs / month</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Scheduling & booking page</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Client portal</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Invoicing & Stripe payments</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Gallery delivery</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-400"><svg class="w-4 h-4 text-gray-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Team & role management</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-400"><svg class="w-4 h-4 text-gray-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Brokerage pricing groups</li>
+          </ul>
+        </div>
+
+        <!-- Pro — Popular -->
+        <div class="pricing-popular rounded-2xl p-8 relative">
+          <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-400 to-orange-400 text-white text-[11px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+            Most Popular
+          </div>
+          <p class="text-xs font-bold text-blue-200 uppercase tracking-widest mb-4">Pro</p>
+          <div class="flex items-end gap-1 mb-1">
+            <span id="price-pro" class="text-5xl font-black text-white">$99</span>
+            <span class="text-blue-200 mb-2 text-sm font-medium">/mo</span>
+          </div>
+          <p class="text-sm text-blue-200 mb-8">For growing studios with a small team.</p>
+
+          <a href="#" class="block w-full text-center bg-white text-[#1B4F9E] hover:bg-blue-50 font-bold py-3 rounded-xl transition-colors mb-8 shadow-lg">
+            Start free trial
+          </a>
+
+          <ul class="space-y-3">
+            <li class="flex items-start gap-2.5 text-sm text-white"><svg class="w-4 h-4 text-blue-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Up to 5 team seats</li>
+            <li class="flex items-start gap-2.5 text-sm text-white"><svg class="w-4 h-4 text-blue-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Unlimited jobs</li>
+            <li class="flex items-start gap-2.5 text-sm text-white"><svg class="w-4 h-4 text-blue-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Everything in Starter</li>
+            <li class="flex items-start gap-2.5 text-sm text-white"><svg class="w-4 h-4 text-blue-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Team & role management</li>
+            <li class="flex items-start gap-2.5 text-sm text-white"><svg class="w-4 h-4 text-blue-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Automated reminders</li>
+            <li class="flex items-start gap-2.5 text-sm text-white"><svg class="w-4 h-4 text-blue-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Unified messages inbox</li>
+            <li class="flex items-start gap-2.5 text-sm text-white"><svg class="w-4 h-4 text-blue-200 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Reports & analytics</li>
+            <li class="flex items-start gap-2.5 text-sm text-blue-200"><svg class="w-4 h-4 text-blue-300/40 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Brokerage pricing groups</li>
+          </ul>
+        </div>
+
+        <!-- Agency -->
+        <div class="bg-white border border-gray-200 rounded-2xl p-8">
+          <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Agency</p>
+          <div class="flex items-end gap-1 mb-1">
+            <span id="price-agency" class="text-5xl font-black text-gray-900">$179</span>
+            <span class="text-gray-400 mb-2 text-sm font-medium">/mo</span>
+          </div>
+          <p class="text-sm text-gray-400 mb-8">For high-volume studios with large teams and corporate clients.</p>
+
+          <a href="#" class="block w-full text-center border-2 border-gray-900 text-gray-900 hover:bg-gray-50 font-bold py-3 rounded-xl transition-colors mb-8">
+            Start free trial
+          </a>
+
+          <ul class="space-y-3">
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Unlimited team seats</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Everything in Pro</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Brokerage pricing groups</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Custom branding & white-label</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Google Calendar sync</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Photographer mobile app</li>
+            <li class="flex items-start gap-2.5 text-sm text-gray-600"><svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 16 16"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Priority support</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Enterprise note -->
+      <div class="text-center mt-10">
+        <p class="text-sm text-gray-500">
+          Need a custom plan for a franchise or multi-location studio?
+          <a href="mailto:hello@focal-os.com" class="text-[#1B4F9E] font-semibold hover:underline ml-1">Talk to us →</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FAQ ───────────────────────────────────────────────────────────────── -->
+  <section id="faq" class="py-24 px-6 bg-white">
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-14">
+        <p class="text-sm font-bold text-[#1B4F9E] uppercase tracking-widest mb-3">FAQ</p>
+        <h2 class="text-4xl font-black text-gray-900 tracking-tight">Common questions</h2>
+      </div>
+
+      <div class="space-y-3">
+
+        <details class="bg-gray-50 border border-gray-100 rounded-xl group">
+          <summary class="flex items-center justify-between px-6 py-5 font-semibold text-gray-900">
+            How does the 14-day free trial work?
+            <span class="faq-icon text-gray-400 shrink-0 ml-4">
+              <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+          </summary>
+          <div class="px-6 pb-5 text-sm text-gray-500 leading-relaxed">
+            Sign up with no credit card required. You get full access to all features on the Pro plan for 14 days.
+            After the trial, you choose a plan that fits — or your account goes read-only. No surprise charges.
+          </div>
+        </details>
+
+        <details class="bg-gray-50 border border-gray-100 rounded-xl group">
+          <summary class="flex items-center justify-between px-6 py-5 font-semibold text-gray-900">
+            Can I switch plans later?
+            <span class="faq-icon text-gray-400 shrink-0 ml-4">
+              <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+          </summary>
+          <div class="px-6 pb-5 text-sm text-gray-500 leading-relaxed">
+            Yes, upgrade or downgrade at any time. Upgrades take effect immediately and are prorated.
+            Downgrades take effect at the end of your current billing cycle.
+          </div>
+        </details>
+
+        <details class="bg-gray-50 border border-gray-100 rounded-xl group">
+          <summary class="flex items-center justify-between px-6 py-5 font-semibold text-gray-900">
+            Does Focal OS take a cut of my payments?
+            <span class="faq-icon text-gray-400 shrink-0 ml-4">
+              <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+          </summary>
+          <div class="px-6 pb-5 text-sm text-gray-500 leading-relaxed">
+            No. Focal OS charges a flat monthly fee — we never take a percentage of your revenue.
+            Stripe's standard processing fees (typically 2.9% + 30¢) apply to card payments, but that goes to Stripe, not us.
+          </div>
+        </details>
+
+        <details class="bg-gray-50 border border-gray-100 rounded-xl group">
+          <summary class="flex items-center justify-between px-6 py-5 font-semibold text-gray-900">
+            How do brokerage pricing groups work?
+            <span class="faq-icon text-gray-400 shrink-0 ml-4">
+              <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+          </summary>
+          <div class="px-6 pb-5 text-sm text-gray-500 leading-relaxed">
+            Create a group (e.g. "RE/MAX VIP — 15% off"), assign clients to it, and every invoice generated for those
+            clients automatically includes the discount as a named line item. It shows on the invoice so your clients
+            see the saving.
+          </div>
+        </details>
+
+        <details class="bg-gray-50 border border-gray-100 rounded-xl group">
+          <summary class="flex items-center justify-between px-6 py-5 font-semibold text-gray-900">
+            Can multiple photographers use the same account?
+            <span class="faq-icon text-gray-400 shrink-0 ml-4">
+              <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+          </summary>
+          <div class="px-6 pb-5 text-sm text-gray-500 leading-relaxed">
+            Absolutely. Invite your whole team — photographers, editors, virtual assistants — each with their own login
+            and role-based permissions. Everyone sees what they need, nothing they don't.
+          </div>
+        </details>
+
+        <details class="bg-gray-50 border border-gray-100 rounded-xl group">
+          <summary class="flex items-center justify-between px-6 py-5 font-semibold text-gray-900">
+            Is my data secure?
+            <span class="faq-icon text-gray-400 shrink-0 ml-4">
+              <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+          </summary>
+          <div class="px-6 pb-5 text-sm text-gray-500 leading-relaxed">
+            Yes. All data is encrypted in transit (TLS) and at rest. Authentication is handled by Supabase with
+            support for magic-link logins. We never share or sell your data.
+          </div>
+        </details>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CTA BANNER ────────────────────────────────────────────────────────── -->
+  <section class="py-24 px-6" style="background: linear-gradient(135deg, #0F2D5E 0%, #1B4F9E 50%, #2563EB 100%);">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-4xl md:text-5xl font-black text-white tracking-tight mb-4">
+        Ready to run a tighter studio?
+      </h2>
+      <p class="text-lg text-blue-200 mb-10">
+        Join photography studios who've stopped drowning in admin work and started growing instead.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="#pricing" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-[#1B4F9E] font-bold text-base px-8 py-4 rounded-xl hover:bg-blue-50 transition-colors shadow-xl">
+          Start your free trial
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a href="mailto:hello@focal-os.com" class="w-full sm:w-auto flex items-center justify-center gap-2 border-2 border-white/30 hover:border-white/60 text-white font-semibold text-base px-8 py-4 rounded-xl transition-colors">
+          Talk to us first
+        </a>
+      </div>
+      <p class="mt-6 text-sm text-blue-300">14-day free trial · No credit card · Cancel anytime</p>
+    </div>
+  </section>
+
+  <!-- ─── FOOTER ────────────────────────────────────────────────────────────── -->
+  <footer class="bg-gray-950 text-gray-400 py-12 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex flex-col md:flex-row items-start justify-between gap-10 mb-10">
+        <!-- Brand -->
+        <div class="max-w-xs">
+          <div class="flex items-center gap-2.5 mb-3">
+            <div class="w-7 h-7 rounded-lg bg-[#1B4F9E] flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="4" fill="white"/>
+                <path d="M9 1v3M9 14v3M1 9h3M14 9h3" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="text-white font-bold text-base">Focal OS</span>
+          </div>
+          <p class="text-sm leading-relaxed">Studio management software built for real estate photographers.</p>
+        </div>
+
+        <!-- Links -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
+          <div>
+            <p class="text-white font-semibold mb-3">Product</p>
+            <ul class="space-y-2">
+              <li><a href="#features" class="hover:text-white transition-colors">Features</a></li>
+              <li><a href="#pricing" class="hover:text-white transition-colors">Pricing</a></li>
+              <li><a href="#faq" class="hover:text-white transition-colors">FAQ</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="text-white font-semibold mb-3">Company</p>
+            <ul class="space-y-2">
+              <li><a href="#" class="hover:text-white transition-colors">About</a></li>
+              <li><a href="mailto:hello@focal-os.com" class="hover:text-white transition-colors">Contact</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="text-white font-semibold mb-3">Legal</p>
+            <ul class="space-y-2">
+              <li><a href="#" class="hover:text-white transition-colors">Privacy Policy</a></li>
+              <li><a href="#" class="hover:text-white transition-colors">Terms of Service</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="border-t border-gray-800 pt-6 text-sm text-center text-gray-600">
+        © 2025 Focal OS. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <!-- ─── JS ───────────────────────────────────────────────────────────────── -->
+  <script>
+    const monthly  = { starter: '$49', pro: '$99',  agency: '$179' };
+    const annual   = { starter: '$39', pro: '$79',  agency: '$143' };
+
+    function setMonthly(isMonthly) {
+      const prices = isMonthly ? monthly : annual;
+      document.getElementById('price-starter').textContent = prices.starter;
+      document.getElementById('price-pro').textContent     = prices.pro;
+      document.getElementById('price-agency').textContent  = prices.agency;
+
+      const btnM = document.getElementById('btn-monthly');
+      const btnA = document.getElementById('btn-annual');
+      if (isMonthly) {
+        btnM.className = 'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-[#1B4F9E] text-white';
+        btnA.className = 'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-gray-500';
+      } else {
+        btnA.className = 'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-[#1B4F9E] text-white';
+        btnM.className = 'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-gray-500';
+      }
+    }
+
+    // Smooth reveal on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.style.opacity = '1';
+          e.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.feature-card').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      observer.observe(el);
+    });
+  </script>
+
+</body>
+</html>

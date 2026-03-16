@@ -9,10 +9,11 @@ const publicRoutes = [
   "/reset-password",
   "/verify",
   "/api/webhooks",
-  "/gallery",     // Public gallery share links
-  "/book",        // Public client booking form
-  "/portal",      // Client portal (self-auth via magic link)
-  "/api/portal",  // Portal API routes (login, verify, logout)
+  "/gallery",      // Public gallery share links
+  "/book",         // Public client booking form
+  "/portal",       // Client portal (self-auth via magic link)
+  "/api/portal",   // Portal API routes (login, verify, logout)
+  "/mobile/login", // Photographer mobile app login
 ];
 
 export async function middleware(request: NextRequest) {
@@ -53,12 +54,16 @@ export async function middleware(request: NextRequest) {
 
   // Redirect unauthenticated users to login
   if (!user && !isPublic) {
+    // Mobile routes redirect to the mobile login page
+    if (pathname.startsWith("/mobile")) {
+      return NextResponse.redirect(new URL("/mobile/login", request.url));
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages (but not mobile login)
   if (user && (pathname === "/login" || pathname === "/register")) {
     return NextResponse.redirect(new URL("/", request.url));
   }

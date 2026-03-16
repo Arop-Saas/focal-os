@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, workspaceProcedure } from "../trpc";
+import { router, workspaceProcedure, adminProcedure } from "../trpc";
 
 export const staffRouter = router({
   list: workspaceProcedure
@@ -65,7 +65,7 @@ export const staffRouter = router({
       return member;
     }),
 
-  invite: workspaceProcedure
+  invite: adminProcedure
     .input(
       z.object({
         email: z.string().email(),
@@ -180,7 +180,7 @@ export const staffRouter = router({
       }
     }),
 
-  updateRole: workspaceProcedure
+  updateRole: adminProcedure
     .input(
       z.object({
         memberId: z.string(),
@@ -200,7 +200,7 @@ export const staffRouter = router({
       });
     }),
 
-  remove: workspaceProcedure
+  remove: adminProcedure
     .input(z.object({ memberId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const member = await ctx.prisma.workspaceMember.findFirst({

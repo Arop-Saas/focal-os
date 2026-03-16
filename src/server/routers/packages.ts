@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, workspaceProcedure } from "../trpc";
+import { router, workspaceProcedure, managerProcedure } from "../trpc";
 
 export const packagesRouter = router({
   listServices: workspaceProcedure.query(async ({ ctx }) => {
@@ -10,7 +10,7 @@ export const packagesRouter = router({
     });
   }),
 
-  createService: workspaceProcedure
+  createService: managerProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -41,7 +41,7 @@ export const packagesRouter = router({
       });
     }),
 
-  updateService: workspaceProcedure
+  updateService: managerProcedure
     .input(
       z.object({
         id: z.string(),
@@ -62,7 +62,7 @@ export const packagesRouter = router({
       return ctx.prisma.service.update({ where: { id }, data });
     }),
 
-  deleteService: workspaceProcedure
+  deleteService: managerProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const service = await ctx.prisma.service.findFirst({
@@ -83,7 +83,7 @@ export const packagesRouter = router({
     });
   }),
 
-  createPackage: workspaceProcedure
+  createPackage: managerProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -119,7 +119,7 @@ export const packagesRouter = router({
       });
     }),
 
-  updatePackage: workspaceProcedure
+  updatePackage: managerProcedure
     .input(
       z.object({
         id: z.string(),
@@ -165,7 +165,7 @@ export const packagesRouter = router({
       });
     }),
 
-  deletePackage: workspaceProcedure
+  deletePackage: managerProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const pkg = await ctx.prisma.package.findFirst({

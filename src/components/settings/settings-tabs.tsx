@@ -25,8 +25,12 @@ import {
   Package,
   Images,
   LayoutDashboard,
+  Users,
+  Tag,
 } from "lucide-react";
 import { IntegrationsTab } from "./integrations-tab";
+import { TeamMembersTab } from "./team-members-tab";
+import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 
 const TIMEZONES = [
   "America/Toronto", "America/New_York", "America/Chicago",
@@ -566,7 +570,19 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
           </button>
         </div>
 
-        {/* ── 7. Billing ──────────────────────────────────────────────── */}
+        {/* ── 7. Brokerage Pricing Groups ─────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <SectionHeading icon={Tag} title="Brokerage Pricing Groups" description="Offer automatic discounts to agents from specific brokerages or corporate accounts" />
+          <BrokerageGroupsManager />
+        </div>
+
+        {/* ── 8. Team Members ─────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <SectionHeading icon={Users} title="Team Members" description="Manage who has access to your workspace and what they can do" />
+          <TeamMembersTab />
+        </div>
+
+        {/* ── 8. Billing ──────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <SectionHeading icon={CreditCard} title="Billing & Subscription" />
           <div className={cn("rounded-xl p-4 border mb-5",

@@ -4,6 +4,10 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import type { MemberRole } from "@prisma/client";
+import { ROLE_HIERARCHY, hasRole } from "@/lib/roles";
+
+export { ROLE_HIERARCHY, hasRole };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -19,6 +23,7 @@ export async function createTRPCContext(opts: CreateContextOptions) {
 
   let user = null;
   let workspace = null;
+  let memberRole: MemberRole | null = null;
 
   if (supabaseUser) {
     user = await prisma.user.findUnique({
@@ -54,6 +59,7 @@ export async function createTRPCContext(opts: CreateContextOptions) {
 
     if (user?.workspaces[0]) {
       workspace = user.workspaces[0].workspace;
+      memberRole = user.workspaces[0].role;
     }
   }
 
@@ -61,6 +67,7 @@ export async function createTRPCContext(opts: CreateContextOptions) {
     supabaseUser,
     user,
     workspace,
+    memberRole,
     prisma,
     req: opts.req,
   };
@@ -115,9 +122,31 @@ const enforceWorkspace = t.middleware(({ ctx, next }) => {
       supabaseUser: ctx.supabaseUser,
       user: ctx.user,
       workspace: ctx.workspace,
+      memberRole: ctx.memberRole,
     },
   });
 });
+
+/**
+ * Role-gate middleware factory. Use this to create role-specific procedures.
+ *
+ * Example:
+ *   export const adminProcedure = workspaceProcedure.use(requireRole("ADMIN"));
+ */
+function requireRole(minRole: MemberRole) {
+  return t.middleware(({ ctx, next }) => {
+    if (!ctx.workspace || !ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    if (!hasRole(ctx.memberRole, minRole)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `This action requires the ${minRole} role or higher.`,
+      });
+    }
+    return next({ ctx });
+  });
+}
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
@@ -126,3 +155,8 @@ export const publicProcedure = t.procedure;
 export const protectedProcedure = t.procedure.use(enforceAuthenticated);
 export const workspaceProcedure = t.procedure.use(enforceWorkspace);
 export const createCallerFactory = t.createCallerFactory;
+
+// Role-gated procedures — compose these onto workspaceProcedure
+export const managerProcedure = workspaceProcedure.use(requireRole("MANAGER"));
+export const adminProcedure   = workspaceProcedure.use(requireRole("ADMIN"));
+export const ownerProcedure   = workspaceProcedure.use(requireRole("OWNER"));

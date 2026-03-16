@@ -77,4 +77,58 @@ export const messagesRouter = router({
         },
       });
     }),
+
+  // All conversations — one entry per job that has at least one message
+  allConversations: workspaceProcedure.query(async ({ ctx }) => {
+    // Get all jobs with messages, latest message per job
+    const jobs = await ctx.prisma.job.findMany({
+      where: {
+        workspaceId: ctx.workspace.id,
+        messages: { some: {} },
+      },
+      include: {
+        client: { select: { id: true, firstName: true, lastName: true, email: true } },
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    // Get unread counts per job in one query
+    const unreadCounts = await ctx.prisma.jobMessage.groupBy({
+      by: ["jobId"],
+      where: {
+        workspaceId: ctx.workspace.id,
+        senderType: "CLIENT",
+        readAt: null,
+      },
+      _count: true,
+    });
+
+    const unreadMap = new Map(unreadCounts.map((r) => [r.jobId, r._count]));
+
+    return jobs.map((job) => ({
+      jobId: job.id,
+      jobNumber: job.jobNumber,
+      propertyAddress: job.propertyAddress,
+      status: job.status,
+      client: job.client,
+      latestMessage: job.messages[0] ?? null,
+      unreadCount: unreadMap.get(job.id) ?? 0,
+    }));
+  }),
+
+  // Total unread across all jobs in this workspace (for sidebar badge)
+  totalUnread: workspaceProcedure.query(async ({ ctx }) => {
+    const count = await ctx.prisma.jobMessage.count({
+      where: {
+        workspaceId: ctx.workspace.id,
+        senderType: "CLIENT",
+        readAt: null,
+      },
+    });
+    return { count };
+  }),
 });

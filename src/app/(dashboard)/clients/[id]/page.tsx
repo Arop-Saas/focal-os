@@ -6,6 +6,8 @@ import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { ArrowLeft, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PortalInviteButton } from "@/components/clients/portal-invite-button";
+import { ClientNotesEditor } from "@/components/clients/client-notes-editor";
+import { BrokerageGroupSelector } from "@/components/clients/brokerage-group-selector";
 
 export const metadata = { title: "Client Details" };
 
@@ -62,6 +64,9 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const client = await prisma.client.findUnique({
     where: { id: params.id },
     include: {
+      brokerageGroup: {
+        select: { id: true, name: true, discountType: true, discountValue: true },
+      },
       jobs: {
         orderBy: { createdAt: "desc" },
         take: 10,
@@ -186,6 +191,18 @@ export default async function ClientDetailPage({ params }: PageProps) {
               </p>
             </div>
           </div>
+
+          {/* Brokerage Pricing Group */}
+          <BrokerageGroupSelector
+            clientId={client.id}
+            initialGroupId={client.brokerageGroup?.id ?? null}
+            initialGroupName={client.brokerageGroup?.name ?? null}
+            initialDiscountType={client.brokerageGroup?.discountType ?? null}
+            initialDiscountValue={client.brokerageGroup?.discountValue ?? null}
+          />
+
+          {/* Internal Notes */}
+          <ClientNotesEditor clientId={client.id} initialNotes={client.notes} />
 
           {/* Recent Jobs */}
           {client.jobs.length > 0 && (

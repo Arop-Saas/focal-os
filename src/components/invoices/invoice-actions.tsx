@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/trpc/client";
 import { formatCurrency } from "@/lib/utils";
+import { useCurrentRole } from "@/hooks/use-current-role";
 import { Send, Check, Ban, Loader2 } from "lucide-react";
 
 interface InvoiceActionsProps {
@@ -17,6 +18,7 @@ interface InvoiceActionsProps {
 
 export function InvoiceActions({ invoice }: InvoiceActionsProps) {
   const router = useRouter();
+  const { can } = useCurrentRole();
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
   const [payAmount, setPayAmount] = useState(invoice.amountDue.toFixed(2));
 
@@ -122,8 +124,8 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
         </div>
       )}
 
-      {/* Void (not PAID and not already VOID) */}
-      {invoice.status !== "PAID" && invoice.status !== "VOID" && (
+      {/* Void (MANAGER+ only; not PAID and not already VOID) */}
+      {can("MANAGER") && invoice.status !== "PAID" && invoice.status !== "VOID" && (
         <button
           onClick={() => {
             if (confirm("Void this invoice? This cannot be undone.")) {

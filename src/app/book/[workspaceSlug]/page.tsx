@@ -712,8 +712,11 @@ export default function BookingPage() {
 
   const submitMutation = trpc.booking.submit.useMutation({
     onSuccess: (result) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const selectedPkg = data?.packages?.find((p: any) => p.id === form.packageId);
+      const pkgName = selectedPkg?.name ?? "";
       router.push(
-        `/book/${workspaceSlug}/success?job=${result.jobNumber}&name=${encodeURIComponent(result.clientName)}&date=${encodeURIComponent(result.scheduledAt)}`
+        `/book/${workspaceSlug}/success?job=${result.jobNumber}&name=${encodeURIComponent(result.clientName)}&date=${encodeURIComponent(result.scheduledAt)}&pkg=${encodeURIComponent(pkgName)}`
       );
     },
     onError: (err) => {

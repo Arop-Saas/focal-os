@@ -60,19 +60,20 @@ model Workspace {
   brandColor            String   @default("#1B4F9E")
 
   // Relations
-  members     WorkspaceMember[]
-  clients     Client[]
-  jobs        Job[]
-  packages    Package[]
-  services    Service[]
-  orders      Order[]
-  invoices    Invoice[]
-  staff       StaffProfile[]
-  galleries   Gallery[]
-  notifications Notification[]
-  activityLogs  ActivityLog[]
-  hours       WorkspaceHours[]
-  territories ServiceTerritory[]
+  members          WorkspaceMember[]
+  clients          Client[]
+  jobs             Job[]
+  packages         Package[]
+  services         Service[]
+  orders           Order[]
+  invoices         Invoice[]
+  staff            StaffProfile[]
+  galleries        Gallery[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  hours            WorkspaceHours[]
+  territories      ServiceTerritory[]
+  brokerageGroups  BrokerageGroup[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -259,6 +260,10 @@ model Client {
   tags          String[]
   stripeCustomerId String?
 
+  // Brokerage pricing group
+  brokerageGroupId String?
+  brokerageGroup   BrokerageGroup? @relation(fields: [brokerageGroupId], references: [id], onDelete: SetNull)
+
   // Stats (denormalized for perf)
   totalJobs     Int      @default(0)
   totalRevenue  Float    @default(0)
@@ -308,6 +313,33 @@ model ClientContact {
   client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// BROKERAGE PRICING GROUPS
+// ─────────────────────────────────────────────────────────────
+
+model BrokerageGroup {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  name          String                      // e.g. "RE/MAX", "Coldwell Banker VIP"
+  discountType  DiscountType @default(PERCENTAGE)
+  discountValue Float        @default(0)   // 10 = 10% off, or $10 flat
+  isActive      Boolean      @default(true)
+  notes         String?
+
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clients       Client[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([workspaceId])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -439,6 +471,7 @@ model Job {
   statusHistory   JobStatusHistory[]
   notifications   Notification[]
   messages        JobMessage[]
+  checklist       JobChecklistItem[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -883,4 +916,23 @@ model JobMessage {
 
   @@index([jobId])
   @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// JOB CHECKLIST
+// ─────────────────────────────────────────────────────────────
+
+model JobChecklistItem {
+  id          String   @id @default(cuid())
+  jobId       String
+  label       String
+  checked     Boolean  @default(false)
+  sortOrder   Int      @default(0)
+
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobId])
 }

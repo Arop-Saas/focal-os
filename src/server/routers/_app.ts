@@ -12,6 +12,9 @@ import { notificationsRouter } from "./notifications";
 import { availabilityRouter } from "./availability";
 import { territoriesRouter } from "./territories";
 import { messagesRouter } from "./messages";
+import { checklistRouter } from "./checklist";
+import { brokeragesRouter } from "./brokerages";
+import { mobileRouter } from "./mobile";
 
 export const appRouter = router({
   workspace: workspaceRouter,
@@ -27,6 +30,9 @@ export const appRouter = router({
   availability: availabilityRouter,
   territories: territoriesRouter,
   messages: messagesRouter,
+  checklist: checklistRouter,
+  brokerages: brokeragesRouter,
+  mobile: mobileRouter,
 });
 
 export type AppRouter = typeof appRouter;

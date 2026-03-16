@@ -13,6 +13,8 @@ import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
 import { JobAssignmentPicker } from "@/components/jobs/job-assignment-picker";
 import { JobMessageThread } from "@/components/messages/job-message-thread";
+import { JobChecklist } from "@/components/jobs/job-checklist";
+import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-button";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   const job = await prisma.job.findFirst({
     where: { id: params.id, workspaceId },
     include: {
-      client: true,
+      client: { include: { brokerageGroup: { select: { name: true, discountType: true, discountValue: true, isActive: true } } } },
       package: { include: { items: { include: { service: true } } } },
       services: { include: { service: true } },
       assignments: {
@@ -291,15 +293,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                     </Link>
                   </div>
                 ) : (
-                  <div className="text-center py-3">
-                    <p className="text-xs text-gray-400 mb-3">No invoice yet</p>
-                    <Link
-                      href={`/invoices/new?jobId=${job.id}`}
-                      className="block text-center text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 py-1.5 rounded-lg transition-colors"
-                    >
-                      Create Invoice
-                    </Link>
-                  </div>
+                  <JobAutoInvoiceButton
+                    jobId={job.id}
+                    packageName={job.package?.name}
+                    packagePrice={job.package?.price}
+                    brokerageGroupName={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.name : null}
+                    brokerageDiscountType={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.discountType : null}
+                    brokerageDiscountValue={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.discountValue : null}
+                  />
                 )}
               </div>
 
@@ -309,6 +310,9 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                 propertyAddress={job.propertyAddress}
                 gallery={job.gallery}
               />
+
+              {/* Checklist */}
+              <JobChecklist jobId={job.id} />
 
               {/* Client messages */}
               <JobMessageThread jobId={job.id} />
