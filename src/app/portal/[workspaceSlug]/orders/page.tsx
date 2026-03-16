@@ -4,6 +4,7 @@ import { PortalNav } from "@/components/portal/portal-nav";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Package, ArrowRight, ShoppingCart, CheckCircle2, Circle, Clock } from "lucide-react";
+import { PortalMessageThread } from "@/components/portal/portal-message-thread";
 
 export const dynamic = "force-dynamic";
 
@@ -180,6 +181,13 @@ export default async function PortalOrdersPage({
 
                   {/* Progress stepper */}
                   <StatusStepper status={job.status} />
+
+                  {/* Messaging */}
+                  <PortalMessageThread
+                    jobId={job.id}
+                    workspaceSlug={params.workspaceSlug}
+                    brandColor={workspace.brandColor ?? "#3B82F6"}
+                  />
                 </div>
               ))}
             </div>

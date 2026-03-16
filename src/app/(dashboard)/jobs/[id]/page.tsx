@@ -12,6 +12,7 @@ import {
 import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
 import { JobAssignmentPicker } from "@/components/jobs/job-assignment-picker";
+import { JobMessageThread } from "@/components/messages/job-message-thread";
 
 export const dynamic = "force-dynamic";
 
@@ -308,6 +309,9 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                 propertyAddress={job.propertyAddress}
                 gallery={job.gallery}
               />
+
+              {/* Client messages */}
+              <JobMessageThread jobId={job.id} />
 
               {/* Status history */}
               {job.statusHistory.length > 0 && (

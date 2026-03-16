@@ -11,6 +11,7 @@ import { galleryRouter } from "./gallery";
 import { notificationsRouter } from "./notifications";
 import { availabilityRouter } from "./availability";
 import { territoriesRouter } from "./territories";
+import { messagesRouter } from "./messages";
 
 export const appRouter = router({
   workspace: workspaceRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   notifications: notificationsRouter,
   availability: availabilityRouter,
   territories: territoriesRouter,
+  messages: messagesRouter,
 });
 
 export type AppRouter = typeof appRouter;

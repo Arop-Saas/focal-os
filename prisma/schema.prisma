@@ -195,6 +195,7 @@ model StaffAvailability {
 
   staff       StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
+  @@unique([staffId, dayOfWeek])
   @@index([staffId])
 }
 
@@ -437,6 +438,7 @@ model Job {
   invoice         Invoice?
   statusHistory   JobStatusHistory[]
   notifications   Notification[]
+  messages        JobMessage[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -860,4 +862,25 @@ model ActivityLog {
   @@index([workspaceId])
   @@index([entityType, entityId])
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// JOB MESSAGES (client ↔ staff messaging per job)
+// ─────────────────────────────────────────────────────────────
+
+model JobMessage {
+  id          String   @id @default(cuid())
+  jobId       String
+  workspaceId String
+  senderType  String   // "CLIENT" | "STAFF"
+  senderName  String
+  body        String
+  readAt      DateTime?
+
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([jobId])
+  @@index([workspaceId])
 }

@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatDate, getInitials } from "@/lib/utils";
-import { Mail, MoreVertical, X } from "lucide-react";
+import { Mail, MoreVertical, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 
 const ROLE_COLORS: Record<string, string> = {
   OWNER: "bg-purple-100 text-purple-800",
@@ -144,9 +145,20 @@ export function StaffTable() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                        <MoreVertical className="h-4 w-4 text-gray-400" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {member.staffProfile?.id && (
+                          <Link
+                            href={`/staff/${member.staffProfile.id}`}
+                            className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-gray-700"
+                            title="View profile & availability"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        )}
+                        <button className="p-1 hover:bg-gray-100 rounded transition-colors">
+                          <MoreVertical className="h-4 w-4 text-gray-400" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

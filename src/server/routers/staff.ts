@@ -377,4 +377,71 @@ export const staffRouter = router({
 
       return { payouts, grandTotal: Math.round(grandTotal * 100) / 100 };
     }),
+
+  // ── Staff Availability ────────────────────────────────────────────────────
+
+  getAvailability: workspaceProcedure
+    .input(z.object({ staffId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const staff = await ctx.prisma.staffProfile.findFirst({
+        where: { id: input.staffId, workspaceId: ctx.workspace.id },
+        select: { id: true },
+      });
+      if (!staff) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const rows = await ctx.prisma.staffAvailability.findMany({
+        where: { staffId: input.staffId },
+        orderBy: { dayOfWeek: "asc" },
+      });
+
+      const DEFAULT = [
+        { dayOfWeek: 0, isAvailable: false, startTime: "09:00", endTime: "17:00" },
+        { dayOfWeek: 1, isAvailable: true,  startTime: "09:00", endTime: "17:00" },
+        { dayOfWeek: 2, isAvailable: true,  startTime: "09:00", endTime: "17:00" },
+        { dayOfWeek: 3, isAvailable: true,  startTime: "09:00", endTime: "17:00" },
+        { dayOfWeek: 4, isAvailable: true,  startTime: "09:00", endTime: "17:00" },
+        { dayOfWeek: 5, isAvailable: true,  startTime: "09:00", endTime: "17:00" },
+        { dayOfWeek: 6, isAvailable: false, startTime: "09:00", endTime: "17:00" },
+      ];
+
+      return DEFAULT.map((def) => {
+        const row = rows.find((r) => r.dayOfWeek === def.dayOfWeek);
+        return row
+          ? { dayOfWeek: row.dayOfWeek, isAvailable: row.isAvailable, startTime: row.startTime, endTime: row.endTime }
+          : def;
+      });
+    }),
+
+  saveAvailability: workspaceProcedure
+    .input(
+      z.object({
+        staffId: z.string(),
+        availability: z.array(
+          z.object({
+            dayOfWeek: z.number().int().min(0).max(6),
+            isAvailable: z.boolean(),
+            startTime: z.string().regex(/^\d{2}:\d{2}$/),
+            endTime: z.string().regex(/^\d{2}:\d{2}$/),
+          })
+        ).length(7),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const staff = await ctx.prisma.staffProfile.findFirst({
+        where: { id: input.staffId, workspaceId: ctx.workspace.id },
+        select: { id: true },
+      });
+      if (!staff) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await ctx.prisma.$transaction(
+        input.availability.map((day) =>
+          ctx.prisma.staffAvailability.upsert({
+            where: { staffId_dayOfWeek: { staffId: input.staffId, dayOfWeek: day.dayOfWeek } },
+            create: { staffId: input.staffId, ...day },
+            update: { isAvailable: day.isAvailable, startTime: day.startTime, endTime: day.endTime },
+          })
+        )
+      );
+      return { ok: true };
+    }),
 });
