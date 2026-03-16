@@ -112,43 +112,90 @@ export default function GalleryDetailPage() {
     onError: (err) => { alert(err.message); setAddingTour(false); },
   });
 
-  // Upload a single file (photo or video)
+  // Upload a single file — uses presigned URL so large videos bypass Vercel's body limit
   const uploadFile = useCallback(
     async (file: File, itemId: string) => {
       setUploads((prev) =>
-        prev.map((u) => (u.id === itemId ? { ...u, status: "uploading", progress: 10 } : u))
+        prev.map((u) => (u.id === itemId ? { ...u, status: "uploading", progress: 5 } : u))
       );
       try {
-        const form = new FormData();
-        form.append("galleryId", galleryId);
-        form.append("file", file);
-
-        const res = await fetch("/api/gallery/upload", { method: "POST", body: form });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Upload failed");
+        // Step 1: Get a presigned upload URL from our API (tiny JSON payload, no file)
+        const urlRes = await fetch("/api/gallery/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            galleryId,
+            fileName: file.name,
+            mimeType: file.type,
+            fileSize: file.size,
+          }),
+        });
+        const urlData = await urlRes.json() as {
+          signedUrl: string; token: string; storageKey: string; cdnUrl: string;
+          fileName: string; originalName: string; mimeType: string; fileSize: number; mediaType: string;
+          error?: string;
+        };
+        if (!urlRes.ok) throw new Error(urlData.error ?? "Could not get upload URL");
 
         setUploads((prev) =>
-          prev.map((u) => (u.id === itemId ? { ...u, progress: 80 } : u))
+          prev.map((u) => (u.id === itemId ? { ...u, progress: 15 } : u))
         );
 
+        // Step 2: Upload the file directly to Supabase Storage via XHR (bypasses Vercel, enables progress)
+        // Supabase storage expects multipart FormData with cacheControl + file at key ""
+        await new Promise<void>((resolve, reject) => {
+          const formBody = new FormData();
+          formBody.append("cacheControl", "3600");
+          formBody.append("", file);          // Supabase SDK uses empty-string key for the file
+
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 75) + 15;
+              setUploads((prev) =>
+                prev.map((u) => (u.id === itemId ? { ...u, progress: Math.min(pct, 90) } : u))
+              );
+            }
+          });
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              let msg = `Upload failed (${xhr.status})`;
+              try { msg = (JSON.parse(xhr.responseText) as { message?: string }).message ?? msg; } catch { /* ignore */ }
+              reject(new Error(msg));
+            }
+          });
+          xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+          xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+          xhr.open("PUT", urlData.signedUrl);
+          // Do NOT set Content-Type — browser sets it automatically for FormData (includes boundary)
+          xhr.send(formBody);
+        });
+
+        setUploads((prev) =>
+          prev.map((u) => (u.id === itemId ? { ...u, progress: 92 } : u))
+        );
+
+        // Step 3: Register the uploaded file in our database via tRPC
         const isFirstPhoto =
           (gallery?.media?.filter((m) => m.mediaType === "PHOTO").length ?? 0) === 0;
 
         await addMediaMutation.mutateAsync({
           galleryId,
-          fileName: data.fileName,
-          originalName: data.originalName,
-          mimeType: data.mimeType,
-          fileSize: data.fileSize,
-          storageKey: data.storageKey,
-          cdnUrl: data.cdnUrl,
-          mediaType: data.mediaType ?? "PHOTO",
-          isCover: data.mediaType === "PHOTO" && isFirstPhoto,
+          fileName: urlData.fileName,
+          originalName: urlData.originalName,
+          mimeType: urlData.mimeType,
+          fileSize: urlData.fileSize,
+          storageKey: urlData.storageKey,
+          cdnUrl: urlData.cdnUrl,
+          mediaType: urlData.mediaType as "PHOTO" | "VIDEO" | "DRONE_VIDEO",
+          isCover: urlData.mediaType === "PHOTO" && isFirstPhoto,
         });
 
         setUploads((prev) =>
           prev.map((u) =>
-            u.id === itemId ? { ...u, status: "done", progress: 100, cdnUrl: data.cdnUrl } : u
+            u.id === itemId ? { ...u, status: "done", progress: 100, cdnUrl: urlData.cdnUrl } : u
           )
         );
       } catch (err) {
