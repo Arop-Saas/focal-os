@@ -72,6 +72,7 @@ model Workspace {
   notifications Notification[]
   activityLogs  ActivityLog[]
   hours       WorkspaceHours[]
+  territories ServiceTerritory[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -208,6 +209,22 @@ model WorkspaceHours {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, dayOfWeek])
+  @@index([workspaceId])
+}
+
+model ServiceTerritory {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String   @default("#3B82F6")
+  description String?
+  cities      String?  // comma-separated list of cities/regions
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([workspaceId])
 }
 

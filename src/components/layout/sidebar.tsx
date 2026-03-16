@@ -19,6 +19,7 @@ import {
   LogOut,
   ShieldAlert,
   Clock,
+  MapPin,
 } from "lucide-react";
 import { NotificationBell } from "./notification-bell";
 import { createClient } from "@/lib/supabase/client";
@@ -53,6 +54,7 @@ const navGroups = [
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Gallery", href: "/gallery", icon: Image },
       { label: "Availability", href: "/availability", icon: Clock },
+      { label: "Territories", href: "/territories", icon: MapPin },
     ],
   },
   {
