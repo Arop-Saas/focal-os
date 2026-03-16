@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { Header } from "@/components/layout/header";
-import { AvailabilityEditor } from "@/components/availability/availability-editor";
+import { AvailabilityTabs } from "@/components/availability/availability-tabs";
 
 export const metadata = { title: "Availability" };
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ export default async function AvailabilityPage() {
 
   const workspaceId = user!.workspaces[0].workspace.id;
 
+  // Load business hours
   const rows = await prisma.workspaceHours.findMany({
     where: { workspaceId },
     orderBy: { dayOfWeek: "asc" },
@@ -42,14 +43,20 @@ export default async function AvailabilityPage() {
     };
   });
 
+  // Load territories
+  const territories = await prisma.serviceTerritory.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "asc" },
+  });
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header
         title="Availability"
-        description="Set your studio's weekly business hours"
+        description="Manage your business hours and service territories"
       />
       <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-        <AvailabilityEditor initialHours={initialHours} />
+        <AvailabilityTabs initialHours={initialHours} initialTerritories={territories} />
       </div>
     </div>
   );
