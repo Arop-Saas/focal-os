@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format } from "date-fns";
@@ -193,7 +193,7 @@ function PaymentGate({
   );
 }
 
-// ─── Lightbox ─────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MediaItem {
   id: string;
@@ -207,15 +207,34 @@ interface MediaItem {
   mimeType: string;
 }
 
+// ─── Download helper ──────────────────────────────────────────────────────────
+
+async function downloadFile(url: string, filename: string) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+
 function Lightbox({
   media,
   index,
+  downloadEnabled,
   onClose,
   onPrev,
   onNext,
 }: {
   media: MediaItem[];
   index: number;
+  downloadEnabled: boolean;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -223,69 +242,60 @@ function Lightbox({
   const item = media[index];
   if (!item) return null;
 
+  // Keyboard nav
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") onPrev();
+      if (e.key === "ArrowRight") onNext();
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onPrev, onNext, onClose]);
+
+  const isVideo = item.mediaType === "VIDEO" || item.mediaType === "DRONE_VIDEO";
+
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/95 flex flex-col"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 bg-black/97 flex flex-col" onClick={onClose}>
       {/* Top bar */}
-      <div
-        className="flex items-center justify-between px-6 py-4 shrink-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <span className="text-white/60 text-sm">
-          {index + 1} / {media.length}
-        </span>
-        <button
-          onClick={onClose}
-          className="text-white/60 hover:text-white text-2xl leading-none transition-colors"
-        >
-          ×
-        </button>
+      <div className="flex items-center justify-between px-5 py-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <span className="text-white/50 text-sm font-medium">{index + 1} / {media.length}</span>
+        <div className="flex items-center gap-3">
+          {downloadEnabled && item.cdnUrl && (
+            <button
+              onClick={() => downloadFile(item.cdnUrl!, item.originalName)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors"
+            >
+              ↓ Download
+            </button>
+          )}
+          <button onClick={onClose} className="text-white/50 hover:text-white text-2xl leading-none transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">×</button>
+        </div>
       </div>
 
-      {/* Image */}
-      <div
-        className="flex-1 flex items-center justify-center px-16 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Prev */}
+      {/* Media */}
+      <div className="flex-1 flex items-center justify-center px-14 overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {index > 0 && (
-          <button
-            onClick={onPrev}
-            className="absolute left-4 text-white/60 hover:text-white text-4xl px-2 transition-colors z-10"
-          >
-            ‹
-          </button>
+          <button onClick={onPrev} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-5xl px-2 transition-colors z-10 h-16 flex items-center">‹</button>
         )}
 
         {item.cdnUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.cdnUrl}
-            alt={item.originalName}
-            className="max-w-full max-h-full object-contain select-none"
-            draggable={false}
-          />
+          isVideo ? (
+            <video src={item.cdnUrl} controls autoPlay className="max-w-full max-h-full rounded-lg" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.cdnUrl} alt={item.originalName} className="max-w-full max-h-full object-contain select-none rounded" draggable={false} />
+          )
         )}
 
-        {/* Next */}
         {index < media.length - 1 && (
-          <button
-            onClick={onNext}
-            className="absolute right-4 text-white/60 hover:text-white text-4xl px-2 transition-colors z-10"
-          >
-            ›
-          </button>
+          <button onClick={onNext} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-5xl px-2 transition-colors z-10 h-16 flex items-center">›</button>
         )}
       </div>
 
-      {/* Bottom caption */}
-      <div
-        className="px-6 py-4 shrink-0 text-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-white/40 text-xs">{item.originalName}</p>
+      {/* Caption */}
+      <div className="px-6 py-3 shrink-0 text-center" onClick={(e) => e.stopPropagation()}>
+        <p className="text-white/30 text-xs">{item.originalName}</p>
       </div>
     </div>
   );
@@ -312,62 +322,119 @@ function GalleryView({
   };
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"photos" | "videos">("photos");
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ done: number; total: number } | null>(null);
   const brandColor = gallery.workspace.brandColor ?? "#1B4F9E";
 
-  const photos = gallery.media;
+  const photos = gallery.media.filter((m) => m.mediaType === "PHOTO");
+  const videos = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
+  const activeMedia = activeTab === "photos" ? photos : videos;
+
+  // Find lightbox index within activeMedia
+  const handleDownloadAll = useCallback(async () => {
+    if (downloading) return;
+    const downloadable = activeMedia.filter((m) => m.cdnUrl);
+    if (downloadable.length === 0) return;
+    setDownloading(true);
+    setDownloadProgress({ done: 0, total: downloadable.length });
+    for (let i = 0; i < downloadable.length; i++) {
+      const item = downloadable[i];
+      if (item.cdnUrl) {
+        await downloadFile(item.cdnUrl, item.originalName);
+        setDownloadProgress({ done: i + 1, total: downloadable.length });
+        // Small delay to avoid browser blocking multiple downloads
+        if (i < downloadable.length - 1) await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+    setDownloading(false);
+    setDownloadProgress(null);
+  }, [downloading, activeMedia]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
       <header className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             {gallery.workspace.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={gallery.workspace.logoUrl}
-                alt={gallery.workspace.name}
-                className="h-7 w-auto"
-              />
+              <img src={gallery.workspace.logoUrl} alt={gallery.workspace.name} className="h-8 w-auto rounded" />
             )}
             <div>
               <p className="text-xs text-gray-500">{gallery.workspace.name}</p>
-              <h1 className="font-semibold text-white text-sm">{gallery.name}</h1>
+              <h1 className="font-semibold text-white">{gallery.name}</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-gray-400">
-            <span>{gallery.mediaCount} photos</span>
+          <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
             {gallery.expiresAt && (
-              <span>Expires {format(new Date(gallery.expiresAt), "MMM d, yyyy")}</span>
+              <span className="bg-gray-800 px-2.5 py-1 rounded-full">
+                Expires {format(new Date(gallery.expiresAt), "MMM d, yyyy")}
+              </span>
             )}
             {gallery.downloadEnabled && (
-              <a
-                href={`/api/gallery/download/${gallery.slug}`}
+              <button
+                onClick={handleDownloadAll}
+                disabled={downloading}
                 style={{ backgroundColor: brandColor }}
-                className="px-4 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                className="px-4 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-1.5"
               >
-                ↓ Download All
-              </a>
+                {downloading && downloadProgress ? (
+                  <>
+                    <span className="animate-spin inline-block w-3 h-3 border border-white/30 border-t-white rounded-full" />
+                    {downloadProgress.done}/{downloadProgress.total}
+                  </>
+                ) : (
+                  <>↓ Download All {activeTab === "photos" ? `(${photos.length})` : `(${videos.length})`}</>
+                )}
+              </button>
             )}
           </div>
         </div>
       </header>
 
-      {/* Address banner */}
-      <div className="border-b border-gray-800 px-6 py-3">
+      {/* Address + tabs bar */}
+      <div className="border-b border-gray-800 px-6">
         <div className="max-w-7xl mx-auto">
-          <p className="text-gray-400 text-sm">
+          <p className="text-gray-400 text-sm py-3 border-b border-gray-800/50">
             📍 {gallery.propertyAddress}, {gallery.propertyCity}, {gallery.propertyState}
           </p>
+          <div className="flex items-center gap-1 pt-1 pb-0">
+            <button
+              onClick={() => setActiveTab("photos")}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "photos"
+                  ? "border-white text-white"
+                  : "border-transparent text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              Photos {photos.length > 0 && <span className="ml-1 text-xs opacity-60">{photos.length}</span>}
+            </button>
+            {videos.length > 0 && (
+              <button
+                onClick={() => setActiveTab("videos")}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "videos"
+                    ? "border-white text-white"
+                    : "border-transparent text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                Videos <span className="ml-1 text-xs opacity-60">{videos.length}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Photo grid */}
+      {/* Media grid */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {photos.length === 0 ? (
-          <div className="text-center py-20 text-gray-600">No photos available yet.</div>
-        ) : (
+        {activeMedia.length === 0 ? (
+          <div className="text-center py-20 text-gray-600">
+            {activeTab === "photos" ? "No photos available yet." : "No videos available yet."}
+          </div>
+        ) : activeTab === "photos" ? (
+          /* Photo masonry grid */
           <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 space-y-2">
             {photos.map((photo, i) => (
               <div
@@ -384,19 +451,45 @@ function GalleryView({
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-full h-40 bg-gray-800 flex items-center justify-center text-gray-600 text-xs">
-                    No preview
-                  </div>
+                  <div className="w-full h-40 bg-gray-800 flex items-center justify-center text-gray-600 text-xs">No preview</div>
                 )}
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
-                  <span className="text-white/0 group-hover:text-white/80 transition-colors text-2xl">⤢</span>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100">
+                  {gallery.downloadEnabled && photo.cdnUrl && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadFile(photo.cdnUrl!, photo.originalName); }}
+                      className="bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1 rounded-lg font-medium backdrop-blur-sm transition-colors"
+                    >
+                      ↓
+                    </button>
+                  )}
                 </div>
                 {photo.isCover && (
-                  <span className="absolute top-2 left-2 text-[10px] bg-white/20 backdrop-blur text-white px-1.5 py-0.5 rounded font-medium">
-                    Cover
-                  </span>
+                  <span className="absolute top-2 left-2 text-[10px] bg-white/20 backdrop-blur text-white px-1.5 py-0.5 rounded font-medium">Cover</span>
                 )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Video grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {videos.map((video) => (
+              <div key={video.id} className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
+                {video.cdnUrl ? (
+                  <video src={video.cdnUrl} controls className="w-full aspect-video object-cover" />
+                ) : (
+                  <div className="w-full aspect-video bg-gray-800 flex items-center justify-center text-gray-600 text-sm">No preview</div>
+                )}
+                <div className="px-3 py-2.5 flex items-center justify-between">
+                  <p className="text-xs text-gray-400 truncate">{video.originalName}</p>
+                  {gallery.downloadEnabled && video.cdnUrl && (
+                    <button
+                      onClick={() => downloadFile(video.cdnUrl!, video.originalName)}
+                      className="ml-2 shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
+                    >
+                      ↓ Save
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -404,20 +497,19 @@ function GalleryView({
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 px-6 py-4 text-center">
+      <footer className="border-t border-gray-800 px-6 py-4 text-center mt-4">
         <p className="text-gray-600 text-xs">Powered by FocalOS</p>
       </footer>
 
-      {/* Lightbox */}
-      {lightboxIndex !== null && (
+      {/* Lightbox — only for photos */}
+      {lightboxIndex !== null && activeTab === "photos" && (
         <Lightbox
           media={photos}
           index={lightboxIndex}
+          downloadEnabled={gallery.downloadEnabled}
           onClose={() => setLightboxIndex(null)}
           onPrev={() => setLightboxIndex((i) => Math.max(0, (i ?? 0) - 1))}
-          onNext={() =>
-            setLightboxIndex((i) => Math.min(photos.length - 1, (i ?? 0) + 1))
-          }
+          onNext={() => setLightboxIndex((i) => Math.min(photos.length - 1, (i ?? 0) + 1))}
         />
       )}
     </div>
