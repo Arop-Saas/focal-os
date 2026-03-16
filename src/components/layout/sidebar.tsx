@@ -18,6 +18,7 @@ import {
   Aperture,
   LogOut,
   ShieldAlert,
+  Clock,
 } from "lucide-react";
 import { NotificationBell } from "./notification-bell";
 import { createClient } from "@/lib/supabase/client";
@@ -51,6 +52,7 @@ const navGroups = [
       { label: "Packages", href: "/packages", icon: Package },
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Gallery", href: "/gallery", icon: Image },
+      { label: "Availability", href: "/availability", icon: Clock },
     ],
   },
   {

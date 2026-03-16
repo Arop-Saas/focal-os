@@ -71,6 +71,7 @@ model Workspace {
   galleries   Gallery[]
   notifications Notification[]
   activityLogs  ActivityLog[]
+  hours       WorkspaceHours[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -194,6 +195,20 @@ model StaffAvailability {
   staff       StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   @@index([staffId])
+}
+
+model WorkspaceHours {
+  id          String   @id @default(cuid())
+  workspaceId String
+  dayOfWeek   Int      // 0=Sunday … 6=Saturday
+  isOpen      Boolean  @default(true)
+  openTime    String   @default("09:00")  // "HH:MM" 24h
+  closeTime   String   @default("17:00")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, dayOfWeek])
+  @@index([workspaceId])
 }
 
 // ─────────────────────────────────────────────────────────────
