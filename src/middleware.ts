@@ -14,6 +14,8 @@ const publicRoutes = [
   "/portal",       // Client portal (self-auth via magic link)
   "/api/portal",   // Portal API routes (login, verify, logout)
   "/mobile/login", // Photographer mobile app login
+  "/invite",       // Staff invite acceptance pages
+  "/api/staff/accept-invite", // Accept invite API
 ];
 
 export async function middleware(request: NextRequest) {

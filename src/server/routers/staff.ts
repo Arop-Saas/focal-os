@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, workspaceProcedure, adminProcedure } from "../trpc";
+import { randomBytes } from "crypto";
+import { Resend } from "resend";
+import { staffInviteEmail } from "@/lib/emails/staff-invite";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const staffRouter = router({
   list: workspaceProcedure
@@ -76,71 +81,65 @@ export const staffRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Check if user already exists
-      let user = await ctx.prisma.user.findUnique({
-        where: { email: input.email },
-      });
-
       // Check if already a member
-      if (user) {
-        const existing = await ctx.prisma.workspaceMember.findFirst({
-          where: { workspaceId: ctx.workspace.id, userId: user.id },
-        });
-        if (existing) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "This person is already a team member.",
-          });
-        }
-      }
-
-      // TODO: Send invitation email via Resend
-      // For now, if user exists, add them directly
-      // In production, implement invite token flow
-
-      if (!user) {
-        // Create placeholder user (they'll sign up later)
-        const { createAdminClient } = await import("@/lib/supabase/server");
-        const adminSupabase = await createAdminClient();
-
-        const { data: authUser, error } = await adminSupabase.auth.admin.inviteUserByEmail(
-          input.email,
-          { data: { full_name: input.fullName } }
-        );
-
-        if (error) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-        }
-
-        user = await ctx.prisma.user.create({
-          data: {
-            supabaseId: authUser.user.id,
-            email: input.email,
-            fullName: input.fullName,
-          },
-        });
-      }
-
-      const member = await ctx.prisma.$transaction(async (tx) => {
-        const m = await tx.workspaceMember.create({
-          data: {
-            workspaceId: ctx.workspace.id,
-            userId: user!.id,
-            role: input.role,
-          },
-        });
-
-        await tx.staffProfile.create({
-          data: {
-            workspaceId: ctx.workspace.id,
-            memberId: m.id,
-          },
-        });
-
-        return m;
+      const existingUser = await ctx.prisma.user.findUnique({
+        where: { email: input.email },
+        include: { workspaces: { where: { workspaceId: ctx.workspace.id } } },
       });
 
-      return member;
+      if (existingUser?.workspaces.length) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This person is already a team member.",
+        });
+      }
+
+      // Invalidate any previous pending invites for this email+workspace
+      await ctx.prisma.staffInvite.updateMany({
+        where: {
+          workspaceId: ctx.workspace.id,
+          email: input.email,
+          usedAt: null,
+        },
+        data: { expiresAt: new Date() }, // expire them immediately
+      });
+
+      // Create a new invite token (expires in 7 days)
+      const token = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await ctx.prisma.staffInvite.create({
+        data: {
+          token,
+          workspaceId: ctx.workspace.id,
+          email: input.email,
+          fullName: input.fullName,
+          role: input.role,
+          expiresAt,
+        },
+      });
+
+      // Send branded invite email
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+      const inviteUrl = `${baseUrl}/invite/${token}`;
+
+      const { html, subject } = staffInviteEmail({
+        fullName: input.fullName,
+        workspaceName: ctx.workspace.name,
+        workspaceLogo: ctx.workspace.logoUrl ?? null,
+        brandColor: ctx.workspace.brandColor ?? "#1B4F9E",
+        inviteUrl,
+        role: input.role,
+      });
+
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM ?? `${ctx.workspace.name} <onboarding@resend.dev>`,
+        to: input.email,
+        subject,
+        html,
+      });
+
+      return { ok: true };
     }),
 
   updateProfile: workspaceProcedure

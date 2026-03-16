@@ -71,6 +71,7 @@ model Workspace {
   galleries        Gallery[]
   notifications    Notification[]
   activityLogs     ActivityLog[]
+  staffInvites     StaffInvite[]
   hours            WorkspaceHours[]
   territories      ServiceTerritory[]
   brokerageGroups  BrokerageGroup[]
@@ -935,4 +936,26 @@ model JobChecklistItem {
   updatedAt   DateTime @updatedAt
 
   @@index([jobId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// STAFF INVITE
+// ─────────────────────────────────────────────────────────────
+
+model StaffInvite {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  workspaceId String
+  email       String
+  fullName    String
+  role        String    @default("PHOTOGRAPHER")
+  expiresAt   DateTime
+  usedAt      DateTime?
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([token])
+  @@index([workspaceId])
 }
