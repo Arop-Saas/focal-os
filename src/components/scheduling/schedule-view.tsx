@@ -1051,7 +1051,7 @@ function MonthGridView({
 
 export function ScheduleView({ jobs }: ScheduleViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<"month" | "week" | "dispatch" | "list">("dispatch");
+  const [view, setView] = useState<"month" | "week" | "dispatch" | "list">("month");
   const [selectedJob, setSelectedJob] = useState<BaseJob | DispatchJob | null>(null);
 
   // Week helpers
