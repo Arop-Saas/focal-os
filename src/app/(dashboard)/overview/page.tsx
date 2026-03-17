@@ -146,16 +146,14 @@ export default async function DashboardPage() {
   }
 
   // ── Setup checklist data ──────────────────────────────────────────────────
-  // Only compute if workspace is less than 60 days old (no point showing to established studios)
-  const workspaceAgeDays = (now.getTime() - workspace.createdAt.getTime()) / (1000 * 60 * 60 * 24);
   let setupSteps: SetupStep[] = [];
 
-  if (workspaceAgeDays < 60) {
+  {
     const [packageCount, staffWithAvailability] = await Promise.all([
       prisma.package.count({ where: { workspaceId: workspace.id } }),
       prisma.staffProfile.count({
         where: {
-          workspaceMember: { workspaceId: workspace.id },
+          workspaceId: workspace.id,
           availability: { some: { isAvailable: true } },
         },
       }),
