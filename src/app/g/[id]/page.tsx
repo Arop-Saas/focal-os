@@ -45,31 +45,26 @@ function PasswordGate({ onSubmit, error }: { onSubmit: (pw: string) => void; err
   );
 }
 
-// ─── Payment Gate ─────────────────────────────────────────────────────────────
+// ─── Payment Banner (sticky bottom CTA when invoice is unpaid) ────────────────
 
-function PaymentGate({
+function PaymentBanner({
   slug,
-  galleryName,
-  propertyAddress,
   amountDue,
   mediaCount,
   brandColor,
   workspaceName,
-  previewMedia,
   hasStripe,
 }: {
   slug: string;
-  galleryName: string;
-  propertyAddress: string;
   amountDue: number;
   mediaCount: number;
   brandColor: string;
   workspaceName: string;
-  previewMedia: Array<{ id: string; cdnUrl: string | null; originalName: string }>;
   hasStripe: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   async function handlePay() {
     setLoading(true);
@@ -92,103 +87,72 @@ function PaymentGate({
   const formatted = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(amountDue);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs text-gray-500">{workspaceName}</p>
-            <h1 className="font-semibold text-white text-sm">{galleryName}</h1>
-          </div>
-          <span className="text-xs text-gray-500">{mediaCount} photos</span>
-        </div>
-      </header>
-
-      {/* Address */}
-      <div className="border-b border-gray-800 px-6 py-3">
-        <p className="text-gray-400 text-sm max-w-7xl mx-auto">📍 {propertyAddress}</p>
-      </div>
-
-      {/* Blurred preview grid with overlay */}
-      <div className="relative max-w-7xl mx-auto px-4 py-6">
-        {/* Blurred photo grid */}
-        <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 space-y-2 select-none pointer-events-none">
-          {previewMedia.slice(0, 12).map((photo) => (
-            <div key={photo.id} className="break-inside-avoid overflow-hidden rounded-lg">
-              {photo.cdnUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={photo.cdnUrl}
-                  alt=""
-                  className="w-full object-cover"
-                  style={{ filter: "blur(18px)", transform: "scale(1.05)" }}
-                  draggable={false}
-                />
-              ) : (
-                <div className="w-full h-40 bg-gray-800" />
-              )}
-            </div>
-          ))}
-          {/* Fill remaining slots with dark tiles if fewer than 12 photos */}
-          {Array.from({ length: Math.max(0, 8 - previewMedia.slice(0, 12).length) }).map((_, i) => (
-            <div key={`placeholder-${i}`} className="break-inside-avoid overflow-hidden rounded-lg">
-              <div className="w-full h-40 bg-gray-800/60" />
-            </div>
-          ))}
-        </div>
-
-        {/* Payment overlay */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl mx-4">
-            <div className="text-5xl mb-4">🔐</div>
-            <h2 className="text-xl font-bold text-white mb-1">Your photos are ready</h2>
-            <p className="text-gray-400 text-sm mb-5">
-              Complete your payment to unlock and download all {mediaCount} photos.
+    <div className="fixed bottom-0 inset-x-0 z-40">
+      {/* Expanded detail panel */}
+      {expanded && (
+        <div className="bg-gray-900/98 backdrop-blur-md border-t border-gray-700 px-4 pt-5 pb-3 max-w-lg mx-auto rounded-t-2xl shadow-2xl">
+          <div className="text-center mb-4">
+            <p className="text-white font-semibold text-base">Ready to download?</p>
+            <p className="text-gray-400 text-sm mt-1">
+              Purchase to unlock and download all {mediaCount} photos.
             </p>
-
-            {/* Amount */}
-            <div
-              className="rounded-xl px-4 py-3 mb-5 text-center"
-              style={{ backgroundColor: `${brandColor}20`, border: `1px solid ${brandColor}40` }}
+          </div>
+          <div
+            className="rounded-xl px-4 py-3 mb-4 text-center"
+            style={{ backgroundColor: `${brandColor}20`, border: `1px solid ${brandColor}40` }}
+          >
+            <p className="text-xs text-gray-400 mb-0.5">Amount due</p>
+            <p className="text-3xl font-bold text-white">{formatted}</p>
+          </div>
+          {hasStripe ? (
+            <button
+              onClick={handlePay}
+              disabled={loading}
+              style={{ backgroundColor: brandColor }}
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2 mb-2"
             >
-              <p className="text-xs text-gray-400 mb-0.5">Amount due</p>
-              <p className="text-3xl font-bold text-white">{formatted}</p>
+              {loading ? (
+                <>
+                  <span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                  Redirecting to payment…
+                </>
+              ) : (
+                <>💳 Pay {formatted} to Download</>
+              )}
+            </button>
+          ) : (
+            <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm text-gray-400 text-center mb-2">
+              Contact <span className="text-white font-medium">{workspaceName}</span> to arrange payment and receive your download link.
             </div>
+          )}
+          {error && <p className="text-red-400 text-xs text-center mb-2">{error}</p>}
+          <p className="text-xs text-gray-600 text-center">Secured by Stripe · Visa, Mastercard, Amex & debit accepted</p>
+          <button onClick={() => setExpanded(false)} className="w-full mt-3 py-2 text-xs text-gray-500 hover:text-gray-300 transition-colors">
+            Close
+          </button>
+        </div>
+      )}
 
-            {hasStripe ? (
-              <button
-                onClick={handlePay}
-                disabled={loading}
-                style={{ backgroundColor: brandColor }}
-                className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                    Redirecting to payment…
-                  </>
-                ) : (
-                  <>💳 Pay {formatted} to Unlock</>
-                )}
-              </button>
-            ) : (
-              <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm text-gray-400">
-                Contact <span className="text-white font-medium">{workspaceName}</span> to arrange payment and receive access to your photos.
-              </div>
-            )}
-
-            {error && <p className="text-red-400 text-xs mt-3">{error}</p>}
-
-            <p className="text-xs text-gray-600 mt-4">
-              Secured by Stripe · Visa, Mastercard, Amex & debit accepted
-            </p>
+      {/* Collapsed sticky bar */}
+      {!expanded && (
+        <div
+          className="border-t border-gray-800 bg-gray-950/95 backdrop-blur-md px-4 py-3"
+        >
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div>
+              <p className="text-white text-sm font-semibold">{mediaCount} photos ready</p>
+              <p className="text-gray-400 text-xs">Purchase to unlock downloads</p>
+            </div>
+            <button
+              onClick={() => setExpanded(true)}
+              style={{ backgroundColor: brandColor }}
+              className="shrink-0 px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90 flex items-center gap-2"
+            >
+              💳 Buy & Download · {formatted}
+            </button>
           </div>
         </div>
-      </div>
-
-      <footer className="border-t border-gray-800 px-6 py-4 text-center mt-8">
-        <p className="text-gray-600 text-xs">Powered by FocalOS</p>
-      </footer>
+      )}
     </div>
   );
 }
@@ -305,6 +269,7 @@ function Lightbox({
 
 function GalleryView({
   gallery,
+  paymentInfo,
 }: {
   gallery: {
     id: string;
@@ -320,12 +285,16 @@ function GalleryView({
     workspace: { name: string; logoUrl: string | null; brandColor: string };
     media: MediaItem[];
   };
+  paymentInfo?: { amountDue: number; hasStripe: boolean; slug: string } | null;
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"photos" | "videos">("photos");
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{ done: number; total: number } | null>(null);
   const brandColor = gallery.workspace.brandColor ?? "#1B4F9E";
+
+  // Downloads are disabled until payment is complete
+  const canDownload = canDownload && !paymentInfo;
 
   const photos = gallery.media.filter((m) => m.mediaType === "PHOTO");
   const videos = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
@@ -373,7 +342,7 @@ function GalleryView({
                 Expires {format(new Date(gallery.expiresAt), "MMM d, yyyy")}
               </span>
             )}
-            {gallery.downloadEnabled && (
+            {canDownload && (
               <button
                 onClick={handleDownloadAll}
                 disabled={downloading}
@@ -454,7 +423,7 @@ function GalleryView({
                   <div className="w-full h-40 bg-gray-800 flex items-center justify-center text-gray-600 text-xs">No preview</div>
                 )}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100">
-                  {gallery.downloadEnabled && photo.cdnUrl && (
+                  {canDownload && photo.cdnUrl && (
                     <button
                       onClick={(e) => { e.stopPropagation(); downloadFile(photo.cdnUrl!, photo.originalName); }}
                       className="bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1 rounded-lg font-medium backdrop-blur-sm transition-colors"
@@ -481,7 +450,7 @@ function GalleryView({
                 )}
                 <div className="px-3 py-2.5 flex items-center justify-between">
                   <p className="text-xs text-gray-400 truncate">{video.originalName}</p>
-                  {gallery.downloadEnabled && video.cdnUrl && (
+                  {canDownload && video.cdnUrl && (
                     <button
                       onClick={() => downloadFile(video.cdnUrl!, video.originalName)}
                       className="ml-2 shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
@@ -496,17 +465,29 @@ function GalleryView({
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800 px-6 py-4 text-center mt-4">
+      {/* Footer — extra bottom padding when payment banner is visible */}
+      <footer className={`border-t border-gray-800 px-6 py-4 text-center mt-4 ${paymentInfo ? "pb-24" : ""}`}>
         <p className="text-gray-600 text-xs">Powered by FocalOS</p>
       </footer>
+
+      {/* Payment banner */}
+      {paymentInfo && (
+        <PaymentBanner
+          slug={paymentInfo.slug}
+          amountDue={paymentInfo.amountDue}
+          mediaCount={gallery.mediaCount}
+          brandColor={brandColor}
+          workspaceName={gallery.workspace.name}
+          hasStripe={paymentInfo.hasStripe}
+        />
+      )}
 
       {/* Lightbox — only for photos */}
       {lightboxIndex !== null && activeTab === "photos" && (
         <Lightbox
           media={photos}
           index={lightboxIndex}
-          downloadEnabled={gallery.downloadEnabled}
+          downloadEnabled={canDownload}
           onClose={() => setLightboxIndex(null)}
           onPrev={() => setLightboxIndex((i) => Math.max(0, (i ?? 0) - 1))}
           onNext={() => setLightboxIndex((i) => Math.min(photos.length - 1, (i ?? 0) + 1))}
@@ -580,32 +561,23 @@ export default function GalleryPage() {
 
   if (!data.gallery) return null;
 
-  // Show payment gate if invoice is unpaid
-  if (data.requiresPayment && data.paymentInfo) {
-    return (
-      <PaymentGate
-        slug={slug}
-        galleryName={data.gallery.name}
-        propertyAddress={`${data.gallery.propertyAddress}, ${data.gallery.propertyCity}, ${data.gallery.propertyState}`}
-        amountDue={data.paymentInfo.amountDue}
-        mediaCount={data.gallery.mediaCount}
-        brandColor={data.gallery.workspace.brandColor ?? "#1B4F9E"}
-        workspaceName={data.gallery.workspace.name}
-        previewMedia={data.gallery.media}
-        hasStripe={data.paymentInfo.hasStripe}
-      />
-    );
-  }
+  const paymentInfo =
+    data.requiresPayment && data.paymentInfo
+      ? { slug, amountDue: data.paymentInfo.amountDue, hasStripe: data.paymentInfo.hasStripe }
+      : null;
 
   return (
     <>
       {/* Payment success toast */}
       {justPaid && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-2 animate-fade-in">
-          ✅ Payment confirmed — enjoy your photos!
+          ✅ Payment confirmed — your photos are ready to download!
         </div>
       )}
-      <GalleryView gallery={data.gallery as Parameters<typeof GalleryView>[0]["gallery"]} />
+      <GalleryView
+        gallery={data.gallery as Parameters<typeof GalleryView>[0]["gallery"]}
+        paymentInfo={paymentInfo}
+      />
     </>
   );
 }
