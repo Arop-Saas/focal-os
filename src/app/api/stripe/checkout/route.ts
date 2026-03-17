@@ -10,7 +10,11 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { slug, invoiceId: directInvoiceId } = body as { slug?: string; invoiceId?: string };
+    const { slug, invoiceId: directInvoiceId, source } = body as {
+      slug?: string;
+      invoiceId?: string;
+      source?: string;
+    };
 
     // ── Path 1: Gallery-based checkout (from the public gallery page) ──────────
     if (slug) {
@@ -89,8 +93,14 @@ export async function POST(req: NextRequest) {
       const stripe = new Stripe(invoice.workspace.stripeSecretKey, { apiVersion: "2024-06-20" });
       const gallerySlug = invoice.job?.gallery?.slug ?? null;
 
-      // Return URL: back to portal invoices after payment
-      const portalBase = `${baseUrl}/portal/${invoice.workspace.slug}`;
+      // Return URLs depend on where the checkout was triggered from
+      const isPayPage = source === "pay-page";
+      const successUrl = isPayPage
+        ? `${baseUrl}/pay/${directInvoiceId}?paid=1`
+        : `${baseUrl}/portal/${invoice.workspace.slug}/invoices?paid=1`;
+      const cancelUrl = isPayPage
+        ? `${baseUrl}/pay/${directInvoiceId}`
+        : `${baseUrl}/portal/${invoice.workspace.slug}/invoices`;
 
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
@@ -111,8 +121,8 @@ export async function POST(req: NextRequest) {
           ...(gallerySlug ? { gallerySlug } : {}),
           workspaceId: invoice.workspace.id,
         },
-        success_url: `${portalBase}/invoices?paid=1`,
-        cancel_url:  `${portalBase}/invoices`,
+        success_url: successUrl,
+        cancel_url:  cancelUrl,
       });
 
       return NextResponse.json({ url: session.url });

@@ -13,19 +13,19 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Focal OS",
-    template: "%s | Focal OS",
+    default: "Propvi — Run your real estate photography business",
+    template: "%s | Propvi",
   },
   description:
-    "The all-in-one operating system for real estate photography companies. Scheduling, delivery, invoicing, and team management in one platform.",
-  keywords: ["real estate photography", "media management", "scheduling", "invoicing"],
-  authors: [{ name: "Focal OS" }],
-  creator: "Focal OS",
+    "Scheduling, gallery delivery, client invoicing, and photographer management — all in one platform built for real estate photography studios.",
+  keywords: ["real estate photography", "photography software", "gallery delivery", "invoicing", "scheduling"],
+  authors: [{ name: "Propvi" }],
+  creator: "Propvi",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "Focal OS",
+    siteName: "Propvi",
   },
 };
 

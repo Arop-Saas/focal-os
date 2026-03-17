@@ -15,6 +15,7 @@ import {
   BarChart3,
   DollarSign,
   Settings,
+  CreditCard,
   Aperture,
   LogOut,
   ShieldAlert,
@@ -162,6 +163,18 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
 
       {/* Bottom utilities */}
       <div className="border-t border-white/[0.06] px-2 py-2 space-y-px">
+        <Link
+          href="/billing"
+          className={cn(
+            "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-all",
+            pathname.startsWith("/billing")
+              ? "bg-white/[0.08] text-white"
+              : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+          )}
+        >
+          <CreditCard className="h-[15px] w-[15px] text-slate-500" />
+          Billing
+        </Link>
         <Link
           href="/settings"
           className={cn(

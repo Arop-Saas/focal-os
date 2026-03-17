@@ -16,6 +16,7 @@ const publicRoutes = [
   "/mobile/login", // Photographer mobile app login
   "/invite",       // Staff invite acceptance pages
   "/api/staff/accept-invite", // Accept invite API
+  "/pay",          // Direct invoice payment page (public link from email)
 ];
 
 export async function middleware(request: NextRequest) {
@@ -69,6 +70,9 @@ export async function middleware(request: NextRequest) {
   if (user && (pathname === "/login" || pathname === "/register")) {
     return NextResponse.redirect(new URL("/", request.url));
   }
+
+  // Forward the current pathname so server layouts can read it
+  response.headers.set("x-pathname", pathname);
 
   // Add workspace slug from subdomain or path header for multi-tenancy
   const host = request.headers.get("host") ?? "";

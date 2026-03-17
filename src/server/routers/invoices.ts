@@ -286,11 +286,11 @@ export const invoicesRouter = router({
       }
 
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
-      const paymentLink = `${APP_URL}/portal/${ctx.workspace.slug}/invoices`;
+      const paymentLink = `${APP_URL}/pay/${input.id}`;
 
       const updated = await ctx.prisma.invoice.update({
         where: { id: input.id },
-        data: { status: "SENT", issuedAt: new Date() },
+        data: { status: "SENT", issuedAt: new Date(), paymentLink },
       });
 
       void ctx.prisma.activityLog.create({
@@ -339,7 +339,7 @@ export const invoicesRouter = router({
       }
 
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
-      const paymentLink = `${APP_URL}/portal/${ctx.workspace.slug}/invoices`;
+      const paymentLink = `${APP_URL}/pay/${input.id}`;
 
       void ctx.prisma.activityLog.create({
         data: {
