@@ -324,88 +324,117 @@ function GalleryView({
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            {gallery.workspace.logoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={gallery.workspace.logoUrl} alt={gallery.workspace.name} className="h-8 w-auto rounded" />
-            )}
-            <div>
-              <p className="text-xs text-gray-500">{gallery.workspace.name}</p>
-              <h1 className="font-semibold text-white">{gallery.name}</h1>
+      <header className="px-6 pt-6 pb-5">
+        <div className="max-w-7xl mx-auto">
+          {/* Top row: branding + actions */}
+          <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+            {/* Logo + name */}
+            <div className="flex items-center gap-4">
+              {gallery.workspace.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={gallery.workspace.logoUrl}
+                  alt={gallery.workspace.name}
+                  className="h-12 w-auto rounded-xl shadow-lg ring-1 ring-white/10"
+                />
+              ) : (
+                <div
+                  className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg ring-1 ring-white/10"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  {gallery.workspace.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <p
+                  className="text-xs font-bold uppercase tracking-widest mb-0.5"
+                  style={{ color: brandColor }}
+                >
+                  {gallery.workspace.name}
+                </p>
+                <h1 className="text-xl font-black text-white tracking-tight leading-tight">
+                  {gallery.name}
+                </h1>
+              </div>
+            </div>
+
+            {/* Right actions */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {gallery.expiresAt && (
+                <span className="bg-gray-800 border border-gray-700 text-gray-400 text-xs font-medium px-3 py-1.5 rounded-xl">
+                  Expires {format(new Date(gallery.expiresAt), "MMM d, yyyy")}
+                </span>
+              )}
+              {canDownload && (
+                <button
+                  onClick={handleDownloadAll}
+                  disabled={downloading}
+                  style={{ backgroundColor: brandColor }}
+                  className="px-4 py-2 rounded-xl text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-2 shadow-lg"
+                >
+                  {downloading && downloadProgress ? (
+                    <>
+                      <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" />
+                      {downloadProgress.done}/{downloadProgress.total}
+                    </>
+                  ) : (
+                    <>↓ Download All ({activeMedia.length})</>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-            {gallery.expiresAt && (
-              <span className="bg-gray-800 px-2.5 py-1 rounded-full">
-                Expires {format(new Date(gallery.expiresAt), "MMM d, yyyy")}
-              </span>
-            )}
-            {canDownload && (
-              <button
-                onClick={handleDownloadAll}
-                disabled={downloading}
-                style={{ backgroundColor: brandColor }}
-                className="px-4 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-1.5"
-              >
-                {downloading && downloadProgress ? (
-                  <>
-                    <span className="animate-spin inline-block w-3 h-3 border border-white/30 border-t-white rounded-full" />
-                    {downloadProgress.done}/{downloadProgress.total}
-                  </>
-                ) : (
-                  <>↓ Download All ({activeMedia.length})</>
-                )}
-              </button>
-            )}
+          {/* Address badge */}
+          <div className="flex items-center gap-2 mb-5">
+            <span className="inline-flex items-center gap-2 bg-gray-800/80 border border-gray-700 text-gray-300 text-sm font-medium px-4 py-2 rounded-xl">
+              <span className="text-base">📍</span>
+              {gallery.propertyAddress}, {gallery.propertyCity}, {gallery.propertyState}
+            </span>
+          </div>
+
+          {/* Tab pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {(
+              [
+                { key: "photos" as const, label: "Photos", count: photos.length, always: true },
+                { key: "videos" as const, label: "Videos", count: videos.length, always: false },
+                { key: "floorplans" as const, label: "Floorplans", count: floorplans.length, always: true },
+              ] as { key: "photos" | "videos" | "floorplans"; label: string; count: number; always: boolean }[]
+            )
+              .filter((t) => t.always || t.count > 0)
+              .map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    style={isActive ? { backgroundColor: brandColor } : {}}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
+                      isActive
+                        ? "text-white shadow-lg scale-105"
+                        : "bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700"
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.count > 0 && (
+                      <span
+                        className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                          isActive ? "bg-white/20 text-white" : "bg-gray-700 text-gray-400"
+                        }`}
+                      >
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
           </div>
         </div>
       </header>
 
-      {/* Address + tabs bar */}
-      <div className="border-b border-gray-800 px-6">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-gray-400 text-sm py-3 border-b border-gray-800/50">
-            📍 {gallery.propertyAddress}, {gallery.propertyCity}, {gallery.propertyState}
-          </p>
-          <div className="flex items-center gap-1 pt-1 pb-0">
-            <button
-              onClick={() => setActiveTab("photos")}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "photos"
-                  ? "border-white text-white"
-                  : "border-transparent text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              Photos {photos.length > 0 && <span className="ml-1 text-xs opacity-60">{photos.length}</span>}
-            </button>
-            {videos.length > 0 && (
-              <button
-                onClick={() => setActiveTab("videos")}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === "videos"
-                    ? "border-white text-white"
-                    : "border-transparent text-gray-500 hover:text-gray-300"
-                }`}
-              >
-                Videos <span className="ml-1 text-xs opacity-60">{videos.length}</span>
-              </button>
-            )}
-            <button
-              onClick={() => setActiveTab("floorplans")}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "floorplans"
-                  ? "border-white text-white"
-                  : "border-transparent text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              Floorplans {floorplans.length > 0 && <span className="ml-1 text-xs opacity-60">{floorplans.length}</span>}
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Divider */}
+      <div className="border-t border-gray-800 mb-2" />
 
       {/* Media grid */}
       <main className="max-w-7xl mx-auto px-4 py-6">
