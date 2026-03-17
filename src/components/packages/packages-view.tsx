@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Plus, X, ToggleRight, ToggleLeft, Star } from "lucide-react";
+import { Plus, X, ToggleRight, ToggleLeft, Star, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -65,6 +65,7 @@ export function PackagesView() {
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
 
   // Service form state
   const [serviceName, setServiceName] = useState("");
@@ -92,26 +93,52 @@ export function PackagesView() {
   const deleteServiceMutation = trpc.packages.deleteService.useMutation();
   const createPackageMutation = trpc.packages.createPackage.useMutation();
 
+  const resetServiceForm = () => {
+    setServiceName("");
+    setServicePrice("");
+    setServiceCategory("PHOTOGRAPHY");
+    setServiceDuration("60");
+    setServiceDescription("");
+    setEditingService(null);
+    setShowServiceModal(false);
+  };
+
+  const handleOpenEditService = (service: Service) => {
+    setEditingService(service);
+    setServiceName(service.name);
+    setServiceCategory(service.category);
+    setServicePrice(String(service.basePrice));
+    setServiceDuration(String(service.durationMins));
+    setServiceDescription(service.description ?? "");
+    setShowServiceModal(true);
+  };
+
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!serviceName || !servicePrice) return;
 
     setIsSubmitting(true);
     try {
-      await createServiceMutation.mutateAsync({
-        name: serviceName,
-        category: serviceCategory as any,
-        basePrice: parseFloat(servicePrice),
-        durationMins: parseInt(serviceDuration),
-        description: serviceDescription || undefined,
-        isActive: true,
-      });
-      setShowServiceModal(false);
-      setServiceName("");
-      setServicePrice("");
-      setServiceCategory("PHOTOGRAPHY");
-      setServiceDuration("60");
-      setServiceDescription("");
+      if (editingService) {
+        await updateServiceMutation.mutateAsync({
+          id: editingService.id,
+          name: serviceName,
+          category: serviceCategory as any,
+          basePrice: parseFloat(servicePrice),
+          durationMins: parseInt(serviceDuration),
+          description: serviceDescription || undefined,
+        });
+      } else {
+        await createServiceMutation.mutateAsync({
+          name: serviceName,
+          category: serviceCategory as any,
+          basePrice: parseFloat(servicePrice),
+          durationMins: parseInt(serviceDuration),
+          description: serviceDescription || undefined,
+          isActive: true,
+        });
+      }
+      resetServiceForm();
       await refetchServices();
     } finally {
       setIsSubmitting(false);
@@ -192,7 +219,7 @@ export function PackagesView() {
       {activeTab === "services" && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <Button size="sm" onClick={() => setShowServiceModal(true)}>
+            <Button size="sm" onClick={() => { setEditingService(null); setServiceName(""); setServicePrice(""); setServiceCategory("PHOTOGRAPHY"); setServiceDuration("60"); setServiceDescription(""); setShowServiceModal(true); }}>
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Service
             </Button>
           </div>
@@ -218,16 +245,26 @@ export function PackagesView() {
                       <h3 className="font-semibold text-gray-900">{service.name}</h3>
                       <p className="text-xs text-gray-500 mt-0.5">{service.description}</p>
                     </div>
-                    <button
-                      onClick={() => handleToggleServiceActive(service.id, service.isActive)}
-                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    >
-                      {service.isActive ? (
-                        <ToggleRight className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <ToggleLeft className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditService(service)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title="Edit service"
+                      >
+                        <Pencil className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                      </button>
+                      <button
+                        onClick={() => handleToggleServiceActive(service.id, service.isActive)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title={service.isActive ? "Deactivate" : "Activate"}
+                      >
+                        {service.isActive ? (
+                          <ToggleRight className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <ToggleLeft className="h-4 w-4 text-gray-400" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -327,9 +364,9 @@ export function PackagesView() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-96 overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
-              <h2 className="text-lg font-semibold text-gray-900">Add Service</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{editingService ? "Edit Service" : "Add Service"}</h2>
               <button
-                onClick={() => setShowServiceModal(false)}
+                onClick={resetServiceForm}
                 className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -405,7 +442,7 @@ export function PackagesView() {
               <div className="flex gap-2 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowServiceModal(false)}
+                  onClick={resetServiceForm}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                   disabled={isSubmitting}
                 >
@@ -416,7 +453,7 @@ export function PackagesView() {
                   disabled={isSubmitting || !serviceName || !servicePrice}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? "Creating..." : "Create"}
+                  {isSubmitting ? (editingService ? "Saving..." : "Creating...") : (editingService ? "Save Changes" : "Create")}
                 </button>
               </div>
             </form>
