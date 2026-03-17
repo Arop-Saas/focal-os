@@ -48,12 +48,74 @@ export const bookingRouter = router({
       return { workspace, packages, services };
     }),
 
+  // Get available photographers for a given date
+  getAvailablePhotographers: publicProcedure
+    .input(z.object({ slug: z.string(), date: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const workspace = await ctx.prisma.workspace.findUnique({
+        where: { slug: input.slug },
+        select: { id: true },
+      });
+      if (!workspace) return { photographers: [] };
+
+      const date = new Date(input.date + "T12:00:00");
+      const dayOfWeek = date.getDay(); // 0=Sun ... 6=Sat
+      const dayStart = new Date(input.date + "T00:00:00");
+      const dayEnd = new Date(input.date + "T23:59:59");
+
+      const members = await ctx.prisma.workspaceMember.findMany({
+        where: {
+          workspaceId: workspace.id,
+          staffProfile: {
+            isActive: true,
+            availability: { some: { dayOfWeek, isAvailable: true } },
+          },
+        },
+        include: {
+          user: { select: { fullName: true, avatarUrl: true, email: true } },
+          staffProfile: {
+            include: {
+              availability: { where: { dayOfWeek } },
+              jobAssignments: {
+                where: {
+                  job: {
+                    scheduledAt: { gte: dayStart, lte: dayEnd },
+                    status: { not: "CANCELLED" },
+                  },
+                },
+                select: { id: true },
+              },
+            },
+          },
+        },
+      });
+
+      const available = members
+        .filter((m) => {
+          if (!m.staffProfile) return false;
+          const jobCount = m.staffProfile.jobAssignments.length;
+          const max = m.staffProfile.maxJobsPerDay ?? 99;
+          return jobCount < max;
+        })
+        .map((m) => ({
+          staffProfileId: m.staffProfile!.id,
+          name: m.user.fullName ?? m.user.email,
+          avatarUrl: m.user.avatarUrl,
+          startTime: m.staffProfile!.availability[0]?.startTime ?? "08:00",
+          endTime: m.staffProfile!.availability[0]?.endTime ?? "18:00",
+          jobsBooked: m.staffProfile!.jobAssignments.length,
+        }));
+
+      return { photographers: available };
+    }),
+
   // Get booked time slots for a given date to block them in the calendar
   getBookedSlots: publicProcedure
     .input(
       z.object({
         slug: z.string(),
         date: z.string(), // ISO date string "YYYY-MM-DD"
+        staffProfileId: z.string().optional(), // filter to a specific photographer
       })
     )
     .query(async ({ ctx, input }) => {
@@ -70,9 +132,10 @@ export const bookingRouter = router({
         where: {
           workspaceId: workspace.id,
           scheduledAt: { gte: dayStart, lte: dayEnd },
-          status: {
-            notIn: ["CANCELLED"],
-          },
+          status: { notIn: ["CANCELLED"] },
+          ...(input.staffProfileId
+            ? { assignments: { some: { staffProfileId: input.staffProfileId } } }
+            : {}),
         },
         select: { scheduledAt: true, estimatedDurationMins: true },
       });
@@ -122,6 +185,7 @@ export const bookingRouter = router({
         // Booking
         packageId: z.string().optional(),
         serviceIds: z.array(z.string()).optional(), // à la carte service selection
+        staffProfileId: z.string().optional(), // assigned photographer
         scheduledAt: z.string(), // ISO datetime string
         clientNotes: z.string().optional(),
       })
@@ -248,6 +312,18 @@ export const bookingRouter = router({
               unitPrice: svc.basePrice,
               totalPrice: svc.basePrice,
             })),
+          });
+        }
+
+        // Assign photographer if selected
+        if (input.staffProfileId) {
+          await tx.jobAssignment.create({
+            data: {
+              jobId: job.id,
+              staffProfileId: input.staffProfileId,
+              role: "PHOTOGRAPHER",
+              isPrimary: true,
+            },
           });
         }
 

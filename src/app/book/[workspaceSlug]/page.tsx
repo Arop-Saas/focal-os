@@ -25,9 +25,10 @@ interface FormData {
   // Step 2 – Package / À la carte
   packageId: string;
   selectedServiceIds: string[];
-  // Step 3 – Date/Time
+  // Step 3 – Date/Time + Photographer
   scheduledDate: string; // "YYYY-MM-DD"
   scheduledTime: string; // "HH:MM"
+  photographerId: string; // staffProfileId of selected photographer
   // Step 4 – Contact
   firstName: string;
   lastName: string;
@@ -52,6 +53,7 @@ const initialForm: FormData = {
   selectedServiceIds: [],
   scheduledDate: "",
   scheduledTime: "",
+  photographerId: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -405,7 +407,7 @@ function Step2Package({
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Choose Your Services</h2>
-        <p className="text-sm text-gray-500 mt-1">Select a package or pick individual services.</p>
+        <p className="text-sm text-gray-500 mt-1">Select a package or pick individual services à la carte.</p>
       </div>
 
       {/* Tab toggle */}
@@ -428,7 +430,7 @@ function Step2Package({
           }`}
           style={tab === "services" ? { backgroundColor: brandColor } : undefined}
         >
-          À la carte
+          Services
           {form.selectedServiceIds.length > 0 && (
             <span className="ml-1.5 text-xs bg-white bg-opacity-30 px-1.5 py-0.5 rounded-full">
               {form.selectedServiceIds.length}
@@ -441,7 +443,7 @@ function Step2Package({
       {tab === "packages" && (
         <>
           {packages.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 text-sm">No packages available. Switch to À la carte to pick individual services.</div>
+            <div className="text-center py-10 text-gray-400 text-sm">No packages available. Switch to Services to pick individual services.</div>
           ) : (
             <div className="space-y-3">
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -572,7 +574,7 @@ function Step2Package({
   );
 }
 
-// ─── Step 3: Date & Time ──────────────────────────────────────────────────────
+// ─── Step 3: Date & Time + Photographer ───────────────────────────────────────
 
 function Step3DateTime({
   form,
@@ -585,29 +587,71 @@ function Step3DateTime({
   workspaceSlug: string;
   brandColor: string;
 }) {
-  // Show a 4-week rolling calendar
   const today = startOfDay(new Date());
   const days = Array.from({ length: 28 }, (_, i) => addDays(today, i + 1));
 
+  // Fetch available photographers when a date is chosen
+  const { data: photographersData, isLoading: photographersLoading } =
+    trpc.booking.getAvailablePhotographers.useQuery(
+      { slug: workspaceSlug, date: form.scheduledDate },
+      { enabled: !!form.scheduledDate }
+    );
+  const photographers = photographersData?.photographers ?? [];
+
+  // Auto-select photographer if only one is available
+  useEffect(() => {
+    if (photographers.length === 1 && !form.photographerId) {
+      setForm({ ...form, photographerId: photographers[0].staffProfileId });
+    }
+    // If previously selected photographer is no longer available, clear them
+    if (
+      form.photographerId &&
+      photographers.length > 0 &&
+      !photographers.find((p) => p.staffProfileId === form.photographerId)
+    ) {
+      setForm({ ...form, photographerId: "", scheduledTime: "" });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photographers]);
+
+  const selectedPhotographer = photographers.find(
+    (p) => p.staffProfileId === form.photographerId
+  );
+
+  // Fetch booked slots (filtered to selected photographer if one is chosen)
   const { data: slotsData } = trpc.booking.getBookedSlots.useQuery(
-    { slug: workspaceSlug, date: form.scheduledDate },
+    {
+      slug: workspaceSlug,
+      date: form.scheduledDate,
+      staffProfileId: form.photographerId || undefined,
+    },
     { enabled: !!form.scheduledDate }
   );
 
-  // Build set of blocked start hours
+  // Build set of blocked times
   const blockedTimes = new Set<string>();
   slotsData?.bookedSlots?.forEach((slot) => {
     if (slot.scheduledAt) {
       const d = new Date(slot.scheduledAt);
-      const hh = d.getHours().toString().padStart(2, "0");
-      const mm = d.getMinutes().toString().padStart(2, "0");
-      blockedTimes.add(`${hh}:${mm}`);
+      blockedTimes.add(
+        `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`
+      );
     }
   });
 
-  const selectedDay = form.scheduledDate
-    ? new Date(`${form.scheduledDate}T00:00:00`)
-    : null;
+  // Filter time slots to photographer's available window (if one selected)
+  const visibleSlots = TIME_SLOTS.filter((slot) => {
+    if (!selectedPhotographer) return true;
+    return slot.value >= selectedPhotographer.startTime && slot.value < selectedPhotographer.endTime;
+  });
+
+  const showPhotographerSection =
+    !!form.scheduledDate && (photographersLoading || photographers.length > 0);
+
+  // Need photographer selected (if photographers exist) before showing times
+  const showTimeSection =
+    !!form.scheduledDate &&
+    (photographers.length === 0 || !!form.photographerId);
 
   return (
     <div className="space-y-5">
@@ -623,7 +667,6 @@ function Step3DateTime({
           {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
             <div key={d} className="text-center text-xs text-gray-400 pb-1 font-medium">{d}</div>
           ))}
-          {/* Empty cells for first row alignment */}
           {Array.from({ length: days[0].getDay() }).map((_, i) => (
             <div key={`empty-${i}`} />
           ))}
@@ -631,13 +674,14 @@ function Step3DateTime({
             const iso = format(day, "yyyy-MM-dd");
             const selected = form.scheduledDate === iso;
             const past = isBefore(day, today);
-            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
             return (
               <button
                 key={iso}
                 type="button"
                 disabled={past}
-                onClick={() => setForm({ ...form, scheduledDate: iso, scheduledTime: "" })}
+                onClick={() =>
+                  setForm({ ...form, scheduledDate: iso, scheduledTime: "", photographerId: "" })
+                }
                 className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-medium transition-all ${
                   selected
                     ? "text-white font-semibold"
@@ -657,36 +701,109 @@ function Step3DateTime({
         </div>
       </div>
 
+      {/* Photographer selection */}
+      {showPhotographerSection && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+            Choose your photographer
+          </p>
+          {photographersLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+              Checking availability…
+            </div>
+          ) : photographers.length === 0 ? (
+            <p className="text-sm text-gray-400">No photographers available on this date.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {photographers.map((p) => {
+                const selected = form.photographerId === p.staffProfileId;
+                return (
+                  <button
+                    key={p.staffProfileId}
+                    type="button"
+                    onClick={() =>
+                      setForm({ ...form, photographerId: p.staffProfileId, scheduledTime: "" })
+                    }
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all bg-white ${
+                      !selected ? "border-gray-200 hover:border-gray-300" : ""
+                    }`}
+                    style={
+                      selected
+                        ? { borderColor: brandColor, boxShadow: `0 0 0 3px ${brandColor}22` }
+                        : undefined
+                    }
+                  >
+                    {p.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.avatarUrl}
+                        alt={p.name ?? ""}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-lg"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        {(p.name ?? "?")[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-xs font-medium text-gray-800 text-center leading-tight">
+                      {p.name}
+                    </span>
+                    {selected && (
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        Selected
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Time slots */}
-      {form.scheduledDate && (
+      {showTimeSection && (
         <div>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
             Available times · {format(new Date(`${form.scheduledDate}T12:00:00`), "EEEE, MMMM d")}
           </p>
-          <div className="grid grid-cols-4 gap-2">
-            {TIME_SLOTS.map((slot) => {
-              const blocked = blockedTimes.has(slot.value);
-              const selected = form.scheduledTime === slot.value;
-              return (
-                <button
-                  key={slot.value}
-                  type="button"
-                  disabled={blocked}
-                  onClick={() => setForm({ ...form, scheduledTime: slot.value })}
-                  className={`py-2 px-3 rounded-lg text-sm border transition-all ${
-                    selected
-                      ? "text-white font-medium"
-                      : blocked
-                      ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed line-through"
-                      : "border-gray-200 text-gray-700 hover:border-gray-300"
-                  }`}
-                  style={selected ? { backgroundColor: brandColor, borderColor: brandColor } : undefined}
-                >
-                  {slot.label}
-                </button>
-              );
-            })}
-          </div>
+          {visibleSlots.length === 0 ? (
+            <p className="text-sm text-gray-400">No time slots available for this selection.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-2">
+              {visibleSlots.map((slot) => {
+                const blocked = blockedTimes.has(slot.value);
+                const selected = form.scheduledTime === slot.value;
+                return (
+                  <button
+                    key={slot.value}
+                    type="button"
+                    disabled={blocked}
+                    onClick={() => setForm({ ...form, scheduledTime: slot.value })}
+                    className={`py-2 px-3 rounded-lg text-sm border transition-all ${
+                      selected
+                        ? "text-white font-medium"
+                        : blocked
+                        ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed line-through"
+                        : "border-gray-200 text-gray-700 hover:border-gray-300"
+                    }`}
+                    style={
+                      selected ? { backgroundColor: brandColor, borderColor: brandColor } : undefined
+                    }
+                  >
+                    {slot.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -739,18 +856,23 @@ function Step5Review({
   form,
   packages,
   services,
+  photographers,
 }: {
   form: FormData;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   packages: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   services: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  photographers: any[];
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pkg = packages.find((p: any) => p.id === form.packageId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const selectedServices = services.filter((s: any) => form.selectedServiceIds.includes(s.id));
   const alaCarteTotal = selectedServices.reduce((sum: number, s: any) => sum + s.basePrice, 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const photographer = photographers.find((p: any) => p.staffProfileId === form.photographerId);
   const scheduledDisplay =
     form.scheduledDate && form.scheduledTime
       ? format(
@@ -773,6 +895,7 @@ function Step5Review({
           : "None selected",
     },
     { label: "Appointment", value: scheduledDisplay },
+    ...(photographer ? [{ label: "Photographer", value: photographer.name }] : []),
     { label: "Name", value: `${form.firstName} ${form.lastName}` },
     { label: "Email", value: form.email },
     { label: "Phone", value: form.phone || "—" },
@@ -827,6 +950,13 @@ export default function BookingPage() {
     { slug: workspaceSlug },
     { enabled: !!workspaceSlug }
   );
+
+  // Pre-fetch photographers for selected date (used in Step 5 review)
+  const { data: reviewPhotographersData } = trpc.booking.getAvailablePhotographers.useQuery(
+    { slug: workspaceSlug, date: form.scheduledDate },
+    { enabled: !!form.scheduledDate && step === 5 }
+  );
+  const reviewPhotographers = reviewPhotographersData?.photographers ?? [];
 
   const submitMutation = trpc.booking.submit.useMutation({
     onSuccess: (result) => {
@@ -903,6 +1033,7 @@ export default function BookingPage() {
       accessNotes: form.accessNotes || undefined,
       packageId: form.packageId || undefined,
       serviceIds: form.selectedServiceIds.length > 0 ? form.selectedServiceIds : undefined,
+      staffProfileId: form.photographerId || undefined,
       scheduledAt: new Date(`${form.scheduledDate}T${form.scheduledTime}`).toISOString(),
       clientNotes: form.clientNotes || undefined,
     });
@@ -964,7 +1095,7 @@ export default function BookingPage() {
             <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} />
           )}
           {step === 4 && <Step4Contact form={form} setForm={setForm} />}
-          {step === 5 && <Step5Review form={form} packages={packages} services={services ?? []} />}
+          {step === 5 && <Step5Review form={form} packages={packages} services={services ?? []} photographers={reviewPhotographers} />}
 
           {error && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
