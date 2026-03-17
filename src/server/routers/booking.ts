@@ -40,7 +40,12 @@ export const bookingRouter = router({
         orderBy: [{ isPopular: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
       });
 
-      return { workspace, packages };
+      const services = await ctx.prisma.service.findMany({
+        where: { workspaceId: workspace.id, isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      });
+
+      return { workspace, packages, services };
     }),
 
   // Get booked time slots for a given date to block them in the calendar
@@ -116,6 +121,7 @@ export const bookingRouter = router({
 
         // Booking
         packageId: z.string().optional(),
+        serviceIds: z.array(z.string()).optional(), // à la carte service selection
         scheduledAt: z.string(), // ISO datetime string
         clientNotes: z.string().optional(),
       })
@@ -137,6 +143,18 @@ export const bookingRouter = router({
           where: { id: input.packageId, workspaceId: workspace.id, isActive: true },
         });
         if (!pkg) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid package." });
+      }
+
+      // Validate à la carte services if provided
+      let alaCarteServices: { id: string; name: string; basePrice: number }[] = [];
+      if (!input.packageId && input.serviceIds && input.serviceIds.length > 0) {
+        alaCarteServices = await ctx.prisma.service.findMany({
+          where: { id: { in: input.serviceIds }, workspaceId: workspace.id, isActive: true },
+          select: { id: true, name: true, basePrice: true },
+        });
+        if (alaCarteServices.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid services selected." });
+        }
       }
 
       const scheduledAt = new Date(input.scheduledAt);
@@ -173,8 +191,8 @@ export const bookingRouter = router({
           workspace.invoiceNextNumber
         );
 
-        // Determine financials from package
-        const subtotal = pkg?.price ?? 0;
+        // Determine financials from package or à la carte services
+        const subtotal = pkg?.price ?? alaCarteServices.reduce((sum, s) => sum + s.basePrice, 0);
 
         // Create job
         const job = await tx.job.create({
@@ -220,6 +238,19 @@ export const bookingRouter = router({
           }
         }
 
+        // If à la carte services selected, add them to the job
+        if (alaCarteServices.length > 0) {
+          await tx.jobService.createMany({
+            data: alaCarteServices.map((svc) => ({
+              jobId: job.id,
+              serviceId: svc.id,
+              quantity: 1,
+              unitPrice: svc.basePrice,
+              totalPrice: svc.basePrice,
+            })),
+          });
+        }
+
         return { job, client };
       });
 
@@ -232,7 +263,7 @@ export const bookingRouter = router({
         jobNumber: result.job.jobNumber,
         propertyAddress: input.propertyAddress,
         scheduledAt,
-        packageName: pkg?.name ?? "",
+        packageName: pkg?.name ?? (alaCarteServices.length > 0 ? alaCarteServices.map((s) => s.name).join(", ") : ""),
       }).catch(console.error);
 
       return {

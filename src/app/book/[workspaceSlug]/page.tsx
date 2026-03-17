@@ -22,8 +22,9 @@ interface FormData {
   bathrooms: string;
   mlsNumber: string;
   accessNotes: string;
-  // Step 2 – Package
+  // Step 2 – Package / À la carte
   packageId: string;
+  selectedServiceIds: string[];
   // Step 3 – Date/Time
   scheduledDate: string; // "YYYY-MM-DD"
   scheduledTime: string; // "HH:MM"
@@ -48,6 +49,7 @@ const initialForm: FormData = {
   mlsNumber: "",
   accessNotes: "",
   packageId: "",
+  selectedServiceIds: [],
   scheduledDate: "",
   scheduledTime: "",
   firstName: "",
@@ -361,107 +363,210 @@ function Step1Property({ form, setForm }: { form: FormData; setForm: (f: FormDat
   );
 }
 
-// ─── Step 2: Package ──────────────────────────────────────────────────────────
+// ─── Step 2: Package / À la carte ─────────────────────────────────────────────
 
 function Step2Package({
   form,
   setForm,
   packages,
+  services,
   brandColor,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   packages: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  services: any[];
   brandColor: string;
 }) {
+  const [tab, setTab] = useState<"packages" | "services">("packages");
+
+  const selectPackage = (pkgId: string) => {
+    setForm({ ...form, packageId: pkgId, selectedServiceIds: [] });
+  };
+
+  const toggleService = (serviceId: string) => {
+    const current = form.selectedServiceIds;
+    const next = current.includes(serviceId)
+      ? current.filter((id) => id !== serviceId)
+      : [...current, serviceId];
+    setForm({ ...form, packageId: "", selectedServiceIds: next });
+  };
+
+  // Compute à la carte total
+  const alaCarteTotal = services
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((s: any) => form.selectedServiceIds.includes(s.id))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .reduce((sum: number, s: any) => sum + s.basePrice, 0);
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Choose a Package</h2>
-        <p className="text-sm text-gray-500 mt-1">Select the services that best fit your listing.</p>
+        <h2 className="text-xl font-semibold text-gray-900">Choose Your Services</h2>
+        <p className="text-sm text-gray-500 mt-1">Select a package or pick individual services.</p>
       </div>
-      {packages.length === 0 ? (
-        <div className="text-center py-10 text-gray-400 text-sm">No packages available at this time. Please contact us directly.</div>
-      ) : (
-        <div className="space-y-3">
-          {packages.map(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (pkg: any) => {
-              const selected = form.packageId === pkg.id;
-              return (
-                <button
-                  key={pkg.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, packageId: pkg.id })}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                    selected ? "bg-white" : "border-gray-200 hover:border-gray-300 bg-white"
-                  }`}
-                  style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 3px ${brandColor}22` } : undefined}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-gray-900">{pkg.name}</span>
-                        {pkg.isPopular && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                            Most Popular
-                          </span>
-                        )}
-                      </div>
-                      {pkg.description && (
-                        <p className="text-sm text-gray-500 mt-1">{pkg.description}</p>
-                      )}
-                      {/* Meta: photo count + turnaround */}
-                      {(pkg.photoCount || pkg.turnaroundDays) && (
-                        <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
-                          {pkg.photoCount && (
-                            <span className="flex items-center gap-1">
-                              📷 {pkg.photoCount} photos
-                            </span>
-                          )}
-                          {pkg.turnaroundDays && (
-                            <span className="flex items-center gap-1">
-                              ⏱ {pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery
+
+      {/* Tab toggle */}
+      <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setTab("packages")}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            tab === "packages" ? "text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+          style={tab === "packages" ? { backgroundColor: brandColor } : undefined}
+        >
+          Packages
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("services")}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            tab === "services" ? "text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+          style={tab === "services" ? { backgroundColor: brandColor } : undefined}
+        >
+          À la carte
+          {form.selectedServiceIds.length > 0 && (
+            <span className="ml-1.5 text-xs bg-white bg-opacity-30 px-1.5 py-0.5 rounded-full">
+              {form.selectedServiceIds.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Packages tab */}
+      {tab === "packages" && (
+        <>
+          {packages.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 text-sm">No packages available. Switch to À la carte to pick individual services.</div>
+          ) : (
+            <div className="space-y-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {packages.map((pkg: any) => {
+                const selected = form.packageId === pkg.id;
+                return (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    onClick={() => selectPackage(pkg.id)}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all bg-white ${
+                      !selected ? "border-gray-200 hover:border-gray-300" : ""
+                    }`}
+                    style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 3px ${brandColor}22` } : undefined}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900">{pkg.name}</span>
+                          {pkg.isPopular && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                              Most Popular
                             </span>
                           )}
                         </div>
-                      )}
-                      {pkg.items?.length > 0 && (
-                        <ul className="mt-2 flex flex-wrap gap-1">
-                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                          {pkg.items.map((item: any) => (
-                            <li
-                              key={item.id}
-                              className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full"
-                            >
-                              {item.service.name}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-xl font-bold text-gray-900">
-                        ${pkg.price.toLocaleString()}
-                      </div>
-                      <div
-                        className="w-5 h-5 mt-2 ml-auto rounded-full border-2 flex items-center justify-center"
-                        style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
-                      >
-                        {selected && (
-                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                            <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-                          </svg>
+                        {pkg.description && (
+                          <p className="text-sm text-gray-500 mt-1">{pkg.description}</p>
+                        )}
+                        {(pkg.photoCount || pkg.turnaroundDays) && (
+                          <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
+                            {pkg.photoCount && <span>📷 {pkg.photoCount} photos</span>}
+                            {pkg.turnaroundDays && <span>⏱ {pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery</span>}
+                          </div>
+                        )}
+                        {pkg.items?.length > 0 && (
+                          <ul className="mt-2 flex flex-wrap gap-1">
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            {pkg.items.map((item: any) => (
+                              <li key={item.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                {item.service.name}
+                              </li>
+                            ))}
+                          </ul>
                         )}
                       </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-xl font-bold text-gray-900">${pkg.price.toLocaleString()}</div>
+                        <div
+                          className="w-5 h-5 mt-2 ml-auto rounded-full border-2 flex items-center justify-center"
+                          style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
+                        >
+                          {selected && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
+                              <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            }
+                  </button>
+                );
+              })}
+            </div>
           )}
-        </div>
+        </>
+      )}
+
+      {/* À la carte tab */}
+      {tab === "services" && (
+        <>
+          {services.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 text-sm">No individual services available at this time.</div>
+          ) : (
+            <div className="space-y-2">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {services.map((svc: any) => {
+                const selected = form.selectedServiceIds.includes(svc.id);
+                return (
+                  <button
+                    key={svc.id}
+                    type="button"
+                    onClick={() => toggleService(svc.id)}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all bg-white ${
+                      !selected ? "border-gray-200 hover:border-gray-300" : ""
+                    }`}
+                    style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 3px ${brandColor}22` } : undefined}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <span className="font-semibold text-gray-900">{svc.name}</span>
+                        {svc.description && (
+                          <p className="text-sm text-gray-500 mt-0.5">{svc.description}</p>
+                        )}
+                        {svc.durationMins && (
+                          <p className="text-xs text-gray-400 mt-0.5">⏱ ~{svc.durationMins} min</p>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex items-center gap-3">
+                        <span className="text-lg font-bold text-gray-900">${svc.basePrice.toLocaleString()}</span>
+                        <div
+                          className="w-5 h-5 rounded border-2 flex items-center justify-center"
+                          style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
+                        >
+                          {selected && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
+                              <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Running total */}
+              {form.selectedServiceIds.length > 0 && (
+                <div className="mt-3 p-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex justify-between items-center text-sm">
+                  <span className="text-gray-600">{form.selectedServiceIds.length} service{form.selectedServiceIds.length !== 1 ? "s" : ""} selected</span>
+                  <span className="font-bold text-gray-900">Total: ${alaCarteTotal.toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -633,13 +738,19 @@ function Step4Contact({ form, setForm }: { form: FormData; setForm: (f: FormData
 function Step5Review({
   form,
   packages,
+  services,
 }: {
   form: FormData;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   packages: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  services: any[];
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pkg = packages.find((p: any) => p.id === form.packageId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectedServices = services.filter((s: any) => form.selectedServiceIds.includes(s.id));
+  const alaCarteTotal = selectedServices.reduce((sum: number, s: any) => sum + s.basePrice, 0);
   const scheduledDisplay =
     form.scheduledDate && form.scheduledTime
       ? format(
@@ -653,7 +764,14 @@ function Step5Review({
     { label: "Type", value: PROPERTY_TYPES.find((t) => t.value === form.propertyType)?.label ?? form.propertyType },
     { label: "Size", value: form.squareFootage ? `${Number(form.squareFootage).toLocaleString()} sq ft` : "—" },
     { label: "Bedrooms / Baths", value: form.bedrooms ? `${form.bedrooms} bd / ${form.bathrooms || "—"} ba` : "—" },
-    { label: "Package", value: pkg ? `${pkg.name} — $${pkg.price.toLocaleString()}` : "No package selected" },
+    {
+      label: pkg ? "Package" : "Services",
+      value: pkg
+        ? `${pkg.name} — $${pkg.price.toLocaleString()}`
+        : selectedServices.length > 0
+          ? `${selectedServices.map((s: any) => s.name).join(", ")} — $${alaCarteTotal.toLocaleString()}`
+          : "None selected",
+    },
     { label: "Appointment", value: scheduledDisplay },
     { label: "Name", value: `${form.firstName} ${form.lastName}` },
     { label: "Email", value: form.email },
@@ -734,8 +852,8 @@ export default function BookingPage() {
       return true;
     }
     if (step === 2) {
-      if (!form.packageId && data?.packages?.length && data.packages.length > 0) {
-        return !!setError("Please select a package to continue.");
+      if (!form.packageId && form.selectedServiceIds.length === 0) {
+        return !!setError("Please select a package or at least one service to continue.");
       }
       return true;
     }
@@ -784,6 +902,7 @@ export default function BookingPage() {
       mlsNumber: form.mlsNumber || undefined,
       accessNotes: form.accessNotes || undefined,
       packageId: form.packageId || undefined,
+      serviceIds: form.selectedServiceIds.length > 0 ? form.selectedServiceIds : undefined,
       scheduledAt: new Date(`${form.scheduledDate}T${form.scheduledTime}`).toISOString(),
       clientNotes: form.clientNotes || undefined,
     });
@@ -807,7 +926,7 @@ export default function BookingPage() {
     );
   }
 
-  const { workspace, packages } = data;
+  const { workspace, packages, services } = data;
   const brandColor = workspace.brandColor ?? "#1B4F9E";
 
   return (
@@ -840,12 +959,12 @@ export default function BookingPage() {
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
           {step === 1 && <Step1Property form={form} setForm={setForm} />}
-          {step === 2 && <Step2Package form={form} setForm={setForm} packages={packages} brandColor={brandColor} />}
+          {step === 2 && <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} />}
           {step === 3 && (
             <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} />
           )}
           {step === 4 && <Step4Contact form={form} setForm={setForm} />}
-          {step === 5 && <Step5Review form={form} packages={packages} />}
+          {step === 5 && <Step5Review form={form} packages={packages} services={services ?? []} />}
 
           {error && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
