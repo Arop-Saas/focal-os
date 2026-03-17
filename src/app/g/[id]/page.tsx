@@ -294,7 +294,7 @@ function GalleryView({
   const brandColor = gallery.workspace.brandColor ?? "#1B4F9E";
 
   // Downloads are disabled until payment is complete
-  const canDownload = canDownload && !paymentInfo;
+  const canDownload = gallery.downloadEnabled && !paymentInfo;
 
   const photos = gallery.media.filter((m) => m.mediaType === "PHOTO");
   const videos = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
