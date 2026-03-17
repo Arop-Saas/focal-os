@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users away from auth/landing pages into the dashboard
   if (user && (pathname === "/" || pathname === "/login" || pathname === "/register")) {
-    return NextResponse.redirect(new URL("/jobs", request.url));
+    return NextResponse.redirect(new URL("/overview", request.url));
   }
 
   // Forward the current pathname so server layouts can read it

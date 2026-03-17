@@ -32,7 +32,7 @@ const navGroups = [
   {
     label: null,
     items: [
-      { label: "Dashboard", href: "/", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/overview", icon: LayoutDashboard },
     ],
   },
   {
@@ -88,7 +88,7 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
   }
 
   function isActive(href: string) {
-    if (href === "/") return pathname === "/";
+    if (href === "/overview") return pathname === "/overview";
     return pathname.startsWith(href);
   }
 
