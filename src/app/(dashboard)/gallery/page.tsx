@@ -36,8 +36,8 @@ export default function GalleryPage() {
       {/* Header */}
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Gallery</h1>
-          <p className="text-sm text-gray-500">{galleries.length} total galleries</p>
+          <h1 className="text-xl font-bold text-gray-900">Listings</h1>
+          <p className="text-sm text-gray-500">{galleries.length} total listings</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
