@@ -274,7 +274,7 @@ export default function GalleryDetailPage() {
 
   const isDelivered = gallery.status === "DELIVERED";
   const isArchived = gallery.status === "ARCHIVED";
-  const canEdit = !isDelivered && !isArchived;
+  const canEdit = !isArchived;
 
   const photos     = gallery.media.filter((m) => m.mediaType === "PHOTO" || m.mediaType === "DRONE_PHOTO");
   const videos     = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
@@ -329,14 +329,14 @@ export default function GalleryDetailPage() {
             <Eye className="h-4 w-4" />
           </a>
 
-          {!isDelivered && !isArchived && (
+          {!isArchived && (
             <button
               onClick={() => { setPublishing(true); publishMutation.mutate({ id: galleryId }); }}
               disabled={publishing || gallery.mediaCount === 0}
               className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
             >
               <Send className="h-3.5 w-3.5" />
-              {publishing ? "Publishing…" : "Publish & Deliver"}
+              {publishing ? "Publishing…" : isDelivered ? "Re-deliver" : "Publish & Deliver"}
             </button>
           )}
 
