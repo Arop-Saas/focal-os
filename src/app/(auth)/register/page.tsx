@@ -17,9 +17,13 @@ const schema = z.object({
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Must contain an uppercase letter")
     .regex(/[0-9]/, "Must contain a number"),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: "You must agree to the terms" }),
   }),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 type FormData = z.infer<typeof schema>;
 
@@ -104,6 +108,18 @@ export default function RegisterPage() {
             className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
           />
           {errors.password && <p className="text-[11px] text-red-500">{errors.password.message}</p>}
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-[13px] font-medium text-gray-700">Confirm password</label>
+          <input
+            {...register("confirmPassword")}
+            type="password"
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
+          />
+          {errors.confirmPassword && <p className="text-[11px] text-red-500">{errors.confirmPassword.message}</p>}
         </div>
 
         <div className="flex items-start gap-2.5 pt-1">
