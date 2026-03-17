@@ -317,7 +317,7 @@ function Step1Property({ form, setForm }: { form: FormData; setForm: (f: FormDat
           required
         />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="City" required>
           <Input value={form.propertyCity} onChange={set("propertyCity")} placeholder="e.g. Toronto" required />
         </Field>
@@ -339,13 +339,13 @@ function Step1Property({ form, setForm }: { form: FormData; setForm: (f: FormDat
         <Select value={form.propertyType} onChange={set("propertyType")} options={PROPERTY_TYPES} />
       </Field>
       <div className="grid grid-cols-3 gap-3">
-        <Field label="Sq Footage">
+        <Field label="Sq Ft">
           <Input value={form.squareFootage} onChange={set("squareFootage")} placeholder="2,400" type="number" />
         </Field>
-        <Field label="Bedrooms">
+        <Field label="Beds">
           <Input value={form.bedrooms} onChange={set("bedrooms")} placeholder="3" type="number" />
         </Field>
-        <Field label="Bathrooms">
+        <Field label="Baths">
           <Input value={form.bathrooms} onChange={set("bathrooms")} placeholder="2" type="number" />
         </Field>
       </div>
@@ -777,7 +777,7 @@ function Step3DateTime({
           {visibleSlots.length === 0 ? (
             <p className="text-sm text-gray-400">No time slots available for this selection.</p>
           ) : (
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {visibleSlots.map((slot) => {
                 const blocked = blockedTimes.has(slot.value);
                 const selected = form.scheduledTime === slot.value;
@@ -828,6 +828,7 @@ function Step4Contact({ form, setForm }: { form: FormData; setForm: (f: FormData
           <Input value={form.lastName} onChange={set("lastName")} placeholder="Smith" required />
         </Field>
       </div>
+
       <Field label="Email" required>
         <Input value={form.email} onChange={set("email")} placeholder="jane@realty.com" type="email" required />
       </Field>

@@ -118,7 +118,57 @@ export function ClientsTable({ clients, total, page, limit }: ClientsTableProps)
 
   return (
     <div className="bg-white rounded-xl border overflow-hidden">
-      <div className="overflow-x-auto">
+
+      {/* ── Mobile card list (hidden on sm+) ───────────────────────────── */}
+      <div className="sm:hidden divide-y">
+        {clients.map((client) => (
+          <div
+            key={client.id}
+            className="px-4 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors"
+            onClick={() => router.push(`/clients/${client.id}`)}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-gray-900 text-sm truncate">
+                  {client.firstName} {client.lastName}
+                </p>
+                {client.company && (
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{client.company}</p>
+                )}
+                <p className="text-xs text-gray-400 truncate mt-0.5">{client.email}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <span className={cn(
+                  "inline-flex items-center text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full",
+                  CLIENT_STATUS_COLORS[client.status]
+                )}>
+                  {client.status}
+                </span>
+                <span className={cn(
+                  "inline-flex items-center text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border",
+                  CLIENT_TYPE_COLORS[client.type]
+                )}>
+                  {client.type}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+              <span>{client.totalJobs} job{client.totalJobs !== 1 ? "s" : ""}</span>
+              <span className="text-gray-300">·</span>
+              <span>{formatCurrency(client.totalRevenue)}</span>
+              {client.lastJobAt && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <span>Last: {formatDate(client.lastJobAt)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Desktop table (hidden on mobile) ───────────────────────────── */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-gray-50">

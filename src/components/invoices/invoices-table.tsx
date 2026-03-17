@@ -231,7 +231,74 @@ export function InvoicesTable({ invoices, total, page, limit, statsOutstanding, 
 
       {/* Table */}
       <div className="bg-white rounded-xl border overflow-hidden">
-        <div className="overflow-x-auto">
+
+        {/* ── Mobile card list (hidden on sm+) ─────────────────────────── */}
+        <div className="sm:hidden divide-y">
+          {invoices.map((invoice) => (
+            <div key={invoice.id} className="px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <Link href={`/invoices/${invoice.id}`} className="font-semibold text-blue-600 text-sm hover:text-blue-800">
+                    {invoice.invoiceNumber}
+                  </Link>
+                  <p className="text-sm text-gray-900 mt-0.5">
+                    {invoice.client.firstName} {invoice.client.lastName}
+                  </p>
+                  {invoice.job?.propertyAddress && (
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">{invoice.job.propertyAddress}</p>
+                  )}
+                  {invoice.dueAt && (
+                    <p className="text-xs text-gray-400 mt-0.5">Due {formatDate(invoice.dueAt)}</p>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className={cn(
+                    "inline-flex items-center text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border",
+                    INVOICE_STATUS_COLORS[invoice.status] || "bg-gray-100 text-gray-800"
+                  )}>
+                    {INVOICE_STATUS_LABELS[invoice.status]}
+                  </span>
+                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(invoice.totalAmount)}</p>
+                  {invoice.amountDue > 0 && (
+                    <p className="text-xs text-red-600">{formatCurrency(invoice.amountDue)} due</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-2">
+                <Link href={`/invoices/${invoice.id}`} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors">
+                  <Eye className="h-4 w-4" />
+                </Link>
+                {invoice.status === "DRAFT" && (
+                  <button onClick={() => handleSend(invoice.id)} disabled={sendMutation.isPending}
+                    className="p-1.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-900 transition-colors disabled:opacity-50">
+                    <Send className="h-4 w-4" />
+                  </button>
+                )}
+                {["SENT", "VIEWED", "PARTIAL", "OVERDUE"].includes(invoice.status) && (
+                  <button onClick={() => handleResend(invoice.id)} disabled={resendMutation.isPending}
+                    className="p-1.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-900 transition-colors disabled:opacity-50">
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                )}
+                {invoice.amountDue > 0 && invoice.status !== "VOID" && (
+                  <button onClick={() => handleMarkPaid(invoice.id, invoice.amountDue)} disabled={markPaidMutation.isPending}
+                    className="p-1.5 hover:bg-green-100 rounded text-green-600 hover:text-green-900 transition-colors disabled:opacity-50">
+                    <Check className="h-4 w-4" />
+                  </button>
+                )}
+                {invoice.status !== "PAID" && invoice.status !== "VOID" && (
+                  <button onClick={() => handleVoid(invoice.id)} disabled={voidMutation.isPending}
+                    className="p-1.5 hover:bg-red-100 rounded text-red-600 hover:text-red-900 transition-colors disabled:opacity-50">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Desktop table (hidden on mobile) ─────────────────────────── */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50">
@@ -349,6 +416,7 @@ export function InvoicesTable({ invoices, total, page, limit, statsOutstanding, 
               ))}
             </tbody>
           </table>
+        </div>
         </div>
 
         {/* Pagination */}

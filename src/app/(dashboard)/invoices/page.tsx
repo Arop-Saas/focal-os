@@ -96,7 +96,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
           </Button>
         }
       />
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
         <InvoicesTable
           invoices={invoices}
           total={total}

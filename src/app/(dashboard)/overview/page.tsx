@@ -217,7 +217,7 @@ export default async function DashboardPage() {
         description={`${workspace.name} — ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`}
       />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-5">
 
         {overdueCount > 0 && (
           <Link

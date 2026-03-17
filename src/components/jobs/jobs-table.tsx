@@ -61,7 +61,63 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
 
   return (
     <div className="bg-white rounded-xl border overflow-hidden">
-      <div className="overflow-x-auto">
+
+      {/* ── Mobile card list (hidden on sm+) ───────────────────────────── */}
+      <div className="sm:hidden divide-y">
+        {jobs.map((job) => {
+          const photographer = job.assignments[0]?.staff.member.user.fullName;
+          return (
+            <div
+              key={job.id}
+              className="px-4 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => router.push(`/jobs/${job.id}`)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {job.isRush && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded">
+                        RUSH
+                      </span>
+                    )}
+                    <p className="font-semibold text-gray-900 text-sm truncate">{job.propertyAddress}</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                    <MapPin className="h-2.5 w-2.5 shrink-0" />
+                    {job.propertyCity}, {job.propertyState}
+                    <span className="text-gray-300 mx-1">·</span>
+                    #{job.jobNumber}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {job.client.firstName} {job.client.lastName}
+                    {photographer && <> · {photographer}</>}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className={cn(
+                    "inline-flex items-center text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border",
+                    JOB_STATUS_COLORS[job.status]
+                  )}>
+                    {JOB_STATUS_LABELS[job.status]}
+                  </span>
+                  <p className="text-xs font-semibold text-gray-900">{formatCurrency(job.totalAmount)}</p>
+                </div>
+              </div>
+              {job.scheduledAt && (
+                <div className="flex items-center gap-1 mt-1.5 text-xs text-gray-400">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(job.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {" · "}
+                  {new Date(job.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Desktop table (hidden on mobile) ───────────────────────────── */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-gray-50">

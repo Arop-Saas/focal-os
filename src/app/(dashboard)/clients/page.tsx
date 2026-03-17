@@ -74,7 +74,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
         description={`${total} total clients`}
         actions={<ClientsPageActions />}
       />
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
         <ClientFilters currentStatus={searchParams.status} currentSearch={searchParams.search} />
         <ClientsTable
           clients={clients}
