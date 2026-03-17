@@ -55,7 +55,7 @@ const navGroups = [
     items: [
       { label: "Packages", href: "/packages", icon: Package },
       { label: "Invoices", href: "/invoices", icon: Receipt },
-      { label: "Gallery", href: "/gallery", icon: Image },
+      { label: "Listings", href: "/gallery", icon: Image },
       { label: "Availability", href: "/availability", icon: Clock },
     ],
   },
