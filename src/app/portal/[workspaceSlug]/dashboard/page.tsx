@@ -76,28 +76,28 @@ export default async function PortalDashboardPage({
 
       <main className="flex-1 overflow-y-auto">
         {/* Header */}
-        <div className="bg-white border-b border-gray-100 px-8 py-5">
+        <div className="bg-white border-b border-gray-100 px-4 md:px-8 py-4 md:py-5">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-lg md:text-xl font-bold text-gray-900">
                 {getGreeting()}, {client.firstName}!
               </h1>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
                 Welcome back to the {workspace.name} client portal.
               </p>
             </div>
             <Link
               href={`/book/${params.workspaceSlug}`}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
+              className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
               style={{ backgroundColor: workspace.brandColor }}
             >
               <ShoppingCart className="w-4 h-4" />
-              Place Order
+              <span className="hidden sm:inline">Place Order</span>
             </Link>
           </div>
         </div>
 
-        <div className="p-8 space-y-6">
+        <div className="p-4 md:p-8 space-y-6 pb-24 md:pb-8">
           {/* Today's appointments */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -144,7 +144,7 @@ export default async function PortalDashboardPage({
           </div>
 
           {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <div className="bg-white border border-gray-100 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Package className="w-4 h-4 text-blue-400" />
@@ -186,7 +186,26 @@ export default async function PortalDashboardPage({
               </div>
             ) : (
               <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
+                {/* Mobile card list */}
+                <div className="sm:hidden divide-y divide-gray-50">
+                  {recentJobs.map((job) => (
+                    <div key={job.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{job.propertyAddress}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            #{job.jobNumber} · {job.scheduledAt ? format(new Date(job.scheduledAt), "MMM d, yyyy") : "Date TBD"}
+                          </p>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusColors[job.status] ?? "bg-gray-100 text-gray-600"}`}>
+                          {job.status.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop table */}
+                <table className="hidden sm:table w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100">
                       <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Order #</th>

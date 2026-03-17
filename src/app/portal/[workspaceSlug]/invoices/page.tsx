@@ -59,7 +59,7 @@ export default async function PortalInvoicesPage({
       />
 
       <main className="flex-1 overflow-y-auto">
-        <div className="bg-white border-b border-gray-100 px-8 py-5">
+        <div className="bg-white border-b border-gray-100 px-4 md:px-8 py-4 md:py-5">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-gray-900">Invoices</h1>
@@ -79,7 +79,7 @@ export default async function PortalInvoicesPage({
           </div>
         </div>
 
-        <div className="p-8 space-y-4">
+        <div className="p-4 md:p-8 space-y-4 pb-24 md:pb-8">
           {/* Payment success banner */}
           {justPaid && (
             <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-5 py-4">
@@ -99,7 +99,44 @@ export default async function PortalInvoicesPage({
             </div>
           ) : (
             <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
+              {/* Mobile card list */}
+              <div className="sm:hidden divide-y divide-gray-50">
+                {invoices.map((inv) => {
+                  const cfg = statusConfig[inv.status] ?? statusConfig.DRAFT;
+                  const canPay = hasStripe && PAYABLE_STATUSES.includes(inv.status) && inv.amountDue > 0;
+                  return (
+                    <div key={inv.id} className="px-4 py-3.5">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {inv.job?.propertyAddress ?? "—"}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                            #{inv.invoiceNumber}
+                            {inv.dueAt ? ` · Due ${format(new Date(inv.dueAt), "MMM d")}` : ""}
+                          </p>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${cfg.color}`}>
+                          {cfg.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="text-xs text-gray-500">
+                          <span className="font-semibold text-gray-800">${inv.totalAmount.toFixed(2)}</span>
+                          {inv.amountDue > 0 && (
+                            <span className="text-amber-600 ml-2">· ${inv.amountDue.toFixed(2)} due</span>
+                          )}
+                        </div>
+                        {canPay && (
+                          <InvoicePayButton invoiceId={inv.id} brandColor={workspace.brandColor} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Desktop table */}
+              <table className="hidden sm:table w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left text-xs font-medium text-gray-400 px-5 py-3.5">Invoice #</th>

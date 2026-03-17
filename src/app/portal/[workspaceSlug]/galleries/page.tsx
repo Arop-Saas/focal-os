@@ -62,14 +62,14 @@ export default async function PortalGalleriesPage({
 
       <main className="flex-1 overflow-y-auto">
         {/* Page header */}
-        <div className="bg-white border-b border-gray-100 px-6 py-5">
+        <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 md:py-5">
           <h1 className="text-xl font-bold text-gray-900">Your Galleries</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {delivered.length} delivered · {pending.length} in progress
           </p>
         </div>
 
-        <div className="p-6 max-w-5xl mx-auto space-y-8">
+        <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-8 pb-24 md:pb-6">
 
           {/* Empty state */}
           {jobsWithGallery.length === 0 && (

@@ -100,12 +100,12 @@ export default function PortalProfilePage({
 
       <main className="flex-1 overflow-y-auto">
         {/* Header */}
-        <div className="bg-white border-b border-gray-100 px-8 py-5">
+        <div className="bg-white border-b border-gray-100 px-4 md:px-8 py-4 md:py-5">
           <h1 className="text-xl font-bold text-gray-900">My Profile</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage your contact information.</p>
         </div>
 
-        <div className="p-8 max-w-2xl">
+        <div className="p-4 md:p-8 max-w-2xl pb-24 md:pb-8">
           {/* Avatar / email block */}
           <div className="bg-white border border-gray-100 rounded-xl p-6 mb-6 flex items-center gap-4">
             <div className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0"
@@ -131,7 +131,7 @@ export default function PortalProfilePage({
               Contact Details
             </h2>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">First Name</label>
                 <input
