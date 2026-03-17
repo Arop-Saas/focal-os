@@ -417,7 +417,6 @@ export function InvoicesTable({ invoices, total, page, limit, statsOutstanding, 
             </tbody>
           </table>
         </div>
-        </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
