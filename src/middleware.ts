@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 
 // Routes that don't require auth
 const publicRoutes = [
+  "/",             // Landing page — always public
   "/login",
   "/register",
   "/forgot-password",
@@ -23,7 +24,10 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes through
-  const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
+  // "/" is an exact match; everything else uses startsWith
+  const isPublic = publicRoutes.some((route) =>
+    route === "/" ? pathname === "/" : pathname.startsWith(route)
+  );
 
   let response = NextResponse.next({
     request: { headers: request.headers },
@@ -66,9 +70,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users away from auth pages (but not mobile login)
-  if (user && (pathname === "/login" || pathname === "/register")) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Redirect authenticated users away from auth/landing pages into the dashboard
+  if (user && (pathname === "/" || pathname === "/login" || pathname === "/register")) {
+    return NextResponse.redirect(new URL("/jobs", request.url));
   }
 
   // Forward the current pathname so server layouts can read it
