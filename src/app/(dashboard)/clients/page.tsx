@@ -1,12 +1,10 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { Header } from "@/components/layout/header";
 import { ClientsTable } from "@/components/clients/clients-table";
 import { ClientFilters } from "@/components/clients/client-filters";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { ClientsPageActions } from "@/components/clients/clients-page-actions";
 
 export const metadata = { title: "Clients" };
 
@@ -74,13 +72,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
       <Header
         title="Clients"
         description={`${total} total clients`}
-        actions={
-          <Button size="sm" asChild>
-            <Link href="/clients/new">
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> New Client
-            </Link>
-          </Button>
-        }
+        actions={<ClientsPageActions />}
       />
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         <ClientFilters currentStatus={searchParams.status} currentSearch={searchParams.search} />

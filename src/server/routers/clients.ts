@@ -188,6 +188,65 @@ export const clientsRouter = router({
       return ctx.prisma.client.update({ where: { id }, data });
     }),
 
+  importCsv: workspaceProcedure
+    .input(
+      z.array(
+        z.object({
+          firstName: z.string().min(1),
+          lastName: z.string().min(1),
+          email: z.string().email(),
+          phone: z.string().optional(),
+          company: z.string().optional(),
+          type: z
+            .enum(["AGENT", "BROKER", "BUILDER", "HOMEOWNER", "PROPERTY_MANAGER", "OTHER"])
+            .default("AGENT"),
+        })
+      ).min(1).max(500)
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Find emails that already exist in this workspace
+      const existingRecords = await ctx.prisma.client.findMany({
+        where: {
+          workspaceId: ctx.workspace.id,
+          email: { in: input.map((r) => r.email.toLowerCase()) },
+        },
+        select: { email: true },
+      });
+      const existingEmails = new Set(existingRecords.map((e) => e.email.toLowerCase()));
+
+      const toCreate = input.filter((r) => !existingEmails.has(r.email.toLowerCase()));
+
+      if (toCreate.length > 0) {
+        await ctx.prisma.client.createMany({
+          data: toCreate.map((r) => ({
+            workspaceId: ctx.workspace.id,
+            firstName: r.firstName.trim(),
+            lastName: r.lastName.trim(),
+            email: r.email.toLowerCase().trim(),
+            phone: r.phone?.trim() || null,
+            company: r.company?.trim() || null,
+            type: r.type,
+          })),
+        });
+
+        await ctx.prisma.activityLog.create({
+          data: {
+            workspaceId: ctx.workspace.id,
+            userId: ctx.user.id,
+            action: "client.imported",
+            entityType: "client",
+            entityId: ctx.workspace.id,
+            metadata: { imported: toCreate.length, skipped: input.length - toCreate.length },
+          },
+        });
+      }
+
+      return {
+        imported: toCreate.length,
+        skipped: input.length - toCreate.length,
+      };
+    }),
+
   delete: workspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
