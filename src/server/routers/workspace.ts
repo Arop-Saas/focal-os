@@ -89,11 +89,7 @@ export const workspaceRouter = router({
           },
         });
 
-        // Mark onboarding as completed
-        await tx.user.update({
-          where: { id: ctx.user.id },
-          data: { onboardingCompleted: true },
-        });
+        // Onboarding completed in a separate step after services/team setup
 
         return ws;
       });
@@ -323,6 +319,15 @@ export const workspaceRouter = router({
         stripeSecretKey: null,
         stripeWebhookSecret: null,
       },
+    });
+    return { ok: true };
+  }),
+
+  // Mark onboarding complete — called at end of onboarding wizard
+  completeOnboarding: protectedProcedure.mutation(async ({ ctx }) => {
+    await ctx.prisma.user.update({
+      where: { id: ctx.user.id },
+      data: { onboardingCompleted: true },
     });
     return { ok: true };
   }),
