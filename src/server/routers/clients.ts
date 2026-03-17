@@ -197,6 +197,7 @@ export const clientsRouter = router({
           email: z.string().email(),
           phone: z.string().optional(),
           company: z.string().optional(),
+          notes: z.string().optional(),
           type: z
             .enum(["AGENT", "BROKER", "BUILDER", "HOMEOWNER", "PROPERTY_MANAGER", "OTHER"])
             .default("AGENT"),
@@ -225,6 +226,7 @@ export const clientsRouter = router({
             email: r.email.toLowerCase().trim(),
             phone: r.phone?.trim() || null,
             company: r.company?.trim() || null,
+            notes: r.notes?.trim() || null,
             type: r.type,
           })),
         });

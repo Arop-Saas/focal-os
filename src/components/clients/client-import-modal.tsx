@@ -34,6 +34,7 @@ interface ParsedRow {
   email: string;
   phone?: string;
   company?: string;
+  notes?: string;
   type: "AGENT" | "BROKER" | "BUILDER" | "HOMEOWNER" | "PROPERTY_MANAGER" | "OTHER";
   _rowNum: number;
   _errors: string[];
@@ -60,8 +61,9 @@ function parseCSV(text: string): { rows: ParsedRow[]; parseErrors: string[] } {
   const lastNameCol   = colIndex(["lastname", "last_name", "last name"]);
   const emailCol      = colIndex(["email"]);
   const phoneCol      = colIndex(["phone"]);
-  const companyCol    = colIndex(["company", "brokerage"]);
-  const typeCol       = colIndex(["type", "client type", "clienttype"]);
+  const companyCol    = colIndex(["company", "brokerage", "brokerage_name", "brokerage name"]);
+  const typeCol       = colIndex(["type", "client type", "clienttype", "role"]);
+  const notesCol      = colIndex(["notes", "internal_notes", "internal notes"]);
 
   const parseErrors: string[] = [];
   if (firstNameCol === -1) parseErrors.push('Missing column: "firstName"');
@@ -93,7 +95,12 @@ function parseCSV(text: string): { rows: ParsedRow[]; parseErrors: string[] } {
     const email     = get(emailCol).toLowerCase();
     const phone     = get(phoneCol) || undefined;
     const company   = get(companyCol) || undefined;
-    const rawType   = get(typeCol).toUpperCase();
+    const notes     = get(notesCol) || undefined;
+    // Normalize Aryeo's "member" role → AGENT; "admin"/"owner" → OTHER
+    const rawType   = get(typeCol).toUpperCase()
+      .replace("MEMBER", "AGENT")
+      .replace("ADMIN", "OTHER")
+      .replace("OWNER", "OTHER");
     const type      = VALID_TYPES.includes(rawType) ? rawType as ParsedRow["type"] : "AGENT";
 
     const rowErrors: string[] = [];
@@ -102,7 +109,7 @@ function parseCSV(text: string): { rows: ParsedRow[]; parseErrors: string[] } {
     if (!email)     rowErrors.push("Missing email");
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) rowErrors.push("Invalid email");
 
-    rows.push({ firstName, lastName, email, phone, company, type, _rowNum: i + 1, _errors: rowErrors });
+    rows.push({ firstName, lastName, email, phone, company, notes, type, _rowNum: i + 1, _errors: rowErrors });
   }
 
   return { rows, parseErrors };
@@ -190,8 +197,8 @@ export function ClientImportModal({ onClose, onSuccess }: Props) {
   const handleImport = () => {
     if (validRows.length === 0) return;
     importMutation.mutate(
-      validRows.map(({ firstName, lastName, email, phone, company, type }) => ({
-        firstName, lastName, email, phone, company, type,
+      validRows.map(({ firstName, lastName, email, phone, company, notes, type }) => ({
+        firstName, lastName, email, phone, company, notes, type,
       }))
     );
   };
