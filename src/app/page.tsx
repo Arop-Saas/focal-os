@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 export const metadata = {
-  title: "Propvi — Run your real estate photography business",
+  title: "Scalist — Run your real estate photography business",
   description:
     "Scheduling, gallery delivery, client invoicing, and photographer management — all in one platform built for real estate photography studios.",
 };
@@ -137,7 +137,7 @@ export default function LandingPage() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
               <Camera className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-white tracking-tight">propvi</span>
+            <span className="font-bold text-white tracking-tight">scalist</span>
           </div>
 
           <div className="hidden md:flex items-center gap-6 text-sm text-gray-400">
@@ -178,7 +178,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed mb-10">
-            From booking to delivery to getting paid — propvi handles every part of your real estate photography workflow so you can focus on shooting.
+            From booking to delivery to getting paid — scalist handles every part of your real estate photography workflow so you can focus on shooting.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -210,7 +210,7 @@ export default function LandingPage() {
               <div className="w-3 h-3 rounded-full bg-green-500/60" />
               <div className="flex-1 flex justify-center">
                 <div className="bg-white/[0.04] border border-white/[0.06] rounded-md px-16 py-1 text-[10px] text-gray-600">
-                  app.propvi.io
+                  app.scalist.io
                 </div>
               </div>
             </div>
@@ -304,7 +304,7 @@ export default function LandingPage() {
               Stop juggling six different apps
             </h2>
             <p className="text-gray-500 max-w-xl mx-auto">
-              Propvi replaces your spreadsheets, Google Drive folder, Square invoices, and everything in between.
+              Scalist replaces your spreadsheets, Google Drive folder, Square invoices, and everything in between.
             </p>
           </div>
 
@@ -528,16 +528,16 @@ export default function LandingPage() {
             <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
               <Camera className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-white tracking-tight">propvi</span>
+            <span className="font-bold text-white tracking-tight">scalist</span>
           </div>
 
           <div className="flex items-center gap-6 text-sm text-gray-600">
             <Link href="/login" className="hover:text-gray-400 transition-colors">Sign in</Link>
             <Link href="/register" className="hover:text-gray-400 transition-colors">Get started</Link>
-            <a href="mailto:hello@propvi.io" className="hover:text-gray-400 transition-colors">Contact</a>
+            <a href="mailto:hello@scalist.io" className="hover:text-gray-400 transition-colors">Contact</a>
           </div>
 
-          <p className="text-xs text-gray-700">© {new Date().getFullYear()} Propvi. All rights reserved.</p>
+          <p className="text-xs text-gray-700">© {new Date().getFullYear()} Scalist. All rights reserved.</p>
         </div>
       </footer>
 

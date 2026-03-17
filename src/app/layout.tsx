@@ -13,19 +13,19 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Propvi — Run your real estate photography business",
-    template: "%s | Propvi",
+    default: "Scalist — Run your real estate photography business",
+    template: "%s | Scalist",
   },
   description:
     "Scheduling, gallery delivery, client invoicing, and photographer management — all in one platform built for real estate photography studios.",
   keywords: ["real estate photography", "photography software", "gallery delivery", "invoicing", "scheduling"],
-  authors: [{ name: "Propvi" }],
-  creator: "Propvi",
+  authors: [{ name: "Scalist" }],
+  creator: "Scalist",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "Propvi",
+    siteName: "Scalist",
   },
 };
 
