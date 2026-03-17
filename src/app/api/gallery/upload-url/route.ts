@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
     const workspaceId = user.workspaces[0].workspace.id;
 
     // Parse request body
-    const body = await req.json() as { galleryId: string; fileName: string; mimeType: string; fileSize: number };
-    const { galleryId, fileName, mimeType, fileSize } = body;
+    const body = await req.json() as { galleryId: string; fileName: string; mimeType: string; fileSize: number; mediaTypeHint?: string };
+    const { galleryId, fileName, mimeType, fileSize, mediaTypeHint } = body;
 
     if (!galleryId || !fileName || !mimeType) {
       return NextResponse.json({ error: "galleryId, fileName, and mimeType are required" }, { status: 400 });
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       originalName: fileName,
       mimeType,
       fileSize,
-      mediaType: isVideo ? "VIDEO" : "PHOTO",
+      mediaType: isVideo ? "VIDEO" : mediaTypeHint === "FLOOR_PLAN" ? "FLOOR_PLAN" : "PHOTO",
     });
   } catch (err) {
     console.error("Upload URL route error:", err);

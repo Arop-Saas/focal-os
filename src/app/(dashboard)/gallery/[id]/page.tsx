@@ -23,6 +23,7 @@ import {
   Play,
   ExternalLink,
   ImageIcon,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,9 +36,10 @@ interface UploadItem {
   progress: number;
   error?: string;
   cdnUrl?: string;
+  mediaTypeHint?: string;
 }
 
-type MediaSection = "photos" | "videos" | "tours";
+type MediaSection = "photos" | "videos" | "tours" | "floorplans";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -76,6 +78,7 @@ export default function GalleryDetailPage() {
   const [previewTour, setPreviewTour] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const floorplanInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
 
   const { data: gallery, isLoading } = trpc.gallery.getById.useQuery(
@@ -114,7 +117,7 @@ export default function GalleryDetailPage() {
 
   // Upload a single file — uses presigned URL so large videos bypass Vercel's body limit
   const uploadFile = useCallback(
-    async (file: File, itemId: string) => {
+    async (file: File, itemId: string, mediaTypeHint?: string) => {
       setUploads((prev) =>
         prev.map((u) => (u.id === itemId ? { ...u, status: "uploading", progress: 5 } : u))
       );
@@ -128,6 +131,7 @@ export default function GalleryDetailPage() {
             fileName: file.name,
             mimeType: file.type,
             fileSize: file.size,
+            ...(mediaTypeHint ? { mediaTypeHint } : {}),
           }),
         });
         const urlData = await urlRes.json() as {
@@ -189,7 +193,7 @@ export default function GalleryDetailPage() {
           fileSize: urlData.fileSize,
           storageKey: urlData.storageKey,
           cdnUrl: urlData.cdnUrl,
-          mediaType: urlData.mediaType as "PHOTO" | "VIDEO" | "DRONE_VIDEO",
+          mediaType: urlData.mediaType as "PHOTO" | "VIDEO" | "DRONE_VIDEO" | "FLOOR_PLAN",
           isCover: urlData.mediaType === "PHOTO" && isFirstPhoto,
         });
 
@@ -226,6 +230,25 @@ export default function GalleryDetailPage() {
     [uploadFile]
   );
 
+  const queueFloorplanFiles = useCallback(
+    (files: FileList | File[]) => {
+      const arr = Array.from(files);
+      const items: UploadItem[] = arr.map((f) => ({
+        id: `${Date.now()}-${Math.random()}`,
+        file: f,
+        status: "queued",
+        progress: 0,
+        mediaTypeHint: "FLOOR_PLAN",
+      }));
+      setUploads((prev) => [...prev, ...items]);
+      items.reduce(
+        (chain, item) => chain.then(() => uploadFile(item.file, item.id, "FLOOR_PLAN")),
+        Promise.resolve()
+      );
+    },
+    [uploadFile]
+  );
+
   const shareUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/g/${gallery?.slug}`
@@ -253,14 +276,16 @@ export default function GalleryDetailPage() {
   const isArchived = gallery.status === "ARCHIVED";
   const canEdit = !isDelivered && !isArchived;
 
-  const photos  = gallery.media.filter((m) => m.mediaType === "PHOTO" || m.mediaType === "DRONE_PHOTO");
-  const videos  = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
-  const tours   = gallery.media.filter((m) => m.mediaType === "VIRTUAL_TOUR");
+  const photos     = gallery.media.filter((m) => m.mediaType === "PHOTO" || m.mediaType === "DRONE_PHOTO");
+  const videos     = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
+  const tours      = gallery.media.filter((m) => m.mediaType === "VIRTUAL_TOUR");
+  const floorplans = gallery.media.filter((m) => m.mediaType === "FLOOR_PLAN");
 
   const sectionTabs: { key: MediaSection; label: string; icon: React.ReactNode; count: number }[] = [
-    { key: "photos",  label: "Photos",  icon: <ImageIcon className="h-3.5 w-3.5" />, count: photos.length },
-    { key: "videos",  label: "Videos",  icon: <Video className="h-3.5 w-3.5" />,     count: videos.length },
-    { key: "tours",   label: "Virtual Tours", icon: <Compass className="h-3.5 w-3.5" />, count: tours.length },
+    { key: "photos",     label: "Photos",        icon: <ImageIcon className="h-3.5 w-3.5" />,     count: photos.length },
+    { key: "videos",     label: "Videos",        icon: <Video className="h-3.5 w-3.5" />,         count: videos.length },
+    { key: "tours",      label: "Virtual Tours", icon: <Compass className="h-3.5 w-3.5" />,       count: tours.length },
+    { key: "floorplans", label: "Floorplans",    icon: <LayoutTemplate className="h-3.5 w-3.5" />, count: floorplans.length },
   ];
 
   return (
@@ -390,7 +415,7 @@ export default function GalleryDetailPage() {
                   </div>
                 )}
 
-                <UploadQueue uploads={uploads.filter((u) => !u.file.type.startsWith("video/"))} onDismiss={(id) => setUploads((p) => p.filter((x) => x.id !== id))} />
+                <UploadQueue uploads={uploads.filter((u) => !u.file.type.startsWith("video/") && u.mediaTypeHint !== "FLOOR_PLAN")} onDismiss={(id) => setUploads((p) => p.filter((x) => x.id !== id))} />
 
                 {photos.length === 0 ? (
                   <EmptyState icon={<ImageIcon className="h-10 w-10 text-gray-200" />} label="No photos yet" sub="Upload photos above to get started." />
@@ -489,6 +514,69 @@ export default function GalleryDetailPage() {
                             onClick={() => { if (confirm("Remove this video?")) removeMutation.mutate({ mediaId: video.id, galleryId }); }}
                             className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-600 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all"
                             title="Remove video"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── FLOORPLANS section ── */}
+            {activeSection === "floorplans" && (
+              <div className="space-y-4">
+                {canEdit && (
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => { e.preventDefault(); setIsDragging(false); queueFloorplanFiles(e.dataTransfer.files); }}
+                    onClick={() => floorplanInputRef.current?.click()}
+                    className={cn(
+                      "border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors",
+                      isDragging ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300 bg-gray-50"
+                    )}
+                  >
+                    <LayoutTemplate className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-gray-600">
+                      Drop floor plans here or <span className="text-orange-600">click to browse</span>
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WebP, HEIC, TIFF · Max 25 MB each</p>
+                    <input
+                      ref={floorplanInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/tiff"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => e.target.files && queueFloorplanFiles(e.target.files)}
+                    />
+                  </div>
+                )}
+
+                <UploadQueue uploads={uploads.filter((u) => u.mediaTypeHint === "FLOOR_PLAN")} onDismiss={(id) => setUploads((p) => p.filter((x) => x.id !== id))} />
+
+                {floorplans.length === 0 ? (
+                  <EmptyState icon={<LayoutTemplate className="h-10 w-10 text-gray-200" />} label="No floor plans yet" sub="Upload floor plan images above to get started." />
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {floorplans.map((fp) => (
+                      <div key={fp.id} className="relative group rounded-xl overflow-hidden bg-gray-100 border">
+                        {fp.cdnUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={fp.cdnUrl} alt={fp.originalName} className="w-full object-contain max-h-72" />
+                        ) : (
+                          <div className="w-full h-48 flex items-center justify-center text-gray-400 text-xs">No preview</div>
+                        )}
+                        <div className="px-3 py-2 bg-white border-t">
+                          <p className="text-xs font-medium text-gray-700 truncate">{fp.originalName}</p>
+                        </div>
+                        {canEdit && (
+                          <button
+                            onClick={() => { if (confirm("Remove this floor plan?")) removeMutation.mutate({ mediaId: fp.id, galleryId }); }}
+                            className="absolute top-2 right-2 p-1.5 bg-white/90 hover:bg-red-50 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                            title="Remove floor plan"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -653,6 +741,7 @@ export default function GalleryDetailPage() {
                 <StatRow label="Photos" value={photos.length} />
                 <StatRow label="Videos" value={videos.length} />
                 <StatRow label="Tours" value={tours.length} />
+                <StatRow label="Floorplans" value={floorplans.length} />
                 <div className="border-t pt-2 mt-2">
                   <StatRow label="Views" value={gallery.viewCount} />
                   <StatRow label="Downloads" value={gallery.downloadCount} />

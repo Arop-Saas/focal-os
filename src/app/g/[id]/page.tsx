@@ -288,7 +288,7 @@ function GalleryView({
   paymentInfo?: { amountDue: number; hasStripe: boolean; slug: string } | null;
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"photos" | "videos">("photos");
+  const [activeTab, setActiveTab] = useState<"photos" | "videos" | "floorplans">("photos");
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{ done: number; total: number } | null>(null);
   const brandColor = gallery.workspace.brandColor ?? "#1B4F9E";
@@ -296,9 +296,10 @@ function GalleryView({
   // Downloads are disabled until payment is complete
   const canDownload = gallery.downloadEnabled && !paymentInfo;
 
-  const photos = gallery.media.filter((m) => m.mediaType === "PHOTO");
-  const videos = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
-  const activeMedia = activeTab === "photos" ? photos : videos;
+  const photos     = gallery.media.filter((m) => m.mediaType === "PHOTO");
+  const videos     = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
+  const floorplans = gallery.media.filter((m) => m.mediaType === "FLOOR_PLAN");
+  const activeMedia = activeTab === "photos" ? photos : activeTab === "videos" ? videos : floorplans;
 
   // Find lightbox index within activeMedia
   const handleDownloadAll = useCallback(async () => {
@@ -355,7 +356,7 @@ function GalleryView({
                     {downloadProgress.done}/{downloadProgress.total}
                   </>
                 ) : (
-                  <>↓ Download All {activeTab === "photos" ? `(${photos.length})` : `(${videos.length})`}</>
+                  <>↓ Download All ({activeMedia.length})</>
                 )}
               </button>
             )}
@@ -392,6 +393,16 @@ function GalleryView({
                 Videos <span className="ml-1 text-xs opacity-60">{videos.length}</span>
               </button>
             )}
+            <button
+              onClick={() => setActiveTab("floorplans")}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "floorplans"
+                  ? "border-white text-white"
+                  : "border-transparent text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              Floorplans {floorplans.length > 0 && <span className="ml-1 text-xs opacity-60">{floorplans.length}</span>}
+            </button>
           </div>
         </div>
       </div>
@@ -400,7 +411,7 @@ function GalleryView({
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeMedia.length === 0 ? (
           <div className="text-center py-20 text-gray-600">
-            {activeTab === "photos" ? "No photos available yet." : "No videos available yet."}
+            {activeTab === "photos" ? "No photos available yet." : activeTab === "videos" ? "No videos available yet." : "No floor plans available yet."}
           </div>
         ) : activeTab === "photos" ? (
           /* Photo masonry grid */
@@ -438,7 +449,7 @@ function GalleryView({
               </div>
             ))}
           </div>
-        ) : (
+        ) : activeTab === "videos" ? (
           /* Video grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {videos.map((video) => (
@@ -453,6 +464,40 @@ function GalleryView({
                   {canDownload && video.cdnUrl && (
                     <button
                       onClick={() => downloadFile(video.cdnUrl!, video.originalName)}
+                      className="ml-2 shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
+                    >
+                      ↓ Save
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Floorplan grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {floorplans.map((fp, i) => (
+              <div
+                key={fp.id}
+                className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800 cursor-pointer group"
+                onClick={() => setLightboxIndex(i)}
+              >
+                {fp.cdnUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={fp.cdnUrl}
+                    alt={fp.originalName}
+                    className="w-full object-contain max-h-80 group-hover:opacity-90 transition-opacity"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gray-800 flex items-center justify-center text-gray-600 text-sm">No preview</div>
+                )}
+                <div className="px-3 py-2.5 flex items-center justify-between border-t border-gray-800">
+                  <p className="text-xs text-gray-400 truncate">{fp.originalName}</p>
+                  {canDownload && fp.cdnUrl && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadFile(fp.cdnUrl!, fp.originalName); }}
                       className="ml-2 shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
                     >
                       ↓ Save
@@ -482,15 +527,15 @@ function GalleryView({
         />
       )}
 
-      {/* Lightbox — only for photos */}
-      {lightboxIndex !== null && activeTab === "photos" && (
+      {/* Lightbox — for photos and floorplans */}
+      {lightboxIndex !== null && (activeTab === "photos" || activeTab === "floorplans") && (
         <Lightbox
-          media={photos}
+          media={activeTab === "photos" ? photos : floorplans}
           index={lightboxIndex}
           downloadEnabled={canDownload}
           onClose={() => setLightboxIndex(null)}
           onPrev={() => setLightboxIndex((i) => Math.max(0, (i ?? 0) - 1))}
-          onNext={() => setLightboxIndex((i) => Math.min(photos.length - 1, (i ?? 0) + 1))}
+          onNext={() => setLightboxIndex((i) => Math.min(activeMedia.length - 1, (i ?? 0) + 1))}
         />
       )}
     </div>
