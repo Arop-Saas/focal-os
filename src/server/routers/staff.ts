@@ -174,7 +174,7 @@ export const staffRouter = router({
         });
       } else {
         return ctx.prisma.staffProfile.create({
-          data: { workspaceId: ctx.workspace.id, memberId, ...data },
+          data: { workspaceId: ctx.workspace.id, memberId, skills: [], ...data },
         });
       }
     }),
