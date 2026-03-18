@@ -86,6 +86,7 @@ export const workspaceRouter = router({
           data: {
             workspaceId: ws.id,
             memberId: member.id,
+            skills: [],
           },
         });
 
