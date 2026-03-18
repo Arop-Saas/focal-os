@@ -52,9 +52,9 @@ function LoginForm() {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Welcome back</h2>
+        <h2 className="text-xl font-bold text-white">Welcome back</h2>
         <p className="mt-1 text-sm text-gray-500">
           Sign in to your account to continue.
         </p>
@@ -62,13 +62,13 @@ function LoginForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {serverError && (
-          <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-[13px] text-red-600">
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-[13px] text-red-400">
             {serverError}
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="block text-[13px] font-medium text-gray-700">
+          <label className="block text-[13px] font-medium text-gray-300">
             Email
           </label>
           <input
@@ -76,17 +76,17 @@ function LoginForm() {
             type="email"
             autoComplete="email"
             placeholder="you@company.com"
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors"
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
           />
           {errors.email && (
-            <p className="text-[11px] text-red-500">{errors.email.message}</p>
+            <p className="text-[11px] text-red-400">{errors.email.message}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="block text-[13px] font-medium text-gray-700">Password</label>
-            <Link href="/forgot-password" className="text-[11px] text-blue-600 hover:text-blue-700 transition-colors">
+            <label className="block text-[13px] font-medium text-gray-300">Password</label>
+            <Link href="/forgot-password" className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -96,25 +96,25 @@ function LoginForm() {
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               placeholder="••••••••"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors pr-10"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors pr-10"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
           {errors.password && (
-            <p className="text-[11px] text-red-500">{errors.password.message}</p>
+            <p className="text-[11px] text-red-400">{errors.password.message}</p>
           )}
         </div>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 text-sm transition-colors disabled:opacity-60 shadow-sm mt-2"
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 hover:opacity-90 text-white font-semibold py-2.5 text-sm transition-all disabled:opacity-50 mt-2"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isSubmitting ? "Signing in…" : "Sign in"}
@@ -123,7 +123,7 @@ function LoginForm() {
 
       <p className="text-center text-[13px] text-gray-500">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+        <Link href="/register" className="font-semibold text-blue-400 hover:text-blue-300 transition-colors">
           Start free trial
         </Link>
       </p>
