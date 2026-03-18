@@ -259,7 +259,7 @@ export const jobsRouter = router({
             workspaceId: ctx.workspace.id,
             jobNumber,
             clientId: jobData.clientId,
-            packageId: jobData.packageId,
+            packageId: jobData.packageId || null,
             propertyAddress: jobData.propertyAddress,
             propertyCity: jobData.propertyCity,
             propertyState: jobData.propertyState,
