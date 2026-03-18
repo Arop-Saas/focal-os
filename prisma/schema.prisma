@@ -120,6 +120,7 @@ model User {
 
   workspaces    WorkspaceMember[]
   activityLogs  ActivityLog[]
+  featureRequestVotes FeatureRequestVote[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -967,4 +968,48 @@ model StaffInvite {
 
   @@index([token])
   @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE REQUESTS (public roadmap / feedback board)
+// ─────────────────────────────────────────────────────────────
+
+enum FeatureRequestStatus {
+  PLANNED
+  IN_PROGRESS
+  IN_BETA
+  COMPLETED
+}
+
+model FeatureRequest {
+  id          String               @id @default(cuid())
+  title       String
+  description String?
+  status      FeatureRequestStatus @default(PLANNED)
+  authorId    String?              // null = anonymous / submitted without auth
+  authorName  String?              // display name captured at submission
+  pinned      Boolean              @default(false)
+
+  votes       FeatureRequestVote[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FeatureRequestVote {
+  id               String         @id @default(cuid())
+  featureRequestId String
+  userId           String
+
+  featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime @default(now())
+
+  @@unique([featureRequestId, userId])
+  @@index([featureRequestId])
+  @@index([userId])
 }

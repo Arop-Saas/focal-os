@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { NotificationBell } from "./notification-bell";
 import { MessagesUnreadBadge } from "@/components/messages/messages-unread-badge";
+import { HelpButton } from "./help-button";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -101,12 +102,13 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 shrink-0">
           <Aperture className="h-3.5 w-3.5 text-white" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <span className="text-sm font-semibold text-white block leading-tight truncate">
             {workspaceName ?? "Scalist"}
           </span>
           <span className="text-[10px] text-slate-500 block leading-tight">Photography Studio</span>
         </div>
+        <HelpButton />
       </div>
 
       {/* Navigation */}
