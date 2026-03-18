@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { ChevronUp, Plus, Loader2, Lightbulb, X } from "lucide-react";
-import { toggleVote, submitFeatureRequest, type FeatureRequestWithMeta } from "./actions";
+import { toggleVote, submitFeatureRequest, type FeatureRequestWithMeta } from "@/lib/feedback-actions";
 import { formatDistanceToNow } from "date-fns";
 
 // ─── Column config ─────────────────────────────────────────────────────────────

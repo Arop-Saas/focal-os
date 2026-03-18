@@ -1,4 +1,4 @@
-import { getFeatureRequests } from "./actions";
+import { getFeatureRequests } from "@/lib/feedback-actions";
 import { FeedbackBoard } from "./feedback-board";
 
 export const dynamic = "force-dynamic";
