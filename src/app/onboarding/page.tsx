@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc/client";
-import { Aperture, Loader2, ChevronRight, Check, ArrowRight } from "lucide-react";
+import { Camera, Loader2, ChevronRight, Check, ArrowRight } from "lucide-react";
 import { slugify } from "@/lib/utils";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -132,10 +132,10 @@ export default function OnboardingPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-6 h-14 flex items-center shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600">
-            <Aperture className="h-3.5 w-3.5 text-white" />
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
+            <Camera className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="text-[15px] font-semibold text-gray-900">Focal OS</span>
+          <span className="text-[15px] font-bold text-gray-900">Scalist</span>
           <span className="text-gray-300 mx-1.5 text-xs">·</span>
           <span className="text-[13px] text-gray-400">Workspace setup</span>
         </div>
@@ -172,7 +172,7 @@ export default function OnboardingPage() {
             <form onSubmit={handleSubmit(onStep1Submit)} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 space-y-5">
               <div>
                 <h2 className="text-[18px] font-bold text-gray-900">Set up your studio</h2>
-                <p className="text-[13px] text-gray-500 mt-1">This is your company&apos;s home in Focal OS.</p>
+                <p className="text-[13px] text-gray-500 mt-1">This is your company&apos;s home in Scalist.</p>
               </div>
 
               {createWorkspace.error && (

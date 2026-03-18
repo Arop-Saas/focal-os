@@ -26,6 +26,21 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "Scalist",
+    title: "Scalist — Run your real estate photography business",
+    description:
+      "Scheduling, gallery delivery, client invoicing, and photographer management — all in one platform built for real estate photography studios.",
+    url: "https://www.scalist.io",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Scalist — Run your real estate photography business",
+    description:
+      "Scheduling, gallery delivery, client invoicing, and photographer management — all in one platform.",
+  },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
   },
 };
 

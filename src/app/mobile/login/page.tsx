@@ -32,10 +32,10 @@ export default function MobileLoginPage() {
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-6">
       {/* Logo area */}
       <div className="mb-8 text-center">
-        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/40">
-          <span className="text-white text-2xl font-bold">F</span>
+        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/40">
+          <span className="text-white text-2xl font-bold">S</span>
         </div>
-        <h1 className="text-2xl font-bold text-white">FocalOS</h1>
+        <h1 className="text-2xl font-bold text-white">Scalist</h1>
         <p className="text-gray-500 text-sm mt-1">Photographer portal</p>
       </div>
 
@@ -89,7 +89,7 @@ export default function MobileLoginPage() {
       </form>
 
       <p className="text-gray-600 text-xs mt-10 text-center">
-        FocalOS · Photographer Access
+        Scalist · Photographer Access
       </p>
     </div>
   );

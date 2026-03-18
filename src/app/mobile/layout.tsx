@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "FocalOS",
+  title: "Scalist",
   description: "Your shoots, uploads, and schedule — all in one place.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "FocalOS",
+    title: "Scalist",
     statusBarStyle: "black-translucent",
   },
   formatDetection: { telephone: false },

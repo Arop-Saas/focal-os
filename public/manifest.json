@@ -1,6 +1,6 @@
 {
-  "name": "FocalOS",
-  "short_name": "FocalOS",
+  "name": "Scalist",
+  "short_name": "Scalist",
   "description": "Photography studio management for photographers on the go.",
   "start_url": "/mobile/jobs",
   "display": "standalone",
