@@ -120,7 +120,8 @@ model User {
 
   workspaces    WorkspaceMember[]
   activityLogs  ActivityLog[]
-  featureRequestVotes FeatureRequestVote[]
+  featureRequestVotes    FeatureRequestVote[]
+  featureRequestComments FeatureRequestComment[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -991,6 +992,7 @@ model FeatureRequest {
   pinned      Boolean              @default(false)
 
   votes       FeatureRequestVote[]
+  comments    FeatureRequestComment[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1012,4 +1014,24 @@ model FeatureRequestVote {
   @@unique([featureRequestId, userId])
   @@index([featureRequestId])
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE REQUEST COMMENTS
+// ─────────────────────────────────────────────────────────────
+
+model FeatureRequestComment {
+  id               String         @id @default(cuid())
+  featureRequestId String
+  authorId         String?
+  authorName       String?
+  body             String
+
+  featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  user             User?          @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt        DateTime @default(now())
+
+  @@index([featureRequestId])
+  @@index([authorId])
 }

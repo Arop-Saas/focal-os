@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { ChevronUp, Plus, Loader2, Lightbulb, X } from "lucide-react";
-import { toggleVote, submitFeatureRequest, type FeatureRequestWithMeta } from "@/lib/feedback-actions";
+import { useState, useTransition, useEffect, useRef } from "react";
+import { ChevronUp, Plus, Loader2, Lightbulb, X, MessageSquare, Send, ChevronDown } from "lucide-react";
+import {
+  toggleVote,
+  submitFeatureRequest,
+  getComments,
+  addComment,
+  type FeatureRequestWithMeta,
+  type FeatureRequestComment,
+} from "@/lib/feedback-actions";
 import { formatDistanceToNow } from "date-fns";
 
 // ─── Column config ─────────────────────────────────────────────────────────────
@@ -36,14 +43,17 @@ const COLUMNS = [
 
 // ─── Vote button ───────────────────────────────────────────────────────────────
 
-function VoteButton({ id, count, hasVoted, loggedIn }: {
+function VoteButton({ id, count, hasVoted, loggedIn, onClick }: {
   id: string; count: number; hasVoted: boolean; loggedIn: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [optCount, setOptCount] = useState(count);
   const [optVoted, setOptVoted] = useState(hasVoted);
 
-  function handleVote() {
+  function handleVote(e: React.MouseEvent) {
+    e.stopPropagation();
+    onClick?.(e);
     if (!loggedIn) return;
     const next = !optVoted;
     setOptVoted(next);
@@ -73,26 +83,252 @@ function VoteButton({ id, count, hasVoted, loggedIn }: {
   );
 }
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
+// ─── Comment section (inside modal) ───────────────────────────────────────────
 
-function RequestCard({ request, userId }: { request: FeatureRequestWithMeta; userId: string | null }) {
+function CommentSection({ requestId, userId }: { requestId: string; userId: string | null }) {
+  const [comments, setComments] = useState<FeatureRequestComment[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [body, setBody] = useState("");
+  const [submitting, startSubmit] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    getComments(requestId).then((c) => {
+      setComments(c);
+      setLoading(false);
+    });
+  }, [requestId]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!body.trim()) return;
+    setError(null);
+    const snapshot = body;
+    setBody("");
+    startSubmit(async () => {
+      try {
+        await addComment(requestId, snapshot);
+        const fresh = await getComments(requestId);
+        setComments(fresh);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to post comment.");
+        setBody(snapshot);
+      }
+    });
+  }
+
   return (
-    <div className="group bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 flex gap-3 hover:bg-white/[0.05] hover:border-white/[0.10] transition-all">
-      <VoteButton id={request.id} count={request._count.votes} hasVoted={request.hasVoted} loggedIn={!!userId} />
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-gray-200 leading-snug group-hover:text-white transition-colors">
-          {request.title}
-        </p>
-        {request.description && (
-          <p className="text-[12px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">
-            {request.description}
+    <div className="mt-6 border-t border-white/[0.06] pt-5">
+      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+        <MessageSquare className="h-3.5 w-3.5" />
+        Discussion
+        {comments && <span className="text-gray-700 font-normal normal-case tracking-normal">({comments.length})</span>}
+      </h3>
+
+      {/* Comments list */}
+      <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
+        {loading && (
+          <div className="flex justify-center py-6">
+            <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
+          </div>
+        )}
+        {!loading && comments?.length === 0 && (
+          <p className="text-sm text-gray-700 text-center py-6">
+            No comments yet — be the first to share your thoughts!
           </p>
         )}
-        <p className="text-[10px] text-gray-700 mt-2 font-mono">
-          {request.authorName ?? "Anonymous"} · {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
+        {!loading && comments?.map((c) => (
+          <div key={c.id} className="flex gap-3 group">
+            {/* Avatar */}
+            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-500/30 to-violet-500/30 border border-white/[0.08] flex items-center justify-center shrink-0 text-[11px] font-bold text-gray-400">
+              {(c.authorName ?? "A")[0].toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-[12px] font-semibold text-gray-300">{c.authorName ?? "Anonymous"}</span>
+                <span className="text-[10px] text-gray-700 font-mono">
+                  {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
+                </span>
+              </div>
+              <p className="text-[13px] text-gray-400 leading-relaxed whitespace-pre-wrap break-words">{c.body}</p>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      {userId ? (
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Share your thoughts…"
+            maxLength={1000}
+            className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={submitting || !body.trim()}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-violet-500 hover:opacity-90 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-all shrink-0"
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </button>
+        </form>
+      ) : (
+        <p className="text-xs text-gray-600 text-center py-3 bg-white/[0.02] rounded-xl border border-white/[0.05]">
+          Log in to join the discussion
         </p>
+      )}
+
+      {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+    </div>
+  );
+}
+
+// ─── Request detail modal ─────────────────────────────────────────────────────
+
+function RequestModal({
+  request,
+  userId,
+  onClose,
+}: {
+  request: FeatureRequestWithMeta;
+  userId: string | null;
+  onClose: () => void;
+}) {
+  // Close on Escape
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const statusLabel: Record<string, string> = {
+    PLANNED: "Planned",
+    IN_PROGRESS: "In Progress",
+    IN_BETA: "In Beta",
+    COMPLETED: "Completed",
+  };
+  const statusColor: Record<string, string> = {
+    PLANNED: "text-violet-300 bg-violet-500/10 border-violet-500/20",
+    IN_PROGRESS: "text-blue-300 bg-blue-500/10 border-blue-500/20",
+    IN_BETA: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
+    COMPLETED: "text-gray-400 bg-gray-500/10 border-gray-500/20",
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative rounded-2xl p-px bg-gradient-to-b from-white/[0.10] to-white/[0.03] w-full max-w-xl max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.7)" }}
+      >
+        <div className="bg-[#0d0d0d] rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="flex items-start justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">
+            <div className="flex-1 min-w-0 pr-4">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor[request.status]}`}>
+                  {statusLabel[request.status]}
+                </span>
+              </div>
+              <h2 className="text-base font-bold text-white leading-snug">{request.title}</h2>
+              <p className="text-[11px] text-gray-600 mt-1 font-mono">
+                Submitted by {request.authorName ?? "Anonymous"} · {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
+              </p>
+            </div>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition-colors shrink-0 mt-0.5">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="overflow-y-auto flex-1 px-6 py-5">
+            {/* Description + vote */}
+            <div className="flex gap-4">
+              <VoteButton
+                id={request.id}
+                count={request._count.votes}
+                hasVoted={request.hasVoted}
+                loggedIn={!!userId}
+              />
+              <div className="flex-1 min-w-0">
+                {request.description ? (
+                  <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap">{request.description}</p>
+                ) : (
+                  <p className="text-sm text-gray-700 italic">No description provided.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Comments */}
+            <CommentSection requestId={request.id} userId={userId} />
+          </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+// ─── Card ─────────────────────────────────────────────────────────────────────
+
+function RequestCard({
+  request,
+  userId,
+}: {
+  request: FeatureRequestWithMeta;
+  userId: string | null;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+
+  return (
+    <>
+      {modalOpen && (
+        <RequestModal request={request} userId={userId} onClose={() => setModalOpen(false)} />
+      )}
+      <div
+        className="group bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 flex gap-3 hover:bg-white/[0.05] hover:border-white/[0.10] transition-all cursor-pointer"
+        onClick={() => setModalOpen(true)}
+      >
+        <VoteButton
+          id={request.id}
+          count={request._count.votes}
+          hasVoted={request.hasVoted}
+          loggedIn={!!userId}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-gray-200 leading-snug group-hover:text-white transition-colors">
+            {request.title}
+          </p>
+          {request.description && (
+            <p className="text-[12px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">
+              {request.description}
+            </p>
+          )}
+          <div className="flex items-center gap-3 mt-2">
+            <p className="text-[10px] text-gray-700 font-mono">
+              {request.authorName ?? "Anonymous"} · {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
+            </p>
+            {request._count.comments > 0 && (
+              <span className="flex items-center gap-1 text-[10px] text-gray-600">
+                <MessageSquare className="h-2.5 w-2.5" />
+                {request._count.comments}
+              </span>
+            )}
+          </div>
+        </div>
+        <ChevronDown className="h-3.5 w-3.5 text-gray-700 group-hover:text-gray-500 transition-colors shrink-0 self-center rotate-[-90deg]" />
+      </div>
+    </>
   );
 }
 
@@ -120,7 +356,6 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="relative rounded-2xl p-px bg-gradient-to-b from-white/[0.1] to-white/[0.03] w-full max-w-lg">
         <div className="bg-[#0d0d0d] rounded-2xl overflow-hidden shadow-2xl">
-          {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-blue-500/20 flex items-center justify-center">
@@ -135,11 +370,8 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             {error && (
-              <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
-                {error}
-              </p>
+              <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>
             )}
-
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
                 Title <span className="text-red-400">*</span>
@@ -152,7 +384,6 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
               />
             </div>
-
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
                 Details <span className="text-gray-700">(optional)</span>
@@ -164,13 +395,8 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors resize-none"
               />
             </div>
-
             <div className="flex justify-end gap-3 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-200 transition-colors"
-              >
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-200 transition-colors">
                 Cancel
               </button>
               <button
@@ -207,10 +433,9 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
     <>
       {showModal && <SubmitModal onClose={() => setShowModal(false)} />}
 
-      {/* Stats + submit */}
       <div className="flex items-center justify-between mb-8">
         <p className="text-sm text-gray-600">
-          <span className="text-gray-300 font-semibold">{total}</span> idea{total !== 1 ? "s" : ""} on the board · click ▲ to upvote
+          <span className="text-gray-300 font-semibold">{total}</span> idea{total !== 1 ? "s" : ""} · click a card to discuss
         </p>
         <button
           onClick={() => setShowModal(true)}
@@ -221,7 +446,6 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
         </button>
       </div>
 
-      {/* Kanban columns */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {COLUMNS.map((col) => {
           const requests = data[col.key];
@@ -230,7 +454,6 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
               key={col.key}
               className={`rounded-2xl border bg-white/[0.02] overflow-hidden ${col.borderAccent}`}
             >
-              {/* Column header */}
               <div className={`px-5 py-4 border-b border-white/[0.06] bg-gradient-to-b ${col.headerGlow}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -243,7 +466,6 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
                 </div>
               </div>
 
-              {/* Cards */}
               <div className="p-4 space-y-3 min-h-[200px]">
                 {requests.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-center">

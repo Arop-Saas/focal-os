@@ -23,8 +23,15 @@ export type FeatureRequestWithMeta = {
   authorName: string | null;
   pinned: boolean;
   createdAt: Date;
-  _count: { votes: number };
+  _count: { votes: number; comments: number };
   hasVoted: boolean;
+};
+
+export type FeatureRequestComment = {
+  id: string;
+  body: string;
+  authorName: string | null;
+  createdAt: Date;
 };
 
 export async function getFeatureRequests(): Promise<{
@@ -37,7 +44,7 @@ export async function getFeatureRequests(): Promise<{
     where: { status: { not: "COMPLETED" } },
     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     include: {
-      _count: { select: { votes: true } },
+      _count: { select: { votes: true, comments: true } },
       votes: user ? { where: { userId: user.id }, select: { id: true } } : false,
     },
   });
@@ -58,18 +65,42 @@ export async function getFeatureRequests(): Promise<{
   };
 }
 
+export async function getComments(featureRequestId: string): Promise<FeatureRequestComment[]> {
+  const comments = await prisma.featureRequestComment.findMany({
+    where: { featureRequestId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, body: true, authorName: true, createdAt: true },
+  });
+  return comments;
+}
+
+export async function addComment(featureRequestId: string, body: string) {
+  const user = await getCurrentUser();
+
+  const trimmed = body?.trim();
+  if (!trimmed || trimmed.length < 2) throw new Error("Comment is too short.");
+  if (trimmed.length > 1000) throw new Error("Comment must be under 1000 characters.");
+
+  await prisma.featureRequestComment.create({
+    data: {
+      featureRequestId,
+      body: trimmed,
+      authorId: user?.id ?? null,
+      authorName: user?.fullName ?? "Anonymous",
+    },
+  });
+
+  revalidatePath("/feedback");
+}
+
 export async function submitFeatureRequest(formData: FormData) {
   const user = await getCurrentUser();
 
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() || null;
 
-  if (!title || title.length < 5) {
-    throw new Error("Title must be at least 5 characters.");
-  }
-  if (title.length > 120) {
-    throw new Error("Title must be under 120 characters.");
-  }
+  if (!title || title.length < 5) throw new Error("Title must be at least 5 characters.");
+  if (title.length > 120) throw new Error("Title must be under 120 characters.");
 
   await prisma.featureRequest.create({
     data: {
