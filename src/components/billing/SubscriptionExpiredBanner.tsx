@@ -50,7 +50,7 @@ export function SubscriptionExpiredBanner({ trialDaysLeft, graceDaysLeft }: Prop
               ? "Your free trial ends today — "
               : `${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left in your trial — `}
           </span>
-          <span>Add a payment method to keep using FocalOS.</span>
+          <span>Add a payment method to keep using Scalist.</span>
         </div>
         <Link
           href="/billing"

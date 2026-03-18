@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       exp: Date.now() + MAGIC_LINK_TTL_MS,
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
     const magicLink = `${baseUrl}/api/portal/verify?token=${encodeURIComponent(token)}&slug=${workspaceSlug}`;
 
     return NextResponse.json({ ok: true, redirectUrl: magicLink });

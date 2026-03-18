@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     });
 
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+      process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
     const magicLink = `${baseUrl}/api/portal/verify?token=${encodeURIComponent(token)}&slug=${workspace.slug}`;
 
     await resend.emails.send({

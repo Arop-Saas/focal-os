@@ -445,7 +445,7 @@ export function IntegrationsTab() {
             <Zap className="h-4 w-4 text-gray-400" />
             Automation
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">Connect FocalOS to thousands of other tools.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Connect Scalist to thousands of other tools.</p>
         </div>
         <div className="space-y-3">
           <IntegrationCard
@@ -455,7 +455,7 @@ export function IntegrationsTab() {
               </div>
             }
             name="Zapier"
-            description="Automate workflows between FocalOS and 6,000+ apps. Trigger zaps on new jobs, paid invoices, and more."
+            description="Automate workflows between Scalist and 6,000+ apps. Trigger zaps on new jobs, paid invoices, and more."
             status="coming_soon"
           />
           <IntegrationCard

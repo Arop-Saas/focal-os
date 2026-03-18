@@ -52,7 +52,7 @@ export default async function BillingPage({
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <Header title="Billing" description="Manage your FocalOS subscription" />
+      <Header title="Billing" description="Manage your Scalist subscription" />
       <div className="flex-1 overflow-y-auto bg-gray-50">
         <BillingClient
           workspace={{

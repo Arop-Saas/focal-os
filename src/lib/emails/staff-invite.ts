@@ -128,7 +128,7 @@ export function staffInviteEmail({
           <tr>
             <td style="background:#f8fafc;padding:16px 36px;border-top:1px solid #e2e8f0;">
               <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">
-                Powered by <strong style="color:#64748b;">FocalOS</strong> — The platform for real estate photography studios
+                Powered by <strong style="color:#64748b;">Scalist</strong> — The platform for real estate photography studios
               </p>
             </td>
           </tr>

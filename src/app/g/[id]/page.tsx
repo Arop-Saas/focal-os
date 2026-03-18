@@ -541,7 +541,7 @@ function GalleryView({
 
       {/* Footer — extra bottom padding when payment banner is visible */}
       <footer className={`border-t border-gray-800 px-6 py-4 text-center mt-4 ${paymentInfo ? "pb-24" : ""}`}>
-        <p className="text-gray-600 text-xs">Powered by FocalOS</p>
+        <p className="text-gray-600 text-xs">Powered by Scalist</p>
       </footer>
 
       {/* Payment banner */}

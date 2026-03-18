@@ -1,5 +1,5 @@
 /**
- * Conflict detection engine for the Focal OS scheduling system.
+ * Conflict detection engine for the Scalist scheduling system.
  *
  * A "conflict" means a photographer cannot physically travel from one job
  * to the next given the drive time + buffer between them.

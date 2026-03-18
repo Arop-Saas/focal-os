@@ -97,7 +97,7 @@ export default async function InvitePage({ params }: Props) {
         </div>
 
         <p className="text-center text-gray-400 text-xs mt-4">
-          Powered by <span className="font-medium text-gray-500">FocalOS</span>
+          Powered by <span className="font-medium text-gray-500">Scalist</span>
         </p>
       </div>
     </div>

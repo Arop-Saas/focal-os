@@ -459,7 +459,7 @@ export const jobsRouter = router({
             clientName,
             jobNumber: fullJob.jobNumber,
             propertyAddress: fullJob.propertyAddress,
-            galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app"}/g/${id}`,
+            galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io"}/g/${id}`,
           });
         }
       }

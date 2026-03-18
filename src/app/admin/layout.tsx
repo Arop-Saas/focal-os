@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { LayoutDashboard, Building2, Users, CreditCard, Activity, Settings, ShieldAlert, LogOut } from "lucide-react";
 
-export const metadata = { title: "FocalOS Control" };
+export const metadata = { title: "Scalist Control" };
 
 const navItems = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
@@ -35,7 +35,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <ShieldAlert className="h-3.5 w-3.5 text-white" />
           </div>
           <div>
-            <p className="text-[11px] font-bold text-white tracking-widest uppercase">FocalOS</p>
+            <p className="text-[11px] font-bold text-white tracking-widest uppercase">Scalist</p>
             <p className="text-[9px] text-violet-400 tracking-widest uppercase">Operator Console</p>
           </div>
         </div>

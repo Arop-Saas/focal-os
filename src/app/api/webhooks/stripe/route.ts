@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode === "payment" && session.metadata?.invoiceId) {
-          // Payment for a Focal OS invoice
+          // Payment for a Scalist invoice
           await prisma.invoice.update({
             where: { id: session.metadata.invoiceId },
             data: {

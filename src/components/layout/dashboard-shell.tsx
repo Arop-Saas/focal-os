@@ -76,7 +76,7 @@ export function DashboardShell({
             <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500 shrink-0">
               <Aperture className="h-3 w-3 text-white" />
             </div>
-            <span className="text-sm font-semibold text-white truncate">{workspaceName ?? "Focal OS"}</span>
+            <span className="text-sm font-semibold text-white truncate">{workspaceName ?? "Scalist"}</span>
           </div>
         </div>
 

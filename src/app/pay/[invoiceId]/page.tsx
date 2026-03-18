@@ -216,7 +216,7 @@ export default async function DirectPayPage({ params, searchParams }: Props) {
       </div>
 
       <p className="text-center text-gray-400 text-xs mt-5">
-        Powered by <span className="font-medium text-gray-500">FocalOS</span>
+        Powered by <span className="font-medium text-gray-500">Scalist</span>
       </p>
     </div>
   );

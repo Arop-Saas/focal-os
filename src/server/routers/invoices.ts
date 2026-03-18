@@ -285,7 +285,7 @@ export const invoicesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invoice is already sent." });
       }
 
-      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
       const paymentLink = `${APP_URL}/pay/${input.id}`;
 
       const updated = await ctx.prisma.invoice.update({
@@ -338,7 +338,7 @@ export const invoicesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invoice cannot be resent in its current status." });
       }
 
-      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
       const paymentLink = `${APP_URL}/pay/${input.id}`;
 
       void ctx.prisma.activityLog.create({

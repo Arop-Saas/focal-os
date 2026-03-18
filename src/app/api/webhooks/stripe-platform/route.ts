@@ -1,5 +1,5 @@
 /**
- * Platform Stripe webhook — handles subscription lifecycle for FocalOS billing.
+ * Platform Stripe webhook — handles subscription lifecycle for Scalist billing.
  *
  * Register this URL in your Stripe Dashboard:
  *   https://yourapp.com/api/webhooks/stripe-platform

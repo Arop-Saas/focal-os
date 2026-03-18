@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
 
 export async function POST(req: NextRequest) {
   try {

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = generateResetToken(client.id, client.email, workspaceSlug);
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
     const resetUrl = `${baseUrl}/portal/${workspaceSlug}/reset-password?token=${encodeURIComponent(token)}`;
 
     return NextResponse.json({ ok: true, redirectUrl: resetUrl });

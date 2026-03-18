@@ -128,7 +128,7 @@ export function BillingClient({ workspace, justSubscribed }: Props) {
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-5 py-4">
           <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-green-800">You&apos;re subscribed — welcome to FocalOS!</p>
+            <p className="text-sm font-semibold text-green-800">You&apos;re subscribed — welcome to Scalist!</p>
             <p className="text-xs text-green-600 mt-0.5">Your account is now fully active.</p>
           </div>
         </div>

@@ -103,7 +103,7 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
         </div>
         <div className="min-w-0">
           <span className="text-sm font-semibold text-white block leading-tight truncate">
-            {workspaceName ?? "Focal OS"}
+            {workspaceName ?? "Scalist"}
           </span>
           <span className="text-[10px] text-slate-500 block leading-tight">Photography Studio</span>
         </div>

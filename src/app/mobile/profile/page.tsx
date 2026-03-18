@@ -93,7 +93,7 @@ export default function MobileProfilePage() {
                     <span className="text-blue-400 text-xs font-bold">F</span>
                   </div>
                   <div>
-                    <p className="text-white text-sm font-medium">FocalOS</p>
+                    <p className="text-white text-sm font-medium">Scalist</p>
                     <p className="text-gray-500 text-xs">Photographer App</p>
                   </div>
                 </div>

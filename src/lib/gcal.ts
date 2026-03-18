@@ -13,7 +13,7 @@ export function getOAuthClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID!,
     process.env.GOOGLE_CLIENT_SECRET!,
-    process.env.GOOGLE_REDIRECT_URI!  // e.g. https://focal-os.vercel.app/api/auth/google/callback
+    process.env.GOOGLE_REDIRECT_URI!  // e.g. https://www.scalist.io/api/auth/google/callback
   );
 }
 

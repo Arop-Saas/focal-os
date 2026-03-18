@@ -120,7 +120,7 @@ export const staffRouter = router({
       });
 
       // Send branded invite email
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://focal-os.vercel.app";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
       const inviteUrl = `${baseUrl}/invite/${token}`;
 
       const { html, subject } = staffInviteEmail({

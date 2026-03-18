@@ -326,7 +326,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
 
   const updateMutation = api.workspace.update.useMutation();
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://focal-os.vercel.app";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://www.scalist.io";
   const bookingUrl = `${origin}/book/${workspace.slug}`;
   const portalUrl  = `${origin}/portal/${workspace.slug}`;
 
@@ -611,7 +611,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
               </div>
             ))}
           </div>
-          <a href="mailto:support@focal-os.com?subject=Upgrade Plan"
+          <a href="mailto:hello@scalist.io?subject=Upgrade Plan"
             className="w-full flex items-center justify-center gap-2 border border-gray-200 hover:border-blue-300 hover:text-blue-700 text-gray-700 text-sm font-semibold py-2.5 rounded-lg transition-colors">
             Contact us to upgrade
           </a>

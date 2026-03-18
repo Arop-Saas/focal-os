@@ -1,5 +1,5 @@
 /**
- * Central notification service for Focal OS.
+ * Central notification service for Scalist.
  *
  * Every notification does two things atomically-ish:
  *  1. Creates a Notification record (drives the in-app bell)
