@@ -1,7 +1,8 @@
 import prisma from "@/lib/prisma";
 import { format } from "date-fns";
 import Link from "next/link";
-import { ArrowUpRight, Search } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { WorkspaceSearchInput } from "./search-input";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,9 @@ export default async function AdminWorkspacesPage({ searchParams }: PageProps) {
         <h1 className="text-2xl font-bold text-white tracking-tight">All Tenants</h1>
         <p className="text-xs text-slate-600 mt-0.5 font-mono">{workspaces.length} workspaces total</p>
       </div>
+
+      {/* Search */}
+      <WorkspaceSearchInput />
 
       {/* Status pills */}
       <div className="flex gap-2 flex-wrap">

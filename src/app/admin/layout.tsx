@@ -2,13 +2,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
-import { LayoutDashboard, Building2, Users, CreditCard, Activity, Settings, ShieldAlert, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Megaphone, ShieldAlert, LogOut } from "lucide-react";
 
 export const metadata = { title: "Scalist Control" };
 
 const navItems = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Workspaces", href: "/admin/workspaces", icon: Building2 },
+  { label: "Broadcast", href: "/admin/broadcast", icon: Megaphone },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

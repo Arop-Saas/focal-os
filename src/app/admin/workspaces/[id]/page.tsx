@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { ArrowLeft, Briefcase, Users, Receipt, Image, CreditCard, Globe, Mail, Phone } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { WorkspaceAdminActions } from "@/components/admin/workspace-admin-actions";
+import { ImpersonateButton } from "@/components/admin/impersonate-button";
 
 export const dynamic = "force-dynamic";
 
@@ -212,6 +213,15 @@ export default async function AdminWorkspaceDetailPage({ params }: { params: { i
             workspaceId={workspace.id}
             currentStatus={workspace.subscriptionStatus as "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "PAUSED"}
           />
+
+          {/* Impersonate */}
+          <div className="bg-[#0d0d1a] rounded-xl border border-[#ffffff08] p-5">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-slate-600 mb-3">Impersonate</p>
+            <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+              Enter this workspace as the owner to debug or provide support. A banner will remind you that you&apos;re in operator mode.
+            </p>
+            <ImpersonateButton workspaceId={workspace.id} workspaceName={workspace.name} />
+          </div>
 
           {/* Activity */}
           {recentActivity.length > 0 && (

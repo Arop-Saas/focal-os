@@ -2,6 +2,8 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 type SubscriptionStatus = "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "PAUSED";
@@ -29,6 +31,26 @@ export async function setWorkspaceStatus(workspaceId: string, status: Subscripti
   revalidatePath(`/admin/workspaces/${workspaceId}`);
   revalidatePath("/admin/workspaces");
   revalidatePath("/admin");
+}
+
+export async function impersonateWorkspace(workspaceId: string) {
+  await assertSuperAdmin();
+  const cookieStore = await cookies();
+  cookieStore.set("admin_impersonating", workspaceId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 8, // 8 hours
+    path: "/",
+  });
+  redirect("/");
+}
+
+export async function exitImpersonation() {
+  await assertSuperAdmin();
+  const cookieStore = await cookies();
+  cookieStore.delete("admin_impersonating");
+  redirect("/admin");
 }
 
 export async function extendTrial(workspaceId: string, days: number) {

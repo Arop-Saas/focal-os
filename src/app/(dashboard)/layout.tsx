@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { SubscriptionExpiredBanner } from "@/components/billing/SubscriptionExpiredBanner";
+import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
 
 // Routes inside the dashboard that should always be accessible
 // even when the subscription has lapsed (so users can re-subscribe)
@@ -53,7 +54,24 @@ export default async function DashboardLayout({
     redirect("/onboarding");
   }
 
-  const workspace = user.workspaces[0].workspace;
+  // ── Impersonation override ────────────────────────────────────────────────
+  const cookieStore = await cookies();
+  const impersonatingId = user.isSuperAdmin ? (cookieStore.get("admin_impersonating")?.value ?? null) : null;
+
+  let workspace = user.workspaces[0].workspace;
+  let isImpersonating = false;
+
+  if (impersonatingId) {
+    const impersonatedWs = await prisma.workspace.findUnique({
+      where: { id: impersonatingId },
+      select: { id: true, name: true, subscriptionStatus: true, trialEndsAt: true, gracePeriodEndsAt: true },
+    });
+    if (impersonatedWs) {
+      workspace = impersonatedWs;
+      isImpersonating = true;
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Subscription guard ────────────────────────────────────────────────────
   const headersList = await headers();
@@ -74,7 +92,7 @@ export default async function DashboardLayout({
     workspace.gracePeriodEndsAt !== null &&
     workspace.gracePeriodEndsAt < now;
 
-  const isLocked = (trialExpired || graceExpired || status === "CANCELED") && !isExempt;
+  const isLocked = (trialExpired || graceExpired || status === "CANCELED") && !isExempt && !isImpersonating;
 
   if (isLocked) {
     redirect("/billing");
@@ -98,8 +116,11 @@ export default async function DashboardLayout({
       userEmail={user.email}
       isSuperAdmin={user.isSuperAdmin}
     >
+      {/* Impersonation banner — shown at top when operator is viewing as another workspace */}
+      {isImpersonating && <ImpersonationBanner workspaceName={workspace.name} />}
+
       {/* Trial / grace period soft banner at the top of every page */}
-      {(trialDaysLeft !== null || graceDaysLeft !== null) && (
+      {!isImpersonating && (trialDaysLeft !== null || graceDaysLeft !== null) && (
         <SubscriptionExpiredBanner
           trialDaysLeft={trialDaysLeft}
           graceDaysLeft={graceDaysLeft}
