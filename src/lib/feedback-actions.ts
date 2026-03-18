@@ -20,6 +20,7 @@ export type FeatureRequestWithMeta = {
   title: string;
   description: string | null;
   status: FeatureRequestStatus;
+  authorId: string | null;
   authorName: string | null;
   pinned: boolean;
   createdAt: Date;
@@ -56,6 +57,7 @@ export async function getFeatureRequests(): Promise<{
       title: r.title,
       description: r.description,
       status: r.status,
+      authorId: r.authorId,
       authorName: r.authorName,
       pinned: r.pinned,
       createdAt: r.createdAt,
@@ -111,6 +113,39 @@ export async function submitFeatureRequest(formData: FormData) {
       status: "PLANNED",
     },
   });
+
+  revalidatePath("/feedback");
+}
+
+export async function updateFeatureRequest(id: string, title: string, description: string | null) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated.");
+
+  const request = await prisma.featureRequest.findUnique({ where: { id }, select: { authorId: true } });
+  if (!request) throw new Error("Feature request not found.");
+  if (request.authorId !== user.id && !user.isSuperAdmin) throw new Error("Not authorised to edit this request.");
+
+  const trimTitle = title?.trim();
+  if (!trimTitle || trimTitle.length < 5) throw new Error("Title must be at least 5 characters.");
+  if (trimTitle.length > 120) throw new Error("Title must be under 120 characters.");
+
+  await prisma.featureRequest.update({
+    where: { id },
+    data: { title: trimTitle, description: description?.trim() || null },
+  });
+
+  revalidatePath("/feedback");
+}
+
+export async function deleteFeatureRequest(id: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated.");
+
+  const request = await prisma.featureRequest.findUnique({ where: { id }, select: { authorId: true } });
+  if (!request) throw new Error("Feature request not found.");
+  if (request.authorId !== user.id && !user.isSuperAdmin) throw new Error("Not authorised to delete this request.");
+
+  await prisma.featureRequest.delete({ where: { id } });
 
   revalidatePath("/feedback");
 }

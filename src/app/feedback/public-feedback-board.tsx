@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef } from "react";
-import { ChevronUp, Plus, Loader2, Lightbulb, X, MessageSquare, Send, ChevronDown } from "lucide-react";
 import {
-  toggleVote,
-  submitFeatureRequest,
-  getComments,
-  addComment,
-  type FeatureRequestWithMeta,
-  type FeatureRequestComment,
+  ChevronUp, Plus, Loader2, Lightbulb, X, MessageSquare,
+  Send, ChevronRight, Pencil, Trash2, MoreHorizontal, Check,
+} from "lucide-react";
+import {
+  toggleVote, submitFeatureRequest, getComments, addComment,
+  updateFeatureRequest, deleteFeatureRequest,
+  type FeatureRequestWithMeta, type FeatureRequestComment,
 } from "@/lib/feedback-actions";
 import { formatDistanceToNow } from "date-fns";
 
@@ -16,36 +16,36 @@ import { formatDistanceToNow } from "date-fns";
 
 const COLUMNS = [
   {
-    key: "planned" as const,
-    label: "Planned",
-    dot: "bg-violet-500",
+    key: "planned" as const, label: "Planned", dot: "bg-violet-500",
     countStyle: "text-violet-300 bg-violet-500/10 border-violet-500/20",
-    headerGlow: "from-violet-600/5 to-transparent",
-    borderAccent: "border-violet-500/20",
+    headerGlow: "from-violet-600/5 to-transparent", borderAccent: "border-violet-500/20",
   },
   {
-    key: "inProgress" as const,
-    label: "In Progress",
-    dot: "bg-blue-400",
+    key: "inProgress" as const, label: "In Progress", dot: "bg-blue-400",
     countStyle: "text-blue-300 bg-blue-500/10 border-blue-500/20",
-    headerGlow: "from-blue-600/5 to-transparent",
-    borderAccent: "border-blue-500/20",
+    headerGlow: "from-blue-600/5 to-transparent", borderAccent: "border-blue-500/20",
   },
   {
-    key: "inBeta" as const,
-    label: "In Beta",
-    dot: "bg-emerald-400",
+    key: "inBeta" as const, label: "In Beta", dot: "bg-emerald-400",
     countStyle: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
-    headerGlow: "from-emerald-600/5 to-transparent",
-    borderAccent: "border-emerald-500/20",
+    headerGlow: "from-emerald-600/5 to-transparent", borderAccent: "border-emerald-500/20",
   },
 ];
 
+const statusLabel: Record<string, string> = {
+  PLANNED: "Planned", IN_PROGRESS: "In Progress", IN_BETA: "In Beta", COMPLETED: "Completed",
+};
+const statusColor: Record<string, string> = {
+  PLANNED: "text-violet-300 bg-violet-500/10 border-violet-500/20",
+  IN_PROGRESS: "text-blue-300 bg-blue-500/10 border-blue-500/20",
+  IN_BETA: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
+  COMPLETED: "text-gray-400 bg-gray-500/10 border-gray-500/20",
+};
+
 // ─── Vote button ───────────────────────────────────────────────────────────────
 
-function VoteButton({ id, count, hasVoted, loggedIn, onClick }: {
+function VoteButton({ id, count, hasVoted, loggedIn }: {
   id: string; count: number; hasVoted: boolean; loggedIn: boolean;
-  onClick?: (e: React.MouseEvent) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [optCount, setOptCount] = useState(count);
@@ -53,7 +53,6 @@ function VoteButton({ id, count, hasVoted, loggedIn, onClick }: {
 
   function handleVote(e: React.MouseEvent) {
     e.stopPropagation();
-    onClick?.(e);
     if (!loggedIn) return;
     const next = !optVoted;
     setOptVoted(next);
@@ -67,23 +66,16 @@ function VoteButton({ id, count, hasVoted, loggedIn, onClick }: {
       disabled={!loggedIn || pending}
       title={loggedIn ? (optVoted ? "Remove vote" : "Upvote") : "Log in to vote"}
       className={`flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-xl border transition-all shrink-0 min-w-[44px]
-        ${optVoted
-          ? "bg-blue-500/15 border-blue-500/40 text-blue-300"
-          : "bg-white/[0.03] border-white/[0.08] text-gray-500 hover:border-white/[0.18] hover:text-gray-300"
-        }
-        ${!loggedIn ? "cursor-default opacity-50" : "cursor-pointer"}
-      `}
+        ${optVoted ? "bg-blue-500/15 border-blue-500/40 text-blue-300" : "bg-white/[0.03] border-white/[0.08] text-gray-500 hover:border-white/[0.18] hover:text-gray-300"}
+        ${!loggedIn ? "cursor-default opacity-50" : "cursor-pointer"}`}
     >
-      {pending
-        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        : <ChevronUp className={`h-3.5 w-3.5 ${optVoted ? "text-blue-400" : "text-gray-500"}`} />
-      }
+      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronUp className={`h-3.5 w-3.5 ${optVoted ? "text-blue-400" : "text-gray-500"}`} />}
       <span className="text-[11px] font-bold leading-none">{optCount}</span>
     </button>
   );
 }
 
-// ─── Comment section (inside modal) ───────────────────────────────────────────
+// ─── Comment section ───────────────────────────────────────────────────────────
 
 function CommentSection({ requestId, userId }: { requestId: string; userId: string | null }) {
   const [comments, setComments] = useState<FeatureRequestComment[] | null>(null);
@@ -95,10 +87,7 @@ function CommentSection({ requestId, userId }: { requestId: string; userId: stri
 
   useEffect(() => {
     setLoading(true);
-    getComments(requestId).then((c) => {
-      setComments(c);
-      setLoading(false);
-    });
+    getComments(requestId).then((c) => { setComments(c); setLoading(false); });
   }, [requestId]);
 
   function handleSubmit(e: React.FormEvent) {
@@ -114,7 +103,7 @@ function CommentSection({ requestId, userId }: { requestId: string; userId: stri
         setComments(fresh);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to post comment.");
+        setError(err instanceof Error ? err.message : "Failed to post.");
         setBody(snapshot);
       }
     });
@@ -128,30 +117,20 @@ function CommentSection({ requestId, userId }: { requestId: string; userId: stri
         {comments && <span className="text-gray-700 font-normal normal-case tracking-normal">({comments.length})</span>}
       </h3>
 
-      {/* Comments list */}
-      <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
-        {loading && (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
-          </div>
-        )}
+      <div className="space-y-3 max-h-60 overflow-y-auto pr-1 mb-4">
+        {loading && <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-gray-600" /></div>}
         {!loading && comments?.length === 0 && (
-          <p className="text-sm text-gray-700 text-center py-6">
-            No comments yet — be the first to share your thoughts!
-          </p>
+          <p className="text-sm text-gray-700 text-center py-6">No comments yet — be the first to share your thoughts!</p>
         )}
         {!loading && comments?.map((c) => (
-          <div key={c.id} className="flex gap-3 group">
-            {/* Avatar */}
+          <div key={c.id} className="flex gap-3">
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-500/30 to-violet-500/30 border border-white/[0.08] flex items-center justify-center shrink-0 text-[11px] font-bold text-gray-400">
               {(c.authorName ?? "A")[0].toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-[12px] font-semibold text-gray-300">{c.authorName ?? "Anonymous"}</span>
-                <span className="text-[10px] text-gray-700 font-mono">
-                  {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
-                </span>
+                <span className="text-[10px] text-gray-700 font-mono">{formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}</span>
               </div>
               <p className="text-[13px] text-gray-400 leading-relaxed whitespace-pre-wrap break-words">{c.body}</p>
             </div>
@@ -160,7 +139,6 @@ function CommentSection({ requestId, userId }: { requestId: string; userId: stri
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       {userId ? (
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
@@ -183,7 +161,6 @@ function CommentSection({ requestId, userId }: { requestId: string; userId: stri
           Log in to join the discussion
         </p>
       )}
-
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
     </div>
   );
@@ -192,35 +169,63 @@ function CommentSection({ requestId, userId }: { requestId: string; userId: stri
 // ─── Request detail modal ─────────────────────────────────────────────────────
 
 function RequestModal({
-  request,
-  userId,
-  onClose,
+  request, userId, onClose, onDeleted,
 }: {
   request: FeatureRequestWithMeta;
   userId: string | null;
   onClose: () => void;
+  onDeleted: () => void;
 }) {
-  // Close on Escape
+  const isOwner = !!userId && userId === request.authorId;
+
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(request.title);
+  const [editDesc, setEditDesc] = useState(request.description ?? "");
+  const [saving, startSave] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Delete state
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, startDelete] = useTransition();
+
+  // Menu state
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    function handler(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
+    function handler(e: KeyboardEvent) { if (e.key === "Escape") { if (editing) setEditing(false); else onClose(); } }
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [editing, onClose]);
 
-  const statusLabel: Record<string, string> = {
-    PLANNED: "Planned",
-    IN_PROGRESS: "In Progress",
-    IN_BETA: "In Beta",
-    COMPLETED: "Completed",
-  };
-  const statusColor: Record<string, string> = {
-    PLANNED: "text-violet-300 bg-violet-500/10 border-violet-500/20",
-    IN_PROGRESS: "text-blue-300 bg-blue-500/10 border-blue-500/20",
-    IN_BETA: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
-    COMPLETED: "text-gray-400 bg-gray-500/10 border-gray-500/20",
-  };
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    if (menuOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  function handleSave() {
+    setSaveError(null);
+    startSave(async () => {
+      try {
+        await updateFeatureRequest(request.id, editTitle, editDesc || null);
+        setEditing(false);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Failed to save.");
+      }
+    });
+  }
+
+  function handleDelete() {
+    startDelete(async () => {
+      await deleteFeatureRequest(request.id);
+      onDeleted();
+      onClose();
+    });
+  }
 
   return (
     <div
@@ -233,36 +238,126 @@ function RequestModal({
         style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.7)" }}
       >
         <div className="bg-[#0d0d0d] rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
           {/* Header */}
           <div className="flex items-start justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">
-            <div className="flex-1 min-w-0 pr-4">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="flex-1 min-w-0 pr-3">
+              <div className="flex items-center gap-2 mb-2">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor[request.status]}`}>
                   {statusLabel[request.status]}
                 </span>
               </div>
-              <h2 className="text-base font-bold text-white leading-snug">{request.title}</h2>
+              {editing ? (
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  maxLength={120}
+                  className="w-full bg-white/[0.05] border border-white/[0.12] rounded-lg px-3 py-1.5 text-base font-bold text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                />
+              ) : (
+                <h2 className="text-base font-bold text-white leading-snug">{request.title}</h2>
+              )}
               <p className="text-[11px] text-gray-600 mt-1 font-mono">
-                Submitted by {request.authorName ?? "Anonymous"} · {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
+                by {request.authorName ?? "Anonymous"} · {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
               </p>
             </div>
-            <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition-colors shrink-0 mt-0.5">
-              <X className="h-4 w-4" />
-            </button>
+
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Owner actions menu */}
+              {isOwner && !editing && (
+                <div ref={menuRef} className="relative">
+                  <button
+                    onClick={() => setMenuOpen((v) => !v)}
+                    className="h-7 w-7 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-300 hover:bg-white/[0.06] transition-colors"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                  {menuOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-40 bg-[#141420] border border-white/[0.10] rounded-xl shadow-xl overflow-hidden z-10">
+                      <button
+                        onClick={() => { setEditing(true); setMenuOpen(false); }}
+                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-white/[0.06] hover:text-white transition-colors"
+                      >
+                        <Pencil className="h-3.5 w-3.5 text-blue-400" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => { setConfirmDelete(true); setMenuOpen(false); }}
+                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Save / cancel when editing */}
+              {editing && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                    Save
+                  </button>
+                  <button
+                    onClick={() => { setEditing(false); setEditTitle(request.title); setEditDesc(request.description ?? ""); setSaveError(null); }}
+                    className="px-3 py-1.5 text-gray-600 hover:text-gray-300 text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              <button onClick={onClose} className="h-7 w-7 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-300 hover:bg-white/[0.06] transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Delete confirmation banner */}
+          {confirmDelete && (
+            <div className="px-6 py-3 bg-red-500/10 border-b border-red-500/20 flex items-center justify-between shrink-0">
+              <p className="text-sm text-red-300">Delete this feature request permanently?</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-xs font-bold rounded-lg transition-colors"
+                >
+                  {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-3 py-1.5 text-gray-500 hover:text-gray-300 text-xs font-semibold rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Scrollable body */}
           <div className="overflow-y-auto flex-1 px-6 py-5">
-            {/* Description + vote */}
+            {saveError && <p className="text-xs text-red-400 mb-3">{saveError}</p>}
+
             <div className="flex gap-4">
-              <VoteButton
-                id={request.id}
-                count={request._count.votes}
-                hasVoted={request.hasVoted}
-                loggedIn={!!userId}
-              />
+              <VoteButton id={request.id} count={request._count.votes} hasVoted={request.hasVoted} loggedIn={!!userId} />
               <div className="flex-1 min-w-0">
-                {request.description ? (
+                {editing ? (
+                  <textarea
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    rows={3}
+                    placeholder="Add a description…"
+                    className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors resize-none"
+                  />
+                ) : request.description ? (
                   <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap">{request.description}</p>
                 ) : (
                   <p className="text-sm text-gray-700 italic">No description provided.</p>
@@ -270,7 +365,6 @@ function RequestModal({
               </div>
             </div>
 
-            {/* Comments */}
             <CommentSection requestId={request.id} userId={userId} />
           </div>
         </div>
@@ -281,38 +375,32 @@ function RequestModal({
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
-function RequestCard({
-  request,
-  userId,
-}: {
-  request: FeatureRequestWithMeta;
-  userId: string | null;
+function RequestCard({ request, userId, onDeleted }: {
+  request: FeatureRequestWithMeta; userId: string | null; onDeleted: (id: string) => void;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <>
       {modalOpen && (
-        <RequestModal request={request} userId={userId} onClose={() => setModalOpen(false)} />
+        <RequestModal
+          request={request}
+          userId={userId}
+          onClose={() => setModalOpen(false)}
+          onDeleted={() => onDeleted(request.id)}
+        />
       )}
       <div
         className="group bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 flex gap-3 hover:bg-white/[0.05] hover:border-white/[0.10] transition-all cursor-pointer"
         onClick={() => setModalOpen(true)}
       >
-        <VoteButton
-          id={request.id}
-          count={request._count.votes}
-          hasVoted={request.hasVoted}
-          loggedIn={!!userId}
-        />
+        <VoteButton id={request.id} count={request._count.votes} hasVoted={request.hasVoted} loggedIn={!!userId} />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-gray-200 leading-snug group-hover:text-white transition-colors">
             {request.title}
           </p>
           {request.description && (
-            <p className="text-[12px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">
-              {request.description}
-            </p>
+            <p className="text-[12px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">{request.description}</p>
           )}
           <div className="flex items-center gap-3 mt-2">
             <p className="text-[10px] text-gray-700 font-mono">
@@ -326,7 +414,7 @@ function RequestCard({
             )}
           </div>
         </div>
-        <ChevronDown className="h-3.5 w-3.5 text-gray-700 group-hover:text-gray-500 transition-colors shrink-0 self-center rotate-[-90deg]" />
+        <ChevronRight className="h-3.5 w-3.5 text-gray-700 group-hover:text-gray-500 transition-colors shrink-0 self-center" />
       </div>
     </>
   );
@@ -343,12 +431,8 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
     setError(null);
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
-      try {
-        await submitFeatureRequest(fd);
-        onClose();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
-      }
+      try { await submitFeatureRequest(fd); onClose(); }
+      catch (err) { setError(err instanceof Error ? err.message : "Something went wrong."); }
     });
   }
 
@@ -367,19 +451,14 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
               <X className="h-4 w-4" />
             </button>
           </div>
-
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {error && (
-              <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>
-            )}
+            {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
                 Title <span className="text-red-400">*</span>
               </label>
               <input
-                name="title"
-                required
-                maxLength={120}
+                name="title" required maxLength={120}
                 placeholder="e.g. Bulk invoice download as PDF"
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
               />
@@ -389,19 +468,14 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
                 Details <span className="text-gray-700">(optional)</span>
               </label>
               <textarea
-                name="description"
-                rows={3}
-                placeholder="Describe why this would be useful and how you'd use it…"
+                name="description" rows={3}
+                placeholder="Describe why this would be useful…"
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors resize-none"
               />
             </div>
             <div className="flex justify-end gap-3 pt-1">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-200 transition-colors">
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={pending}
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-200 transition-colors">Cancel</button>
+              <button type="submit" disabled={pending}
                 className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-violet-500 hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-all"
               >
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -426,8 +500,17 @@ interface Props {
 
 export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Props) {
   const [showModal, setShowModal] = useState(false);
-  const data = { planned, inProgress, inBeta };
-  const total = planned.length + inProgress.length + inBeta.length;
+
+  // Local state so delete removes card instantly without full page reload
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const hide = (id: string) => setHidden((s) => new Set([...s, id]));
+
+  const data = {
+    planned: planned.filter((r) => !hidden.has(r.id)),
+    inProgress: inProgress.filter((r) => !hidden.has(r.id)),
+    inBeta: inBeta.filter((r) => !hidden.has(r.id)),
+  };
+  const total = data.planned.length + data.inProgress.length + data.inBeta.length;
 
   return (
     <>
@@ -450,10 +533,7 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
         {COLUMNS.map((col) => {
           const requests = data[col.key];
           return (
-            <div
-              key={col.key}
-              className={`rounded-2xl border bg-white/[0.02] overflow-hidden ${col.borderAccent}`}
-            >
+            <div key={col.key} className={`rounded-2xl border bg-white/[0.02] overflow-hidden ${col.borderAccent}`}>
               <div className={`px-5 py-4 border-b border-white/[0.06] bg-gradient-to-b ${col.headerGlow}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -465,7 +545,6 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
                   </span>
                 </div>
               </div>
-
               <div className="p-4 space-y-3 min-h-[200px]">
                 {requests.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-center">
@@ -474,7 +553,7 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
                   </div>
                 ) : (
                   requests.map((req) => (
-                    <RequestCard key={req.id} request={req} userId={userId} />
+                    <RequestCard key={req.id} request={req} userId={userId} onDeleted={hide} />
                   ))
                 )}
               </div>
