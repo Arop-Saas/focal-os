@@ -137,7 +137,7 @@ export default function LandingPage() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
               <Camera className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-white tracking-tight">scalist</span>
+            <span className="font-bold text-white tracking-tight">Scalist</span>
           </div>
 
           <div className="hidden md:flex items-center gap-6 text-sm text-gray-400">
@@ -178,7 +178,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed mb-10">
-            From booking to delivery to getting paid — scalist handles every part of your real estate photography workflow so you can focus on shooting.
+            From booking to delivery to getting paid — Scalist handles every part of your real estate photography workflow so you can focus on shooting.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -528,7 +528,7 @@ export default function LandingPage() {
             <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
               <Camera className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-white tracking-tight">scalist</span>
+            <span className="font-bold text-white tracking-tight">Scalist</span>
           </div>
 
           <div className="flex items-center gap-6 text-sm text-gray-600">

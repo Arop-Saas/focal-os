@@ -14,7 +14,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
             <Camera className="h-4 w-4 text-white" />
           </div>
-          <span className="text-[15px] font-bold text-white tracking-tight">scalist</span>
+          <span className="text-[15px] font-bold text-white tracking-tight">Scalist</span>
         </Link>
 
         {/* Hero text */}
@@ -57,7 +57,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
               <Camera className="h-4 w-4 text-white" />
             </div>
-            <span className="text-base font-bold text-white tracking-tight">scalist</span>
+            <span className="text-base font-bold text-white tracking-tight">Scalist</span>
           </div>
           {children}
         </div>
