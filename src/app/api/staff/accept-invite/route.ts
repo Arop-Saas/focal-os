@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
             workspaceId: invite.workspaceId,
             memberId: member.id,
             skills: [],
+            serviceRegions: [],
           },
         });
       });
