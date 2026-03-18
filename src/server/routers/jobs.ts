@@ -281,7 +281,6 @@ export const jobsRouter = router({
             subtotal,
             taxAmount,
             totalAmount,
-            amountDue: totalAmount,
             status: "PENDING",
             services: {
               create: serviceItems.map((s) => ({
