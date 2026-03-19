@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -21,6 +21,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/";
+  const confirmed = searchParams.get("confirmed") === "true";
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -39,6 +40,10 @@ function LoginForm() {
     });
 
     if (error) {
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        router.push(`/confirm-email?email=${encodeURIComponent(data.email)}`);
+        return;
+      }
       setServerError(
         error.message === "Invalid login credentials"
           ? "Incorrect email or password. Please try again."
@@ -61,6 +66,12 @@ function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {confirmed && (
+          <div className="flex items-center gap-2.5 rounded-lg bg-green-500/10 border border-green-500/20 px-4 py-3 text-[13px] text-green-400">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            Email confirmed! Sign in to get started.
+          </div>
+        )}
         {serverError && (
           <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-[13px] text-red-400">
             {serverError}
