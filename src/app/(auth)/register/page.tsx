@@ -10,7 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 const schema = z.object({
-  fullName: z.string().min(2, "Please enter your full name"),
+  firstName: z.string().min(1, "Please enter your first name"),
+  lastName: z.string().min(1, "Please enter your last name"),
   email: z.string().email("Please enter a valid email"),
   password: z
     .string()
@@ -41,11 +42,13 @@ export default function RegisterPage() {
     setServerError(null);
     const supabase = createClient();
 
+    const fullName = `${data.firstName} ${data.lastName}`;
+
     const { error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
-        data: { full_name: data.fullName },
+        data: { full_name: fullName, first_name: data.firstName, last_name: data.lastName },
         emailRedirectTo: `${window.location.origin}/api/auth/callback`,
       },
     });
@@ -55,8 +58,7 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push("/onboarding");
-    router.refresh();
+    router.push(`/confirm-email?email=${encodeURIComponent(data.email)}`);
   }
 
   return (
@@ -75,15 +77,28 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <label className="block text-[13px] font-medium text-gray-300">Full name</label>
-          <input
-            {...register("fullName")}
-            autoComplete="name"
-            placeholder="Alex Johnson"
-            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-          />
-          {errors.fullName && <p className="text-[11px] text-red-400">{errors.fullName.message}</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="block text-[13px] font-medium text-gray-300">First name</label>
+            <input
+              {...register("firstName")}
+              autoComplete="given-name"
+              placeholder="Alex"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            />
+            {errors.firstName && <p className="text-[11px] text-red-400">{errors.firstName.message}</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[13px] font-medium text-gray-300">Last name</label>
+            <input
+              {...register("lastName")}
+              autoComplete="family-name"
+              placeholder="Johnson"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            />
+            {errors.lastName && <p className="text-[11px] text-red-400">{errors.lastName.message}</p>}
+          </div>
         </div>
 
         <div className="space-y-1.5">
