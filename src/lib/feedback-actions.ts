@@ -150,6 +150,38 @@ export async function deleteFeatureRequest(id: string) {
   revalidatePath("/feedback");
 }
 
+export async function adminUpdateStatus(id: string, status: FeatureRequestStatus) {
+  const user = await getCurrentUser();
+  if (!user?.isSuperAdmin) throw new Error("Not authorised.");
+  await prisma.featureRequest.update({ where: { id }, data: { status } });
+  revalidatePath("/feedback");
+  revalidatePath("/admin/feature-requests");
+}
+
+export async function adminTogglePin(id: string, pinned: boolean) {
+  const user = await getCurrentUser();
+  if (!user?.isSuperAdmin) throw new Error("Not authorised.");
+  await prisma.featureRequest.update({ where: { id }, data: { pinned } });
+  revalidatePath("/feedback");
+  revalidatePath("/admin/feature-requests");
+}
+
+export async function adminDeleteRequest(id: string) {
+  const user = await getCurrentUser();
+  if (!user?.isSuperAdmin) throw new Error("Not authorised.");
+  await prisma.featureRequest.delete({ where: { id } });
+  revalidatePath("/feedback");
+  revalidatePath("/admin/feature-requests");
+}
+
+export async function getAllFeatureRequestsForAdmin() {
+  const requests = await prisma.featureRequest.findMany({
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+    include: { _count: { select: { votes: true, comments: true } } },
+  });
+  return requests;
+}
+
 export async function toggleVote(featureRequestId: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error("You must be logged in to vote.");

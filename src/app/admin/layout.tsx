@@ -2,13 +2,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
-import { LayoutDashboard, Building2, Megaphone, ShieldAlert, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Megaphone, ShieldAlert, LogOut, Lightbulb } from "lucide-react";
 
 export const metadata = { title: "Scalist Control" };
 
 const navItems = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Workspaces", href: "/admin/workspaces", icon: Building2 },
+  { label: "Feature Requests", href: "/admin/feature-requests", icon: Lightbulb },
   { label: "Broadcast", href: "/admin/broadcast", icon: Megaphone },
 ];
 
