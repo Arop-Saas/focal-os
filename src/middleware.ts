@@ -8,6 +8,7 @@ const publicRoutes = [
   "/register",
   "/forgot-password",
   "/reset-password",
+  "/confirm-email",
   "/verify",
   "/api/webhooks",
   "/gallery",      // Public gallery share links
