@@ -151,6 +151,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                       jobId={job.id}
                       currentStaffProfileId={primaryStaffProfileId}
                       currentAssigneeName={primaryPhotographer?.fullName}
+                      schedulingData={job.scheduledAt ? {
+                        propertyAddress: job.propertyAddress,
+                        propertyCity: job.propertyCity,
+                        propertyState: job.propertyState,
+                        propertyZip: job.propertyZip,
+                        scheduledAt: new Date(job.scheduledAt),
+                        estimatedDurationMins: job.estimatedDurationMins ?? 90,
+                      } : undefined}
                     />
                   </div>
                   <div>

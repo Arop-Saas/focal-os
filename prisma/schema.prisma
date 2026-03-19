@@ -545,6 +545,7 @@ model JobAssignment {
   isPrimary Boolean  @default(true)
   confirmedAt DateTime?
   travelMinutes Int?   // Calculated from previous job
+  gcalEventId String?  // Google Calendar event ID for this assignment
 
   job       Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
   staff     StaffProfile @relation(fields: [staffId], references: [id])

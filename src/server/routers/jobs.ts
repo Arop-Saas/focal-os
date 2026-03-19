@@ -9,7 +9,7 @@ import {
   notifyJobCancelled,
   notifyJobDelivered,
 } from "@/lib/notify";
-import { createCalendarEvent } from "@/lib/gcal";
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "@/lib/gcal";
 
 const JobCreateSchema = z.object({
   clientId: z.string(),
@@ -463,6 +463,41 @@ export const jobsRouter = router({
         }
       }
 
+      // Fire-and-forget: update Google Calendar events if scheduledAt changed
+      if (input.scheduledAt && input.scheduledAt.getTime() !== job.scheduledAt?.getTime()) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore – gcalEventId added via migration, Prisma client not yet regenerated
+        const assignments = await ctx.prisma.jobAssignment.findMany({
+          // @ts-ignore
+          where: { jobId: id, gcalEventId: { not: null } },
+          include: {
+            staff: {
+              include: {
+                member: { include: { user: { select: { googleRefreshToken: true, googleCalendarId: true } } } },
+              },
+            },
+          },
+        });
+
+        for (const assignment of assignments) {
+          const refreshToken = (assignment as any).staff.member.user.googleRefreshToken;
+          const calendarId = (assignment as any).staff.member.user.googleCalendarId ?? "primary";
+          const gcalEventId = (assignment as any).gcalEventId;
+          if (refreshToken && gcalEventId) {
+            const startAt = input.scheduledAt;
+            const endAt = new Date(
+              startAt.getTime() + (updated.estimatedDurationMins ?? 90) * 60_000
+            );
+            updateCalendarEvent(refreshToken, gcalEventId, {
+              title: `📷 Shoot — ${updated.propertyAddress}`,
+              startAt,
+              endAt,
+              calendarId,
+            }).catch(console.error);
+          }
+        }
+      }
+
       return updated;
     }),
 
@@ -534,6 +569,7 @@ export const jobsRouter = router({
           const endAt = new Date(
             startAt.getTime() + (jobForNotify.estimatedDurationMins ?? 90) * 60_000
           );
+          // Create the event and store its ID on the assignment so we can update/delete it later
           createCalendarEvent(photographerUser.googleRefreshToken, {
             title: `📷 Shoot — ${jobForNotify.propertyAddress}`,
             description: [
@@ -547,6 +583,14 @@ export const jobsRouter = router({
             startAt,
             endAt,
             calendarId: photographerUser.googleCalendarId ?? "primary",
+          }).then(async (eventId) => {
+            if (eventId) {
+              await (ctx.prisma.jobAssignment.update as any)({
+                where: { jobId_staffId: { jobId: input.jobId, staffId: input.staffId } },
+                // @ts-ignore – gcalEventId added via migration, Prisma client not yet regenerated
+                data: { gcalEventId: eventId },
+              }).catch(console.error);
+            }
           }).catch(console.error);
         }
       }
@@ -631,6 +675,29 @@ export const jobsRouter = router({
           propertyAddress: job.propertyAddress,
           reason: input.reason,
         });
+      }
+
+      // Fire-and-forget: delete Google Calendar events for all assigned photographers
+      // @ts-ignore – gcalEventId added via migration, Prisma client not yet regenerated
+      const assignments = await ctx.prisma.jobAssignment.findMany({
+        // @ts-ignore
+        where: { jobId: input.id, gcalEventId: { not: null } },
+        include: {
+          staff: {
+            include: {
+              member: { include: { user: { select: { googleRefreshToken: true, googleCalendarId: true } } } },
+            },
+          },
+        },
+      });
+
+      for (const assignment of assignments) {
+        const refreshToken = (assignment as any).staff.member.user.googleRefreshToken;
+        const calendarId = (assignment as any).staff.member.user.googleCalendarId ?? "primary";
+        const gcalEventId = (assignment as any).gcalEventId;
+        if (refreshToken && gcalEventId) {
+          deleteCalendarEvent(refreshToken, gcalEventId, calendarId).catch(console.error);
+        }
       }
 
       return cancelled;
