@@ -23,10 +23,25 @@ const step1Schema = z.object({
 type Step1Data = z.infer<typeof step1Schema>;
 
 const TIMEZONES = [
-  "America/New_York", "America/Chicago", "America/Denver",
-  "America/Los_Angeles", "America/Phoenix", "America/Anchorage",
-  "Pacific/Honolulu", "America/Toronto", "America/Vancouver",
-  "Australia/Sydney", "Europe/London",
+  // United States
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Phoenix",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  // Canada
+  "America/Toronto",
+  "America/Winnipeg",
+  "America/Regina",
+  "America/Edmonton",
+  "America/Vancouver",
+  "America/Halifax",
+  "America/St_Johns",
+  // Other
+  "Australia/Sydney",
+  "Europe/London",
 ];
 
 // ─── Service presets ──────────────────────────────────────────────────────────
@@ -227,8 +242,8 @@ export default function OnboardingPage() {
                     className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[13px] font-medium text-gray-700">State</label>
-                  <input {...register("state")} placeholder="TN"
+                  <label className="block text-[13px] font-medium text-gray-700">State / Province</label>
+                  <input {...register("state")} placeholder="TN / ON"
                     className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-colors" />
                 </div>
               </div>
