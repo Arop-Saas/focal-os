@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual, scryptSync, randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 
-const SECRET = process.env.CRON_SECRET ?? "focal-portal-secret";
+const SECRET = process.env.CRON_SECRET ?? "scalist-portal-secret";
 
 interface ResetPayload {
   clientId: string;

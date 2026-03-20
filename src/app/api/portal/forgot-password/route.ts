@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import prisma from "@/lib/prisma";
 
-const SECRET = process.env.CRON_SECRET ?? "focal-portal-secret";
+const SECRET = process.env.CRON_SECRET ?? "scalist-portal-secret";
 const TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 export function generateResetToken(clientId: string, email: string, workspaceSlug: string): string {

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc";
 import { TRPCError } from "@trpc/server";
-import { startOfDay, endOfDay, addDays } from "date-fns";
+import { startOfDay, endOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
+import { generateJobNumber } from "@/lib/utils";
 
 // ─── Mobile procedure — requires logged-in user with a StaffProfile ──────────
 
@@ -32,9 +33,274 @@ const mobileProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   });
 });
 
+// ─── Admin procedure — requires OWNER, ADMIN, or MANAGER role ────────────────
+
+const ADMIN_ROLES = ["OWNER", "ADMIN", "MANAGER"];
+
+const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  const member = await ctx.prisma.workspaceMember.findFirst({
+    where: {
+      userId: ctx.user.id,
+      role: { in: ADMIN_ROLES },
+    },
+    include: { workspace: true },
+  });
+
+  if (!member) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Admin access required.",
+    });
+  }
+
+  return next({
+    ctx: { ...ctx, member, workspace: member.workspace },
+  });
+});
+
+// ─── Client procedure — requires logged-in user with a Client record ─────────
+
+const clientProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  const client = await ctx.prisma.client.findFirst({
+    where: { email: ctx.user.email },
+    include: { workspace: true },
+  });
+
+  if (!client) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No client profile found for this account.",
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      client,
+      workspace: client.workspace,
+    },
+  });
+});
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 export const mobileRouter = router({
+
+  // Detect whether the logged-in user is admin, staff, or a client
+  getMyRole: protectedProcedure.query(async ({ ctx }) => {
+    // Admin check first (OWNER / ADMIN / MANAGER)
+    const adminMember = await ctx.prisma.workspaceMember.findFirst({
+      where: { userId: ctx.user.id, role: { in: ADMIN_ROLES } },
+      select: { id: true },
+    });
+    if (adminMember) return { role: "admin" as const };
+
+    // Staff check
+    const staffProfile = await ctx.prisma.staffProfile.findFirst({
+      where: { member: { userId: ctx.user.id }, isActive: true },
+      select: { id: true },
+    });
+    if (staffProfile) return { role: "staff" as const };
+
+    // Client check
+    const client = await ctx.prisma.client.findFirst({
+      where: { email: ctx.user.email },
+      select: { id: true },
+    });
+    if (client) return { role: "client" as const };
+
+    return { role: "unknown" as const };
+  }),
+
+  // ── Admin portal endpoints ──────────────────────────────────────────────
+
+  // Live overview stats: today's jobs by status, month revenue, staff on field
+  getAdminOverview: adminProcedure.query(async ({ ctx }) => {
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const todayEnd = endOfDay(now);
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+
+    const [todayJobs, monthInvoices, activeStaff, upcomingJobs] = await Promise.all([
+      ctx.prisma.job.findMany({
+        where: { workspaceId: ctx.workspace.id, scheduledAt: { gte: todayStart, lte: todayEnd } },
+        select: {
+          id: true, status: true, propertyAddress: true, scheduledAt: true, totalAmount: true,
+          client: { select: { firstName: true, lastName: true } },
+          assignments: {
+            select: { staff: { select: { displayName: true, avatarUrl: true } } },
+            take: 1,
+          },
+        },
+        orderBy: { scheduledAt: "asc" },
+      }),
+      ctx.prisma.invoice.aggregate({
+        where: {
+          workspaceId: ctx.workspace.id,
+          status: { in: ["PAID", "PARTIAL"] },
+          paidAt: { gte: monthStart, lte: monthEnd },
+        },
+        _sum: { amountPaid: true },
+      }),
+      ctx.prisma.staffProfile.count({
+        where: { member: { workspaceId: ctx.workspace.id }, isActive: true },
+      }),
+      ctx.prisma.job.count({
+        where: {
+          workspaceId: ctx.workspace.id,
+          scheduledAt: { gte: todayEnd },
+          status: { notIn: ["COMPLETED", "CANCELLED"] },
+        },
+      }),
+    ]);
+
+    const statusCounts: Record<string, number> = {};
+    for (const job of todayJobs) {
+      statusCounts[job.status] = (statusCounts[job.status] ?? 0) + 1;
+    }
+
+    return {
+      todayJobs,
+      statusCounts,
+      monthRevenue: monthInvoices._sum.amountPaid ?? 0,
+      activeStaff,
+      upcomingJobs,
+      workspaceName: ctx.workspace.name,
+    };
+  }),
+
+  // All workspace jobs — today + next 14 days
+  getAdminJobs: adminProcedure.query(async ({ ctx }) => {
+    const now = new Date();
+    return ctx.prisma.job.findMany({
+      where: {
+        workspaceId: ctx.workspace.id,
+        scheduledAt: { gte: startOfDay(now), lte: endOfDay(addDays(now, 14)) },
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+      },
+      orderBy: { scheduledAt: "asc" },
+      select: {
+        id: true, status: true, propertyAddress: true, propertyCity: true,
+        scheduledAt: true, isRush: true, totalAmount: true,
+        client: { select: { firstName: true, lastName: true, phone: true } },
+        package: { select: { name: true } },
+        assignments: {
+          select: {
+            role: true,
+            staff: { select: { id: true, displayName: true, avatarUrl: true } },
+          },
+        },
+      },
+    });
+  }),
+
+  // All active staff with today's job count and clock-in status
+  getAdminStaff: adminProcedure.query(async ({ ctx }) => {
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+
+    const staff = await ctx.prisma.staffProfile.findMany({
+      where: { member: { workspaceId: ctx.workspace.id }, isActive: true },
+      select: {
+        id: true, displayName: true, title: true, avatarUrl: true, phone: true, email: true,
+        member: { select: { role: true } },
+        assignments: {
+          where: { job: { scheduledAt: { gte: todayStart, lte: todayEnd } } },
+          select: {
+            job: {
+              select: {
+                id: true, status: true, propertyAddress: true,
+                scheduledAt: true, actualStartAt: true, actualEndAt: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { displayName: "asc" },
+    });
+
+    return staff.map((s) => {
+      const todayAssignments = s.assignments;
+      const clockedIn = todayAssignments.some(
+        (a) => a.job.actualStartAt && !a.job.actualEndAt
+      );
+      return {
+        ...s,
+        todayJobCount: todayAssignments.length,
+        clockedIn,
+        currentJob: todayAssignments.find((a) => a.job.actualStartAt && !a.job.actualEndAt)?.job ?? null,
+      };
+    });
+  }),
+
+  // Admin profile
+  getAdminProfile: adminProcedure.query(async ({ ctx }) => {
+    return {
+      email: ctx.user.email,
+      role: ctx.member.role,
+      workspaceName: ctx.workspace.name,
+      workspaceSlug: ctx.workspace.slug,
+    };
+  }),
+
+  // ── Client portal endpoints ─────────────────────────────────────────────
+
+  // Client's jobs (all, ordered newest first)
+  getClientOrders: clientProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.job.findMany({
+      where: { clientId: ctx.client.id },
+      orderBy: { scheduledAt: "desc" },
+      select: {
+        id: true,
+        propertyAddress: true,
+        propertyCity: true,
+        propertyState: true,
+        scheduledAt: true,
+        status: true,
+        package: { select: { name: true } },
+        assignments: {
+          where: { role: "PHOTOGRAPHER" },
+          select: { staff: { select: { displayName: true } } },
+          take: 1,
+        },
+      },
+    });
+  }),
+
+  // Client's invoices
+  getClientInvoices: clientProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.invoice.findMany({
+      where: { clientId: ctx.client.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+        totalAmount: true,
+        amountDue: true,
+        amountPaid: true,
+        issuedAt: true,
+        dueAt: true,
+        paidAt: true,
+        paymentLink: true,
+        job: { select: { propertyAddress: true } },
+      },
+    });
+  }),
+
+  // Client profile info
+  getClientProfile: clientProcedure.query(async ({ ctx }) => {
+    return {
+      firstName: ctx.client.firstName,
+      lastName: ctx.client.lastName,
+      email: ctx.client.email,
+      phone: ctx.client.phone,
+      company: ctx.client.company,
+      workspaceName: ctx.workspace.name,
+      totalJobs: ctx.client.totalJobs,
+    };
+  }),
 
   // Get my assigned jobs — today + next 7 days
   getMyJobs: mobileProcedure.query(async ({ ctx }) => {
@@ -217,4 +483,214 @@ export const mobileRouter = router({
       workspaceLogo: ctx.workspace.logoUrl,
     };
   }),
+
+  // All assigned jobs (no date filter) — for Listings tab
+  getAllMyJobs: mobileProcedure.query(async ({ ctx }) => {
+    const assignments = await ctx.prisma.jobAssignment.findMany({
+      where: {
+        staffId: ctx.staffProfile.id,
+        job: {
+          workspaceId: ctx.workspace.id,
+          status: { notIn: ["CANCELLED"] },
+        },
+      },
+      include: {
+        job: {
+          include: {
+            client: {
+              select: { id: true, firstName: true, lastName: true, phone: true },
+            },
+            package: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { job: { scheduledAt: "desc" } },
+    });
+    return assignments.map((a) => a.job);
+  }),
+
+  // Unique clients from all assigned jobs — for Customers tab
+  getMyClients: mobileProcedure.query(async ({ ctx }) => {
+    const assignments = await ctx.prisma.jobAssignment.findMany({
+      where: {
+        staffId: ctx.staffProfile.id,
+        job: { workspaceId: ctx.workspace.id, status: { notIn: ["CANCELLED"] } },
+      },
+      include: {
+        job: {
+          select: {
+            id: true,
+            status: true,
+            scheduledAt: true,
+            propertyAddress: true,
+            client: {
+              select: {
+                id: true, firstName: true, lastName: true,
+                phone: true, email: true, company: true, clientType: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Deduplicate clients, attach job count + most recent job
+    const clientMap = new Map<string, {
+      id: string; firstName: string; lastName: string;
+      phone: string | null; email: string | null;
+      company: string | null; clientType: string;
+      jobCount: number; lastJobAt: Date | null; lastAddress: string | null;
+    }>();
+
+    for (const a of assignments) {
+      const c = a.job.client;
+      if (!c) continue;
+      const existing = clientMap.get(c.id);
+      const jobDate = a.job.scheduledAt;
+      if (!existing) {
+        clientMap.set(c.id, {
+          ...c,
+          jobCount: 1,
+          lastJobAt: jobDate,
+          lastAddress: a.job.propertyAddress,
+        });
+      } else {
+        existing.jobCount += 1;
+        if (jobDate && (!existing.lastJobAt || jobDate > existing.lastJobAt)) {
+          existing.lastJobAt = jobDate;
+          existing.lastAddress = a.job.propertyAddress;
+        }
+      }
+    }
+
+    return Array.from(clientMap.values()).sort((a, b) =>
+      a.lastName.localeCompare(b.lastName)
+    );
+  }),
+
+  // ── Admin: data needed to render the new-job form ────────────────────────
+  getJobFormData: adminProcedure.query(async ({ ctx }) => {
+    const [clients, packages, staff] = await Promise.all([
+      ctx.prisma.client.findMany({
+        where: { workspaceId: ctx.workspace.id, status: "ACTIVE" },
+        select: { id: true, firstName: true, lastName: true, email: true, company: true },
+        orderBy: { lastName: "asc" },
+      }),
+      ctx.prisma.package.findMany({
+        where: { workspaceId: ctx.workspace.id, isActive: true },
+        select: {
+          id: true, name: true, price: true,
+          items: { select: { service: { select: { name: true } } } },
+        },
+        orderBy: { sortOrder: "asc" },
+      }),
+      ctx.prisma.staffProfile.findMany({
+        where: { workspaceId: ctx.workspace.id, isActive: true },
+        select: {
+          id: true,
+          member: { select: { user: { select: { fullName: true } } } },
+        },
+        orderBy: { member: { user: { fullName: "asc" } } },
+      }),
+    ]);
+    return { clients, packages, staff };
+  }),
+
+  // ── Admin: create a new job ───────────────────────────────────────────────
+  createJob: adminProcedure
+    .input(
+      z.object({
+        clientId: z.string(),
+        packageId: z.string().optional(),
+        propertyAddress: z.string().min(5),
+        propertyCity: z.string(),
+        propertyState: z.string(),
+        propertyZip: z.string().optional(),
+        propertyType: z
+          .enum(["RESIDENTIAL", "COMMERCIAL", "LAND", "MULTI_FAMILY", "RENTAL", "NEW_CONSTRUCTION"])
+          .default("RESIDENTIAL"),
+        squareFootage: z.number().optional(),
+        bedrooms: z.number().optional(),
+        bathrooms: z.number().optional(),
+        mlsNumber: z.string().optional(),
+        accessNotes: z.string().optional(),
+        scheduledAt: z.string().optional(), // ISO string from mobile
+        estimatedDurationMins: z.number().default(90),
+        internalNotes: z.string().optional(),
+        clientNotes: z.string().optional(),
+        priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
+        isRush: z.boolean().default(false),
+        rushFee: z.number().default(0),
+        assignedStaffIds: z.array(z.string()).default([]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { assignedStaffIds, scheduledAt, ...jobData } = input;
+
+      // Resolve package price → subtotal
+      let subtotal = 0;
+      if (jobData.packageId) {
+        const pkg = await ctx.prisma.package.findFirst({
+          where: { id: jobData.packageId, workspaceId: ctx.workspace.id },
+        });
+        if (pkg) subtotal = pkg.price;
+      }
+      const taxAmount = (subtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
+      const totalAmount = subtotal + taxAmount + (jobData.rushFee ?? 0);
+
+      const ws = await ctx.prisma.workspace.findUnique({
+        where: { id: ctx.workspace.id },
+        select: { invoiceNextNumber: true, invoicePrefix: true },
+      });
+      const jobNumber = generateJobNumber(
+        ws?.invoicePrefix ?? "JOB",
+        ws?.invoiceNextNumber ?? 1001
+      );
+
+      const job = await ctx.prisma.$transaction(async (tx) => {
+        await tx.workspace.update({
+          where: { id: ctx.workspace.id },
+          data: { invoiceNextNumber: { increment: 1 } },
+        });
+
+        const newJob = await tx.job.create({
+          data: {
+            workspaceId: ctx.workspace.id,
+            jobNumber,
+            ...jobData,
+            packageId: jobData.packageId || null,
+            scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+            subtotal,
+            taxAmount,
+            totalAmount,
+            status: "PENDING",
+          },
+        });
+
+        if (assignedStaffIds.length > 0) {
+          await tx.jobAssignment.createMany({
+            data: assignedStaffIds.map((staffId) => ({
+              jobId: newJob.id,
+              staffId,
+              role: "PHOTOGRAPHER",
+            })),
+          });
+        }
+
+        await tx.activityLog.create({
+          data: {
+            workspaceId: ctx.workspace.id,
+            userId: ctx.user.id,
+            entityType: "job",
+            entityId: newJob.id,
+            action: "job.created",
+            metadata: { jobNumber, source: "mobile" },
+          },
+        });
+
+        return newJob;
+      });
+
+      return { id: job.id, jobNumber: job.jobNumber };
+    }),
 });

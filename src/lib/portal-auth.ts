@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const SECRET = process.env.CRON_SECRET ?? "focal-portal-secret";
+const SECRET = process.env.CRON_SECRET ?? "scalist-portal-secret";
 
 export interface PortalSession {
   clientId: string;
@@ -9,7 +9,7 @@ export interface PortalSession {
   exp: number;
 }
 
-export const PORTAL_COOKIE = "focal_portal_session";
+export const PORTAL_COOKIE = "scalist_portal_session";
 export const PORTAL_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
