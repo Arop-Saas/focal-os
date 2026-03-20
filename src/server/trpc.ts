@@ -61,6 +61,25 @@ export async function createTRPCContext(opts: CreateContextOptions) {
       workspace = user.workspaces[0].workspace;
       memberRole = user.workspaces[0].role;
     }
+
+    // ── Impersonation override ──────────────────────────────────────────────
+    // If a super-admin has set the admin_impersonating cookie, swap the
+    // workspace context so all tRPC procedures operate on that workspace.
+    if (user?.isSuperAdmin) {
+      const cookieHeader = opts.req?.headers.get("cookie") ?? "";
+      const match = cookieHeader.match(/admin_impersonating=([^;]+)/);
+      const impersonatingId = match?.[1] ?? null;
+      if (impersonatingId) {
+        const impersonatedWs = await prisma.workspace.findUnique({
+          where: { id: impersonatingId },
+        });
+        if (impersonatedWs) {
+          workspace = impersonatedWs;
+          memberRole = "OWNER"; // grant full access when impersonating
+        }
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────────
   }
 
   return {
