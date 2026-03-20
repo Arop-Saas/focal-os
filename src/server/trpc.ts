@@ -17,9 +17,20 @@ interface CreateContextOptions {
 
 export async function createTRPCContext(opts: CreateContextOptions) {
   const supabase = await createClient();
-  const {
-    data: { user: supabaseUser },
-  } = await supabase.auth.getUser();
+
+  // Mobile clients send Authorization: Bearer <token> instead of cookies.
+  // Check the header first; fall back to cookie-based session.
+  let supabaseUser = null;
+  const authHeader = opts.req?.headers.get("authorization") ?? "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (bearerToken) {
+    const { data } = await supabase.auth.getUser(bearerToken);
+    supabaseUser = data.user;
+  } else {
+    const { data } = await supabase.auth.getUser();
+    supabaseUser = data.user;
+  }
 
   let user = null;
   let workspace = null;
