@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import { format } from "date-fns";
 import { formatCurrency, JOB_STATUS_COLORS, JOB_STATUS_LABELS, cn } from "@/lib/utils";
@@ -22,11 +23,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
-    include: { workspaces: { include: { workspace: true }, take: 1 } },
-  });
-  const workspaceId = user!.workspaces[0].workspace.id;
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
 
   const job = await prisma.job.findFirst({
     where: { id: params.id, workspaceId },

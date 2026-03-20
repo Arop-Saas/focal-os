@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { subWeeks, startOfWeek } from "date-fns";
 import { Header } from "@/components/layout/header";
 import { DashboardStats } from "@/components/dashboard/stats";
@@ -22,11 +23,12 @@ export default async function DashboardPage() {
 
   const user = await prisma.user.findUnique({
     where: { supabaseId: supabaseUser.id },
-    include: { workspaces: { include: { workspace: true }, take: 1 } },
   });
-  if (!user || !user.workspaces.length) redirect("/onboarding");
+  if (!user) redirect("/onboarding");
 
-  const workspace = user.workspaces[0].workspace;
+  const workspaceId = await resolveWorkspaceId(supabaseUser.id);
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+  if (!workspace) redirect("/onboarding");
   const now = new Date();
 
   // Time boundaries

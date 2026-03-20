@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import { RevenueChart } from "@/components/reports/revenue-chart";
 import { StatsOverview } from "@/components/reports/stats-overview";
@@ -14,12 +15,7 @@ export default async function ReportsPage() {
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
-    include: { workspaces: { include: { workspace: true }, take: 1 } },
-  });
-
-  const workspaceId = user!.workspaces[0].workspace.id;
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);

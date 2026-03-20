@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import { ArrowLeft, Mail, Phone, User, Briefcase } from "lucide-react";
 import Link from "next/link";
@@ -13,11 +14,7 @@ export default async function StaffDetailPage({ params }: { params: { id: string
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
-    include: { workspaces: { include: { workspace: true }, take: 1 } },
-  });
-  const workspaceId = user!.workspaces[0].workspace.id;
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
 
   const staff = await prisma.staffProfile.findFirst({
     where: { id: params.id, workspaceId },

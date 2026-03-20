@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import { ScheduleView } from "@/components/scheduling/schedule-view";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,7 @@ export default async function SchedulingPage() {
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
-    include: { workspaces: { include: { workspace: true }, take: 1 } },
-  });
-
-  const workspaceId = user!.workspaces[0].workspace.id;
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
 
   // Fetch jobs for a 4-month window (1 month back, 3 months forward)
   // so month/week views work when navigating around today

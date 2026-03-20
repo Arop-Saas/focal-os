@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import Link from "next/link";
 import { formatDistanceToNow, isToday, isYesterday, format } from "date-fns";
@@ -145,11 +146,7 @@ export default async function NotificationsPage() {
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
-    include: { workspaces: { include: { workspace: true }, take: 1 } },
-  });
-  const workspaceId = user!.workspaces[0].workspace.id;
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
 
   const logs = await prisma.activityLog.findMany({
     where: { workspaceId },

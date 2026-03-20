@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import { BillingClient } from "./BillingClient";
 import { differenceInDays } from "date-fns";
@@ -16,30 +17,20 @@ export default async function BillingPage({
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
-    include: {
-      workspaces: {
-        include: {
-          workspace: {
-            select: {
-              id: true,
-              name: true,
-              subscriptionStatus: true,
-              subscriptionTier: true,
-              subscriptionEndsAt: true,
-              trialEndsAt: true,
-              gracePeriodEndsAt: true,
-              stripeCustomerId: true,
-            },
-          },
-        },
-        take: 1,
-      },
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: {
+      id: true,
+      name: true,
+      subscriptionStatus: true,
+      subscriptionTier: true,
+      subscriptionEndsAt: true,
+      trialEndsAt: true,
+      gracePeriodEndsAt: true,
+      stripeCustomerId: true,
     },
   });
-
-  const workspace = user?.workspaces[0]?.workspace;
   if (!workspace) return null;
 
   const now = new Date();

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { ArrowLeft, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,13 +54,8 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser!.id },
-    include: { workspaces: { include: { workspace: true }, take: 1 } },
-  });
-
-  const workspace = user!.workspaces[0].workspace;
-  const workspaceId = workspace.id;
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { id: true, slug: true } });
 
   const client = await prisma.client.findUnique({
     where: { id: params.id },
