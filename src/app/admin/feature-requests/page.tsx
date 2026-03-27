@@ -7,8 +7,8 @@ import {
   adminUpdateCategory,
   adminTogglePin,
   adminDeleteRequest,
-  CATEGORY_META,
 } from "@/lib/feedback-actions";
+import { CATEGORY_META, CATEGORY_OPTIONS } from "@/lib/feedback-categories";
 import { FeatureRequestStatus, FeatureRequestCategory } from "@prisma/client";
 import { Pin, PinOff, Trash2, ChevronDown } from "lucide-react";
 
@@ -20,11 +20,6 @@ const STATUS_OPTIONS: { value: FeatureRequestStatus; label: string; color: strin
   { value: "IN_BETA",     label: "In Beta",     color: "bg-green-500/10 text-green-400 border-green-500/20", dot: "bg-green-500" },
   { value: "COMPLETED",   label: "Completed",   color: "bg-slate-500/10 text-slate-400 border-slate-500/20", dot: "bg-slate-500" },
 ];
-
-const CATEGORY_OPTIONS = Object.entries(CATEGORY_META).map(([value, meta]) => ({
-  value: value as FeatureRequestCategory,
-  ...meta,
-}));
 
 function statusMeta(status: FeatureRequestStatus) {
   return STATUS_OPTIONS.find((s) => s.value === status) ?? STATUS_OPTIONS[0];

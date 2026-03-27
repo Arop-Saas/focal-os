@@ -7,9 +7,10 @@ import {
 } from "lucide-react";
 import {
   toggleVote, submitFeatureRequest, getComments, addComment,
-  updateFeatureRequest, deleteFeatureRequest, CATEGORY_META,
+  updateFeatureRequest, deleteFeatureRequest,
   type FeatureRequestWithMeta, type FeatureRequestComment,
 } from "@/lib/feedback-actions";
+import { CATEGORY_META, CATEGORY_OPTIONS } from "@/lib/feedback-categories";
 import { formatDistanceToNow } from "date-fns";
 import { FeatureRequestCategory } from "@prisma/client";
 
@@ -42,11 +43,6 @@ const statusColor: Record<string, string> = {
   IN_BETA: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
   COMPLETED: "text-gray-400 bg-gray-500/10 border-gray-500/20",
 };
-
-const CATEGORY_OPTIONS = Object.entries(CATEGORY_META).map(([value, meta]) => ({
-  value: value as FeatureRequestCategory,
-  ...meta,
-}));
 
 // ─── Vote button ───────────────────────────────────────────────────────────────
 
