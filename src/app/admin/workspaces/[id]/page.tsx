@@ -212,6 +212,7 @@ export default async function AdminWorkspaceDetailPage({ params }: { params: { i
           <WorkspaceAdminActions
             workspaceId={workspace.id}
             currentStatus={workspace.subscriptionStatus as "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "PAUSED"}
+            workspaceName={workspace.name}
           />
 
           {/* Impersonate */}

@@ -1,19 +1,22 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { setWorkspaceStatus, extendTrial } from "@/app/admin/workspaces/[id]/actions";
-import { ShieldAlert, Play, Pause, RefreshCw, Clock } from "lucide-react";
+import { setWorkspaceStatus, extendTrial, deleteWorkspace } from "@/app/admin/workspaces/[id]/actions";
+import { ShieldAlert, Play, Pause, RefreshCw, Clock, Trash2 } from "lucide-react";
 
 type Status = "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "PAUSED";
 
 interface Props {
   workspaceId: string;
   currentStatus: Status;
+  workspaceName: string;
 }
 
-export function WorkspaceAdminActions({ workspaceId, currentStatus }: Props) {
+export function WorkspaceAdminActions({ workspaceId, currentStatus, workspaceName }: Props) {
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [showDeleteZone, setShowDeleteZone] = useState(false);
 
   function run(action: () => Promise<void>, label: string) {
     if (confirm !== label) {
@@ -131,6 +134,51 @@ export function WorkspaceAdminActions({ workspaceId, currentStatus }: Props) {
           Applying changes…
         </p>
       )}
+
+      {/* Danger Zone */}
+      <div className="mt-5 pt-5 border-t border-red-500/20">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-red-600">
+            Danger Zone
+          </p>
+          <button
+            onClick={() => { setShowDeleteZone((v) => !v); setDeleteInput(""); }}
+            className="text-[9px] font-bold tracking-widest uppercase text-red-600 hover:text-red-400 transition-colors"
+          >
+            {showDeleteZone ? "Cancel" : "Delete Workspace"}
+          </button>
+        </div>
+
+        {showDeleteZone && (
+          <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-4 space-y-3">
+            <p className="text-[11px] text-red-400 leading-relaxed">
+              This will <span className="font-bold">permanently delete</span> all jobs, clients, invoices, galleries, staff, and members. This cannot be undone.
+            </p>
+            <p className="text-[10px] text-slate-500 font-mono">
+              Type <span className="text-red-400 font-bold">{workspaceName}</span> to confirm
+            </p>
+            <input
+              type="text"
+              value={deleteInput}
+              onChange={(e) => setDeleteInput(e.target.value)}
+              placeholder={workspaceName}
+              className="w-full bg-black/40 border border-red-500/30 rounded px-3 py-1.5 text-xs text-red-200 font-mono placeholder:text-slate-700 focus:outline-none focus:border-red-400/60"
+            />
+            <button
+              disabled={pending || deleteInput !== workspaceName}
+              onClick={() =>
+                startTransition(async () => {
+                  await deleteWorkspace(workspaceId);
+                })
+              }
+              className="flex items-center gap-1.5 w-full justify-center px-3 py-2 rounded text-[11px] font-bold tracking-wide uppercase transition-all border bg-red-500/20 border-red-500/40 text-red-300 hover:bg-red-500/30 hover:border-red-400/60 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="h-3 w-3" />
+              {pending ? "Deleting…" : "Delete Workspace Forever"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
