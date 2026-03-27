@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
+import { useRouter } from "next/navigation";
 import { setWorkspaceStatus, extendTrial, deleteWorkspace } from "@/app/admin/workspaces/[id]/actions";
 import { ShieldAlert, Play, Pause, RefreshCw, Clock, Trash2 } from "lucide-react";
 
@@ -17,6 +18,7 @@ export function WorkspaceAdminActions({ workspaceId, currentStatus, workspaceNam
   const [confirm, setConfirm] = useState<string | null>(null);
   const [deleteInput, setDeleteInput] = useState("");
   const [showDeleteZone, setShowDeleteZone] = useState(false);
+  const router = useRouter();
 
   function run(action: () => Promise<void>, label: string) {
     if (confirm !== label) {
@@ -169,6 +171,7 @@ export function WorkspaceAdminActions({ workspaceId, currentStatus, workspaceNam
               onClick={() =>
                 startTransition(async () => {
                   await deleteWorkspace(workspaceId);
+                  router.push("/admin/workspaces");
                 })
               }
               className="flex items-center gap-1.5 w-full justify-center px-3 py-2 rounded text-[11px] font-bold tracking-wide uppercase transition-all border bg-red-500/20 border-red-500/40 text-red-300 hover:bg-red-500/30 hover:border-red-400/60 disabled:opacity-30 disabled:cursor-not-allowed"

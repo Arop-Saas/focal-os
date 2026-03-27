@@ -53,6 +53,19 @@ export async function exitImpersonation() {
   redirect("/admin");
 }
 
+export async function deleteWorkspace(workspaceId: string) {
+  await assertSuperAdmin();
+
+  // All child models have onDelete: Cascade in the schema, so a single
+  // delete is sufficient — Postgres handles the cascade automatically.
+  await prisma.workspace.delete({ where: { id: workspaceId } });
+
+  // Return instead of redirect() — calling redirect() from a Server Action
+  // invoked via useTransition in a Client Component causes a client-side crash.
+  // Navigation is handled in the component after the action resolves.
+  return { success: true };
+}
+
 export async function extendTrial(workspaceId: string, days: number) {
   await assertSuperAdmin();
   const ws = await prisma.workspace.findUnique({
