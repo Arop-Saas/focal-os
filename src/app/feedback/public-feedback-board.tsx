@@ -7,10 +7,11 @@ import {
 } from "lucide-react";
 import {
   toggleVote, submitFeatureRequest, getComments, addComment,
-  updateFeatureRequest, deleteFeatureRequest,
+  updateFeatureRequest, deleteFeatureRequest, CATEGORY_META,
   type FeatureRequestWithMeta, type FeatureRequestComment,
 } from "@/lib/feedback-actions";
 import { formatDistanceToNow } from "date-fns";
+import { FeatureRequestCategory } from "@prisma/client";
 
 // ─── Column config ─────────────────────────────────────────────────────────────
 
@@ -41,6 +42,11 @@ const statusColor: Record<string, string> = {
   IN_BETA: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
   COMPLETED: "text-gray-400 bg-gray-500/10 border-gray-500/20",
 };
+
+const CATEGORY_OPTIONS = Object.entries(CATEGORY_META).map(([value, meta]) => ({
+  value: value as FeatureRequestCategory,
+  ...meta,
+}));
 
 // ─── Vote button ───────────────────────────────────────────────────────────────
 
@@ -177,6 +183,7 @@ function RequestModal({
   onDeleted: () => void;
 }) {
   const isOwner = !!userId && userId === request.authorId;
+  const cat = CATEGORY_META[request.category] ?? CATEGORY_META.GENERAL;
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -242,9 +249,12 @@ function RequestModal({
           {/* Header */}
           <div className="flex items-start justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">
             <div className="flex-1 min-w-0 pr-3">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor[request.status]}`}>
                   {statusLabel[request.status]}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cat.color}`}>
+                  {cat.label}
                 </span>
               </div>
               {editing ? (
@@ -379,6 +389,7 @@ function RequestCard({ request, userId, onDeleted }: {
   request: FeatureRequestWithMeta; userId: string | null; onDeleted: (id: string) => void;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const cat = CATEGORY_META[request.category] ?? CATEGORY_META.GENERAL;
 
   return (
     <>
@@ -402,10 +413,14 @@ function RequestCard({ request, userId, onDeleted }: {
           {request.description && (
             <p className="text-[12px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">{request.description}</p>
           )}
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
             <p className="text-[10px] text-gray-700 font-mono">
               {request.authorName ?? "Anonymous"} · {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
             </p>
+            {/* Category pill */}
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${cat.color}`}>
+              {cat.label}
+            </span>
             {request._count.comments > 0 && (
               <span className="flex items-center gap-1 text-[10px] text-gray-600">
                 <MessageSquare className="h-2.5 w-2.5" />
@@ -455,6 +470,22 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
             {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
+                Category
+              </label>
+              <select
+                name="category"
+                defaultValue="GENERAL"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-gray-200 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
+              >
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <option key={cat.value} value={cat.value} className="bg-[#0d0d0d]">
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
                 Title <span className="text-red-400">*</span>
               </label>
               <input
@@ -500,15 +531,22 @@ interface Props {
 
 export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Props) {
   const [showModal, setShowModal] = useState(false);
+  const [catFilter, setCatFilter] = useState<FeatureRequestCategory | "ALL">("ALL");
 
   // Local state so delete removes card instantly without full page reload
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const hide = (id: string) => setHidden((s) => new Set([...s, id]));
 
+  function applyFilters(items: FeatureRequestWithMeta[]) {
+    return items
+      .filter((r) => !hidden.has(r.id))
+      .filter((r) => catFilter === "ALL" || r.category === catFilter);
+  }
+
   const data = {
-    planned: planned.filter((r) => !hidden.has(r.id)),
-    inProgress: inProgress.filter((r) => !hidden.has(r.id)),
-    inBeta: inBeta.filter((r) => !hidden.has(r.id)),
+    planned: applyFilters(planned),
+    inProgress: applyFilters(inProgress),
+    inBeta: applyFilters(inBeta),
   };
   const total = data.planned.length + data.inProgress.length + data.inBeta.length;
 
@@ -516,7 +554,8 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
     <>
       {showModal && <SubmitModal onClose={() => setShowModal(false)} />}
 
-      <div className="flex items-center justify-between mb-8">
+      {/* Top bar */}
+      <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-gray-600">
           <span className="text-gray-300 font-semibold">{total}</span> idea{total !== 1 ? "s" : ""} · click a card to discuss
         </p>
@@ -527,6 +566,33 @@ export function PublicFeedbackBoard({ planned, inProgress, inBeta, userId }: Pro
           <Plus className="h-4 w-4" />
           Submit Idea
         </button>
+      </div>
+
+      {/* Category filter bar */}
+      <div className="flex items-center gap-2 mb-8 flex-wrap">
+        <button
+          onClick={() => setCatFilter("ALL")}
+          className={`text-[11px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+            catFilter === "ALL"
+              ? "bg-white/10 border-white/20 text-white"
+              : "bg-transparent border-white/[0.08] text-gray-500 hover:text-gray-300 hover:border-white/[0.15]"
+          }`}
+        >
+          All
+        </button>
+        {CATEGORY_OPTIONS.map((cat) => (
+          <button
+            key={cat.value}
+            onClick={() => setCatFilter(cat.value === catFilter ? "ALL" : cat.value)}
+            className={`text-[11px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+              catFilter === cat.value
+                ? `${cat.color}`
+                : "bg-transparent border-white/[0.08] text-gray-500 hover:text-gray-300 hover:border-white/[0.15]"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

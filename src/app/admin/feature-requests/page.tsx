@@ -4,10 +4,12 @@ import { useEffect, useState, useTransition } from "react";
 import {
   getAllFeatureRequestsForAdmin,
   adminUpdateStatus,
+  adminUpdateCategory,
   adminTogglePin,
   adminDeleteRequest,
+  CATEGORY_META,
 } from "@/lib/feedback-actions";
-import { FeatureRequestStatus } from "@prisma/client";
+import { FeatureRequestStatus, FeatureRequestCategory } from "@prisma/client";
 import { Pin, PinOff, Trash2, ChevronDown } from "lucide-react";
 
 type Request = Awaited<ReturnType<typeof getAllFeatureRequestsForAdmin>>[number];
@@ -19,13 +21,23 @@ const STATUS_OPTIONS: { value: FeatureRequestStatus; label: string; color: strin
   { value: "COMPLETED",   label: "Completed",   color: "bg-slate-500/10 text-slate-400 border-slate-500/20", dot: "bg-slate-500" },
 ];
 
+const CATEGORY_OPTIONS = Object.entries(CATEGORY_META).map(([value, meta]) => ({
+  value: value as FeatureRequestCategory,
+  ...meta,
+}));
+
 function statusMeta(status: FeatureRequestStatus) {
   return STATUS_OPTIONS.find((s) => s.value === status) ?? STATUS_OPTIONS[0];
+}
+
+function categoryMeta(category: FeatureRequestCategory) {
+  return CATEGORY_META[category] ?? CATEGORY_META.GENERAL;
 }
 
 export default function AdminFeatureRequestsPage() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [filter, setFilter] = useState<FeatureRequestStatus | "ALL">("ALL");
+  const [catFilter, setCatFilter] = useState<FeatureRequestCategory | "ALL">("ALL");
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -39,6 +51,13 @@ export default function AdminFeatureRequestsPage() {
   function handleStatus(id: string, status: FeatureRequestStatus) {
     startTransition(async () => {
       await adminUpdateStatus(id, status);
+      await load();
+    });
+  }
+
+  function handleCategory(id: string, category: FeatureRequestCategory) {
+    startTransition(async () => {
+      await adminUpdateCategory(id, category);
       await load();
     });
   }
@@ -58,7 +77,9 @@ export default function AdminFeatureRequestsPage() {
     });
   }
 
-  const filtered = filter === "ALL" ? requests : requests.filter((r) => r.status === filter);
+  const filtered = requests
+    .filter((r) => filter === "ALL" || r.status === filter)
+    .filter((r) => catFilter === "ALL" || r.category === catFilter);
 
   const counts = {
     ALL:         requests.length,
@@ -111,6 +132,34 @@ export default function AdminFeatureRequestsPage() {
         ))}
       </div>
 
+      {/* Category filter pills */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[9px] font-bold tracking-widest uppercase text-slate-600">Category:</span>
+        <button
+          onClick={() => setCatFilter("ALL")}
+          className={`text-[10px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
+            catFilter === "ALL"
+              ? "bg-white/10 border-white/20 text-white"
+              : "bg-transparent border-white/[0.06] text-slate-500 hover:text-slate-300"
+          }`}
+        >
+          All
+        </button>
+        {CATEGORY_OPTIONS.map((cat) => (
+          <button
+            key={cat.value}
+            onClick={() => setCatFilter(cat.value)}
+            className={`text-[10px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
+              catFilter === cat.value
+                ? `${cat.color} font-bold`
+                : "bg-transparent border-white/[0.06] text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
       {/* Requests list */}
       <div className="space-y-2">
         {filtered.length === 0 && (
@@ -119,6 +168,7 @@ export default function AdminFeatureRequestsPage() {
 
         {filtered.map((req) => {
           const meta = statusMeta(req.status);
+          const cat = categoryMeta(req.category);
           return (
             <div
               key={req.id}
@@ -142,6 +192,10 @@ export default function AdminFeatureRequestsPage() {
                       Pinned
                     </span>
                   )}
+                  {/* Category pill */}
+                  <span className={`text-[10px] border rounded px-1.5 py-0.5 font-medium ${cat.color}`}>
+                    {cat.label}
+                  </span>
                 </div>
                 {req.description && (
                   <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-2">{req.description}</p>
@@ -156,6 +210,29 @@ export default function AdminFeatureRequestsPage() {
 
               {/* Controls */}
               <div className="flex items-center gap-2 shrink-0">
+                {/* Category dropdown */}
+                <div className="relative group">
+                  <button className={`flex items-center gap-1.5 text-[11px] font-medium border rounded px-2.5 py-1.5 transition-colors ${cat.color}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${cat.dot}`} />
+                    {cat.label}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-[#0f0f1a] border border-white/[0.08] rounded-lg shadow-xl z-10 overflow-hidden hidden group-hover:block">
+                    {CATEGORY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleCategory(req.id, opt.value)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-[11px] hover:bg-white/[0.04] transition-colors text-left ${
+                          req.category === opt.value ? "text-white font-semibold" : "text-slate-400"
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${opt.dot}`} />
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Status dropdown */}
                 <div className="relative group">
                   <button className={`flex items-center gap-1.5 text-[11px] font-medium border rounded px-2.5 py-1.5 transition-colors ${meta.color}`}>

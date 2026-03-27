@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { FeatureRequestStatus } from "@prisma/client";
+import { FeatureRequestStatus, FeatureRequestCategory } from "@prisma/client";
 
 async function getCurrentUser() {
   const supabase = await createClient();
@@ -15,11 +15,23 @@ async function getCurrentUser() {
   });
 }
 
+export const CATEGORY_META: Record<FeatureRequestCategory, { label: string; color: string; dot: string }> = {
+  GENERAL:       { label: "General",       color: "bg-slate-500/10 text-slate-400 border-slate-500/20",   dot: "bg-slate-400" },
+  DASHBOARD:     { label: "Dashboard",     color: "bg-violet-500/10 text-violet-400 border-violet-500/20", dot: "bg-violet-400" },
+  CLIENT_PORTAL: { label: "Client Portal", color: "bg-blue-500/10 text-blue-400 border-blue-500/20",       dot: "bg-blue-400" },
+  JOBS:          { label: "Jobs",          color: "bg-amber-500/10 text-amber-400 border-amber-500/20",    dot: "bg-amber-400" },
+  INVOICING:     { label: "Invoicing",     color: "bg-green-500/10 text-green-400 border-green-500/20",    dot: "bg-green-400" },
+  CALENDAR:      { label: "Calendar",      color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",       dot: "bg-cyan-400" },
+  MOBILE_APP:    { label: "Mobile App",    color: "bg-pink-500/10 text-pink-400 border-pink-500/20",       dot: "bg-pink-400" },
+  INTEGRATIONS:  { label: "Integrations",  color: "bg-orange-500/10 text-orange-400 border-orange-500/20", dot: "bg-orange-400" },
+};
+
 export type FeatureRequestWithMeta = {
   id: string;
   title: string;
   description: string | null;
   status: FeatureRequestStatus;
+  category: FeatureRequestCategory;
   authorId: string | null;
   authorName: string | null;
   pinned: boolean;
@@ -57,6 +69,7 @@ export async function getFeatureRequests(): Promise<{
       title: r.title,
       description: r.description,
       status: r.status,
+      category: r.category,
       authorId: r.authorId,
       authorName: r.authorName,
       pinned: r.pinned,
@@ -100,6 +113,8 @@ export async function submitFeatureRequest(formData: FormData) {
 
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() || null;
+  const categoryRaw = (formData.get("category") as string) || "GENERAL";
+  const category = (categoryRaw in CATEGORY_META ? categoryRaw : "GENERAL") as FeatureRequestCategory;
 
   if (!title || title.length < 5) throw new Error("Title must be at least 5 characters.");
   if (title.length > 120) throw new Error("Title must be under 120 characters.");
@@ -108,6 +123,7 @@ export async function submitFeatureRequest(formData: FormData) {
     data: {
       title,
       description,
+      category,
       authorId: user?.id ?? null,
       authorName: user?.fullName ?? "Anonymous",
       status: "PLANNED",
@@ -154,6 +170,14 @@ export async function adminUpdateStatus(id: string, status: FeatureRequestStatus
   const user = await getCurrentUser();
   if (!user?.isSuperAdmin) throw new Error("Not authorised.");
   await prisma.featureRequest.update({ where: { id }, data: { status } });
+  revalidatePath("/feedback");
+  revalidatePath("/admin/feature-requests");
+}
+
+export async function adminUpdateCategory(id: string, category: FeatureRequestCategory) {
+  const user = await getCurrentUser();
+  if (!user?.isSuperAdmin) throw new Error("Not authorised.");
+  await prisma.featureRequest.update({ where: { id }, data: { category } });
   revalidatePath("/feedback");
   revalidatePath("/admin/feature-requests");
 }
