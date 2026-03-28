@@ -57,7 +57,7 @@ export function JobGalleryCard({ jobId, propertyAddress, gallery }: JobGalleryCa
       {/* Header */}
       <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
         <Camera className="w-4 h-4 text-gray-400" />
-        Gallery
+        Listing
       </h2>
 
       {gallery ? (
@@ -82,7 +82,7 @@ export function JobGalleryCard({ jobId, propertyAddress, gallery }: JobGalleryCa
               className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
             >
               <Upload className="h-3.5 w-3.5" />
-              {gallery.status === "DELIVERED" ? "Manage Gallery" : "Upload & Manage"}
+              {gallery.status === "DELIVERED" ? "Manage Listing" : "Upload & Manage"}
             </Link>
 
             {gallery.status === "DELIVERED" && (
@@ -114,9 +114,9 @@ export function JobGalleryCard({ jobId, propertyAddress, gallery }: JobGalleryCa
             <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
               <Camera className="h-5 w-5 text-gray-400" />
             </div>
-            <p className="text-sm font-medium text-gray-600">No gallery yet</p>
+            <p className="text-sm font-medium text-gray-600">No listing yet</p>
             <p className="text-xs text-gray-400 mt-0.5">
-              Create a gallery to upload and deliver photos
+              Create a listing to upload and deliver photos
             </p>
           </div>
           <button
@@ -125,7 +125,7 @@ export function JobGalleryCard({ jobId, propertyAddress, gallery }: JobGalleryCa
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors disabled:opacity-60"
           >
             <Upload className="h-3.5 w-3.5" />
-            {creating ? "Creating…" : "Create Gallery"}
+            {creating ? "Creating…" : "Create Listing"}
           </button>
         </div>
       )}

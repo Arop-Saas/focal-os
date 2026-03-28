@@ -21,8 +21,8 @@ import {
   ShieldAlert,
   Clock,
   MessageCircle,
+  Puzzle,
 } from "lucide-react";
-import { NotificationBell } from "./notification-bell";
 import { MessagesUnreadBadge } from "@/components/messages/messages-unread-badge";
 import { HelpButton } from "./help-button";
 import { createClient } from "@/lib/supabase/client";
@@ -54,10 +54,11 @@ const navGroups = [
   {
     label: "Business",
     items: [
-      { label: "Packages", href: "/packages", icon: Package },
+      { label: "Products", href: "/packages", icon: Package },
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Listings", href: "/gallery", icon: Image },
       { label: "Availability", href: "/availability", icon: Clock },
+      { label: "Integrations", href: "/settings", icon: Puzzle },
     ],
   },
   {
@@ -189,7 +190,6 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
           <Settings className="h-[15px] w-[15px] text-slate-500" />
           Settings
         </Link>
-        <NotificationBell />
       </div>
 
       {/* Operator Console — superAdmin only */}

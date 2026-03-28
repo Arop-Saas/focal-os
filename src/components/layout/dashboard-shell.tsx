@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X, Aperture } from "lucide-react";
 import { Sidebar } from "./sidebar";
+import { NotificationBell } from "./notification-bell";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -72,12 +73,18 @@ export function DashboardShell({
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500 shrink-0">
               <Aperture className="h-3 w-3 text-white" />
             </div>
             <span className="text-sm font-semibold text-white truncate">{workspaceName ?? "Scalist"}</span>
           </div>
+          <NotificationBell />
+        </div>
+
+        {/* Desktop top bar */}
+        <div className="hidden md:flex items-center justify-end h-10 px-4 bg-[#0c1e3d] border-b border-white/[0.06] shrink-0">
+          <NotificationBell />
         </div>
 
         {/* Page content */}

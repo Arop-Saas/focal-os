@@ -211,7 +211,7 @@ export function PackagesView() {
               : "border-transparent text-gray-600 hover:text-gray-900"
           )}
         >
-          Packages
+          Products
         </button>
       </div>
 
@@ -230,7 +230,6 @@ export function PackagesView() {
             </div>
           ) : !services || services.length === 0 ? (
             <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-16 text-center">
-              <div className="text-5xl mb-4">🎯</div>
               <p className="text-base font-semibold text-gray-700">No services yet</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Create your first service to get started.
@@ -297,20 +296,19 @@ export function PackagesView() {
         <div className="space-y-4">
           <div className="flex justify-end">
             <Button size="sm" onClick={() => setShowPackageModal(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Package
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Product
             </Button>
           </div>
 
           {packagesLoading ? (
             <div className="bg-white rounded-xl border p-8 text-center">
-              <p className="text-gray-500">Loading packages...</p>
+              <p className="text-gray-500">Loading products...</p>
             </div>
           ) : !packages || packages.length === 0 ? (
             <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-16 text-center">
-              <div className="text-5xl mb-4">📦</div>
-              <p className="text-base font-semibold text-gray-700">No packages yet</p>
+              <p className="text-base font-semibold text-gray-700">No products yet</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Create your first package to bundle services.
+                Create your first product to bundle services.
               </p>
             </div>
           ) : (
@@ -330,10 +328,9 @@ export function PackagesView() {
                       {pkg.description && (
                         <p className="text-xs text-gray-500 mt-0.5">{pkg.description}</p>
                       )}
-                      {(pkg.photoCount || pkg.turnaroundDays) && (
+                      {pkg.turnaroundDays && (
                         <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
-                          {pkg.photoCount && <span>📷 {pkg.photoCount} photos</span>}
-                          {pkg.turnaroundDays && <span>⏱ {pkg.turnaroundDays}d delivery</span>}
+                          <span>{pkg.turnaroundDays}d delivery</span>
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -383,22 +380,6 @@ export function PackagesView() {
                   placeholder="Photography"
                   disabled={isSubmitting}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
-                <select
-                  value={serviceCategory}
-                  onChange={(e) => setServiceCategory(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full px-3 py-2 rounded-md border border-gray-300 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-0"
-                >
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -466,7 +447,7 @@ export function PackagesView() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-96 overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
-              <h2 className="text-lg font-semibold text-gray-900">Create Package</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Create Product</h2>
               <button
                 onClick={() => setShowPackageModal(false)}
                 className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -477,7 +458,7 @@ export function PackagesView() {
 
             <form onSubmit={handleCreatePackage} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Package Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Product Name</label>
                 <Input
                   type="text"
                   value={packageName}
@@ -511,29 +492,16 @@ export function PackagesView() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Photos Delivered</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={packagePhotoCount}
-                    onChange={(e) => setPackagePhotoCount(e.target.value)}
-                    placeholder="e.g. 25"
-                    disabled={isSubmitting}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Turnaround (days)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={packageTurnaroundDays}
-                    onChange={(e) => setPackageTurnaroundDays(e.target.value)}
-                    placeholder="e.g. 2"
-                    disabled={isSubmitting}
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turnaround (days)</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={packageTurnaroundDays}
+                  onChange={(e) => setPackageTurnaroundDays(e.target.value)}
+                  placeholder="e.g. 2"
+                  disabled={isSubmitting}
+                />
               </div>
 
               <label className="flex items-center gap-2.5 cursor-pointer">
