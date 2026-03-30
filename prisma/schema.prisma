@@ -444,6 +444,7 @@ model Job {
 
   // Property Info
   propertyAddress String
+  propertyUnit    String?
   propertyCity    String
   propertyState   String
   propertyZip     String?
@@ -472,8 +473,7 @@ model Job {
   internalNotes   String?
   clientNotes     String?
   priority        JobPriority @default(NORMAL)
-  isRush          Boolean  @default(false)
-  rushFee         Float    @default(0)
+  priorityFee     Float    @default(0)
 
   workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   client          Client          @relation(fields: [clientId], references: [id])

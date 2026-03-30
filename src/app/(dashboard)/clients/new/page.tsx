@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc/client";
 import { Header } from "@/components/layout/header";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function NewClientPage() {
     phone: "",
     company: "",
     type: "AGENT" as const,
+    addressLine1: "",
     city: "",
     state: "",
     country: "",
@@ -93,6 +95,23 @@ export default function NewClientPage() {
                   <option value="OTHER">Other</option>
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700">Street address</label>
+              <AddressAutocomplete
+                value={form.addressLine1}
+                onChange={(v) => setForm((prev) => ({ ...prev, addressLine1: v }))}
+                onSelect={(result) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    addressLine1: result.streetAddress || prev.addressLine1,
+                    city: result.city || prev.city,
+                    state: result.state || prev.state,
+                  }));
+                }}
+                placeholder="123 Main Street"
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-4">

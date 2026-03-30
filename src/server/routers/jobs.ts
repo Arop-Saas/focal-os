@@ -15,6 +15,7 @@ const JobCreateSchema = z.object({
   clientId: z.string(),
   packageId: z.string().optional(),
   propertyAddress: z.string().min(5),
+  propertyUnit: z.string().optional(),
   propertyCity: z.string(),
   propertyState: z.string(),
   propertyZip: z.string().optional(),
@@ -39,8 +40,7 @@ const JobCreateSchema = z.object({
   internalNotes: z.string().optional(),
   clientNotes: z.string().optional(),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
-  isRush: z.boolean().default(false),
-  rushFee: z.number().default(0),
+  priorityFee: z.number().default(0),
   services: z
     .array(
       z.object({
@@ -235,7 +235,7 @@ export const jobsRouter = router({
       }
 
       const taxAmount = (subtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
-      const totalAmount = subtotal + taxAmount + (jobData.rushFee ?? 0);
+      const totalAmount = subtotal + taxAmount + (jobData.priorityFee ?? 0);
 
       // Get next job number
       const ws = await ctx.prisma.workspace.findUnique({
@@ -261,6 +261,7 @@ export const jobsRouter = router({
             clientId: jobData.clientId,
             packageId: jobData.packageId || null,
             propertyAddress: jobData.propertyAddress,
+            propertyUnit: jobData.propertyUnit || null,
             propertyCity: jobData.propertyCity,
             propertyState: jobData.propertyState,
             propertyZip: jobData.propertyZip,
@@ -276,8 +277,7 @@ export const jobsRouter = router({
             internalNotes: jobData.internalNotes,
             clientNotes: jobData.clientNotes,
             priority: jobData.priority,
-            isRush: jobData.isRush,
-            rushFee: jobData.rushFee,
+            priorityFee: jobData.priorityFee,
             subtotal,
             taxAmount,
             totalAmount,
@@ -433,8 +433,7 @@ export const jobsRouter = router({
         clientNotes: z.string().optional(),
         accessNotes: z.string().optional(),
         priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
-        isRush: z.boolean().optional(),
-        rushFee: z.number().optional(),
+        priorityFee: z.number().optional(),
         mlsNumber: z.string().optional(),
         listingUrl: z.string().optional(),
       })

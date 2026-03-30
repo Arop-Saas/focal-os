@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Workspace } from "@prisma/client";
 import { api } from "@/lib/trpc/client";
+import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
 import { cn } from "@/lib/utils";
 import {
   Copy,
@@ -310,6 +311,10 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   const [invoicePrefix, setInvoicePrefix] = useState(workspace.invoicePrefix ?? "INV");
   const [autoCreateInvoice, setAutoCreateInvoice] = useState(workspace.autoCreateInvoice ?? false);
   const [invoiceDueDays, setInvoiceDueDays] = useState(String(workspace.invoiceDueDays ?? 30));
+  const [addressLine1, setAddressLine1] = useState(workspace.addressLine1 ?? "");
+  const [addressCity, setAddressCity] = useState(workspace.city ?? "");
+  const [addressState, setAddressState] = useState(workspace.state ?? "");
+  const [addressZip, setAddressZip] = useState(workspace.postalCode ?? "");
   const [brandColor,  setBrandColor]  = useState(workspace.brandColor ?? "#1B4F9E");
   const [colorText,   setColorText]   = useState(workspace.brandColor ?? "#1B4F9E");
   const [logoUrl,     setLogoUrl]     = useState(workspace.logoUrl ?? "");
@@ -360,6 +365,10 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
       website: website || undefined,
       timezone, currency,
       defaultTaxRate: parseFloat(taxRate) || 0,
+      addressLine1: addressLine1 || undefined,
+      city: addressCity || undefined,
+      state: addressState || undefined,
+      postalCode: addressZip || undefined,
     }, {
       onSuccess: () => { setGeneralSaved(true); setTimeout(() => setGeneralSaved(false), 3000); },
     });
@@ -406,6 +415,41 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
             <Field label="Website">
               <TextInput value={website} onChange={setWebsite} type="url" placeholder="https://mystudio.com" />
             </Field>
+            <Field label="Business address" hint="Appears on invoices and client portal">
+              <AddressAutocomplete
+                value={addressLine1}
+                onChange={setAddressLine1}
+                onSelect={(result) => {
+                  if (result.streetAddress) setAddressLine1(result.streetAddress);
+                  if (result.city) setAddressCity(result.city);
+                  if (result.state) setAddressState(result.state);
+                  if (result.zip) setAddressZip(result.zip);
+                }}
+                placeholder="123 Business Ave"
+              />
+            </Field>
+            {addressLine1 && (
+              <div className="grid grid-cols-3 gap-3 -mt-2">
+                <input
+                  value={addressCity}
+                  onChange={(e) => setAddressCity(e.target.value)}
+                  placeholder="City"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  value={addressState}
+                  onChange={(e) => setAddressState(e.target.value)}
+                  placeholder="State"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  value={addressZip}
+                  onChange={(e) => setAddressZip(e.target.value)}
+                  placeholder="Postal code"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <Field label="Timezone">
                 <select value={timezone} onChange={(e) => setTimezone(e.target.value)}
