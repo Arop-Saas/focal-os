@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, MapPin } from "lucide-react";
+import { Clock, MapPin, Users } from "lucide-react";
 import { AvailabilityEditor } from "./availability-editor";
 import { TerritoriesManager } from "@/components/territories/territories-manager";
+import { StaffAvailabilityManager } from "./staff-availability-manager";
 
 interface DayHours {
   dayOfWeek: number;
@@ -18,20 +19,30 @@ interface Territory {
   color: string;
   description: string | null;
   cities: string | null;
+  travelFee: number | null;
+}
+
+interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  title?: string | null;
 }
 
 interface Props {
   initialHours: DayHours[];
   initialTerritories: Territory[];
+  staffMembers: StaffMember[];
 }
 
 const TABS = [
   { key: "hours", label: "Business Hours", icon: Clock },
+  { key: "team", label: "Team Schedule", icon: Users },
   { key: "territories", label: "Territories", icon: MapPin },
 ];
 
-export function AvailabilityTabs({ initialHours, initialTerritories }: Props) {
-  const [activeTab, setActiveTab] = useState<"hours" | "territories">("hours");
+export function AvailabilityTabs({ initialHours, initialTerritories, staffMembers }: Props) {
+  const [activeTab, setActiveTab] = useState<"hours" | "team" | "territories">("hours");
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -42,7 +53,7 @@ export function AvailabilityTabs({ initialHours, initialTerritories }: Props) {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as "hours" | "territories")}
+              onClick={() => setActiveTab(tab.key as "hours" | "team" | "territories")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 active
                   ? "bg-blue-600 text-white shadow-sm"
@@ -59,6 +70,8 @@ export function AvailabilityTabs({ initialHours, initialTerritories }: Props) {
       {/* Tab content */}
       {activeTab === "hours" ? (
         <AvailabilityEditor initialHours={initialHours} />
+      ) : activeTab === "team" ? (
+        <StaffAvailabilityManager staff={staffMembers} />
       ) : (
         <TerritoriesManager initialTerritories={initialTerritories} />
       )}

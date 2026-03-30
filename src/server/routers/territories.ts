@@ -17,6 +17,7 @@ export const territoriesRouter = router({
         color: z.string().default("#3B82F6"),
         description: z.string().optional(),
         cities: z.string().optional(),
+        travelFee: z.number().min(0).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -27,6 +28,7 @@ export const territoriesRouter = router({
           color: input.color,
           description: input.description,
           cities: input.cities,
+          travelFee: input.travelFee,
         },
       });
     }),
@@ -39,6 +41,7 @@ export const territoriesRouter = router({
         color: z.string().optional(),
         description: z.string().optional(),
         cities: z.string().optional(),
+        travelFee: z.number().min(0).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

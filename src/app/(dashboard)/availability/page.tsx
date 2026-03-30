@@ -40,10 +40,24 @@ export default async function AvailabilityPage() {
   });
 
   // Load territories
-  const territories = await prisma.serviceTerritory.findMany({
-    where: { workspaceId },
-    orderBy: { createdAt: "asc" },
-  });
+  const [territories, staffProfiles] = await Promise.all([
+    prisma.serviceTerritory.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.staffProfile.findMany({
+      where: { workspaceId, isActive: true },
+      include: { member: { include: { user: { select: { fullName: true, email: true } } } } },
+      orderBy: { member: { user: { fullName: "asc" } } },
+    }),
+  ]);
+
+  const staffMembers = staffProfiles.map((sp) => ({
+    id: sp.id,
+    name: sp.member.user.fullName,
+    email: sp.member.user.email,
+    title: sp.title,
+  }));
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -52,7 +66,11 @@ export default async function AvailabilityPage() {
         description="Manage your business hours and service territories"
       />
       <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-        <AvailabilityTabs initialHours={initialHours} initialTerritories={territories} />
+        <AvailabilityTabs
+          initialHours={initialHours}
+          initialTerritories={territories}
+          staffMembers={staffMembers}
+        />
       </div>
     </div>
   );

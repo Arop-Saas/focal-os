@@ -20,7 +20,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
 
   const workspace = await prisma.workspace.findUniqueOrThrow({
     where: { id: workspaceId },
-    select: { invoiceDueDays: true },
+    select: { invoiceDueDays: true, defaultTaxRate: true },
   });
 
   const [clients, services, prefillJob] = await Promise.all([
@@ -80,6 +80,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
           prefillJobId={prefillJob?.id}
           prefillLineItems={prefillLineItems}
           defaultDueDate={defaultDueDateStr}
+          defaultTaxRate={workspace.defaultTaxRate ?? 0}
         />
       </div>
     </div>

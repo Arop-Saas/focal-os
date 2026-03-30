@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
-import { Plus, MapPin, Pencil, Trash2, X, Check, Loader2 } from "lucide-react";
+import { Plus, MapPin, Pencil, Trash2, X, Check, Loader2, DollarSign, List, Map } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { TerritoryMap } from "./territory-map";
 
 const PRESET_COLORS = [
   "#3B82F6", // blue
@@ -22,6 +24,7 @@ interface Territory {
   color: string;
   description: string | null;
   cities: string | null;
+  travelFee: number | null;
 }
 
 interface Props {
@@ -35,7 +38,7 @@ function TerritoryForm({
   isPending,
 }: {
   initial?: Partial<Territory>;
-  onSave: (data: { name: string; color: string; description: string; cities: string }) => void;
+  onSave: (data: { name: string; color: string; description: string; cities: string; travelFee?: number }) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
@@ -43,6 +46,9 @@ function TerritoryForm({
   const [color, setColor] = useState(initial?.color ?? "#3B82F6");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [cities, setCities] = useState(initial?.cities ?? "");
+  const [travelFee, setTravelFee] = useState(
+    initial?.travelFee != null ? String(initial.travelFee) : ""
+  );
 
   return (
     <div className="bg-white rounded-xl border p-5 space-y-4">
@@ -93,22 +99,45 @@ function TerritoryForm({
         <p className="text-xs text-gray-400 mt-1">Separate multiple cities with commas</p>
       </div>
 
-      {/* Description */}
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="e.g. Covers the greater Edmonton area, within 50km radius"
-          rows={2}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-        />
+      {/* Travel fee + Description */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            <DollarSign className="inline w-3 h-3 mr-0.5" />Travel Fee (optional)
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={travelFee}
+              onChange={(e) => setTravelFee(e.target.value)}
+              placeholder="0.00"
+              className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Flat fee added to jobs in this area</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Covers greater Edmonton, within 50km"
+            rows={3}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 pt-1">
         <button
           type="button"
-          onClick={() => onSave({ name, color, description, cities })}
+          onClick={() => {
+            const fee = parseFloat(travelFee);
+            onSave({ name, color, description, cities, travelFee: isNaN(fee) ? undefined : fee });
+          }}
           disabled={!name.trim() || isPending}
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
         >
@@ -133,10 +162,11 @@ export function TerritoriesManager({ initialTerritories }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   const createMutation = api.territories.create.useMutation({
     onSuccess: (newT) => {
-      setTerritories((prev) => [...prev, newT]);
+      setTerritories((prev) => [...prev, { ...newT, travelFee: (newT as Territory).travelFee ?? null }]);
       setShowCreate(false);
       router.refresh();
     },
@@ -144,7 +174,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
 
   const updateMutation = api.territories.update.useMutation({
     onSuccess: (updated) => {
-      setTerritories((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setTerritories((prev) => prev.map((t) => (t.id === updated.id ? { ...updated, travelFee: (updated as Territory).travelFee ?? null } : t)));
       setEditingId(null);
       router.refresh();
     },
@@ -164,24 +194,45 @@ export function TerritoriesManager({ initialTerritories }: Props) {
       <div className="bg-white rounded-xl border p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
-            <MapPin className="h-4.5 w-4.5 text-blue-600" />
+            <MapPin className="h-4 w-4 text-blue-600" />
           </div>
           <div>
             <h2 className="text-sm font-semibold text-gray-900">Service Territories</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Define the areas your studio covers — useful for multi-location or regional businesses.
+              Define the areas your studio covers — set travel fees per territory.
             </p>
           </div>
         </div>
-        {!showCreate && (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-            Add Territory
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* List / Map toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === "list" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <List className="w-3.5 h-3.5" /> List
+            </button>
+            <button
+              onClick={() => setViewMode("map")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === "map" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Map className="w-3.5 h-3.5" /> Map
+            </button>
+          </div>
+          {!showCreate && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Create form */}
@@ -193,8 +244,15 @@ export function TerritoriesManager({ initialTerritories }: Props) {
         />
       )}
 
+      {/* Map view */}
+      {viewMode === "map" && (
+        <div className="bg-white rounded-xl border p-5">
+          <TerritoryMap territories={territories} />
+        </div>
+      )}
+
       {/* Territory list */}
-      {territories.length === 0 && !showCreate ? (
+      {viewMode === "list" && territories.length === 0 && !showCreate ? (
         <div className="bg-white rounded-xl border p-10 text-center">
           <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
             <MapPin className="h-5 w-5 text-gray-400" />
@@ -204,7 +262,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
             Add your first service territory to get started.
           </p>
         </div>
-      ) : (
+      ) : viewMode === "list" ? (
         <div className="space-y-3">
           {territories.map((territory) =>
             editingId === territory.id ? (
@@ -228,7 +286,15 @@ export function TerritoriesManager({ initialTerritories }: Props) {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">{territory.name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900">{territory.name}</p>
+                    {territory.travelFee != null && territory.travelFee > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        <DollarSign className="w-3 h-3" />
+                        {formatCurrency(territory.travelFee)} travel fee
+                      </span>
+                    )}
+                  </div>
 
                   {territory.cities && (
                     <div className="flex flex-wrap gap-1.5 mt-2">

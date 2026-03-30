@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api } from "@/lib/trpc/client";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, Loader2, Search, ChevronDown, BookOpen } from "lucide-react";
+import { Plus, Trash2, Loader2, Search, ChevronDown, BookOpen, Percent, DollarSign } from "lucide-react";
 
 const lineItemSchema = z.object({
   description: z.string().min(1, "Required"),
@@ -48,6 +48,7 @@ interface NewInvoiceFormProps {
   prefillJobId?: string;
   prefillLineItems?: { description: string; quantity: number; unitPrice: number }[];
   defaultDueDate?: string;
+  defaultTaxRate?: number;
 }
 
 // Searchable client picker component
@@ -250,6 +251,17 @@ function ServicePicker({
   );
 }
 
+// Quick-pick discount presets
+const DISCOUNT_PRESETS = [
+  { label: "5% off",  type: "pct" as const, value: 5 },
+  { label: "10% off", type: "pct" as const, value: 10 },
+  { label: "15% off", type: "pct" as const, value: 15 },
+  { label: "20% off", type: "pct" as const, value: 20 },
+  { label: "$25 off",  type: "fixed" as const, value: 25 },
+  { label: "$50 off",  type: "fixed" as const, value: 50 },
+  { label: "$100 off", type: "fixed" as const, value: 100 },
+];
+
 export function NewInvoiceForm({
   clients,
   services = [],
@@ -257,9 +269,12 @@ export function NewInvoiceForm({
   prefillJobId,
   prefillLineItems = [],
   defaultDueDate,
+  defaultTaxRate = 0,
 }: NewInvoiceFormProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState("");
+  const [discountMode, setDiscountMode] = useState<"fixed" | "pct">("fixed");
+  const [discountInput, setDiscountInput] = useState("0");
 
   const {
     register,
@@ -276,7 +291,7 @@ export function NewInvoiceForm({
         prefillLineItems.length > 0
           ? prefillLineItems
           : [{ description: "", quantity: 1, unitPrice: 0 }],
-      taxRate: 0,
+      taxRate: defaultTaxRate,
       discountAmount: 0,
       dueAt: defaultDueDate ?? "",
       notes: "",
@@ -297,15 +312,26 @@ export function NewInvoiceForm({
   // Live totals
   const watchedItems = watch("lineItems");
   const watchedTax = watch("taxRate") ?? 0;
-  const watchedDiscount = watch("discountAmount") ?? 0;
   const clientId = watch("clientId");
 
   const subtotal = watchedItems.reduce(
     (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
     0
   );
+
+  // Compute discount $ amount from either fixed or percentage input
+  const discountRaw = parseFloat(discountInput) || 0;
+  const computedDiscountAmount = discountMode === "pct"
+    ? parseFloat(((subtotal * discountRaw) / 100).toFixed(2))
+    : discountRaw;
+
+  // Keep form value in sync
+  useEffect(() => {
+    setValue("discountAmount", computedDiscountAmount);
+  }, [computedDiscountAmount, setValue]);
+
   const taxAmount = (subtotal * Number(watchedTax)) / 100;
-  const total = subtotal + taxAmount - Number(watchedDiscount);
+  const total = subtotal + taxAmount - computedDiscountAmount;
 
   const onSubmit = useCallback(
     (values: FormValues) => {
@@ -441,26 +467,67 @@ export function NewInvoiceForm({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Tax Rate (%)</label>
-              <input
-                {...register("taxRate")}
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                placeholder="0"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="relative">
+                <input
+                  {...register("taxRate")}
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="0"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {defaultTaxRate > 0 && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-blue-500 bg-blue-50 px-1 rounded">
+                    auto
+                  </span>
+                )}
+              </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Discount ($)</label>
-              <input
-                {...register("discountAmount")}
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="block text-xs font-medium text-gray-500 mb-1">Discount</label>
+              {/* Toggle: fixed vs % */}
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setDiscountMode("fixed")}
+                  className={`flex items-center gap-1 px-2 py-2 text-xs font-medium transition-colors ${discountMode === "fixed" ? "bg-gray-100 text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
+                >
+                  <DollarSign className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountMode("pct")}
+                  className={`flex items-center gap-1 px-2 py-2 text-xs font-medium transition-colors border-l border-gray-200 ${discountMode === "pct" ? "bg-gray-100 text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
+                >
+                  <Percent className="w-3 h-3" />
+                </button>
+                <input
+                  type="number"
+                  min="0"
+                  step={discountMode === "pct" ? "1" : "0.01"}
+                  value={discountInput}
+                  onChange={(e) => setDiscountInput(e.target.value)}
+                  placeholder="0"
+                  className="flex-1 border-l border-gray-200 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
+                />
+              </div>
+              {/* Quick-pick presets */}
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {DISCOUNT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => { setDiscountMode(preset.type); setDiscountInput(String(preset.value)); }}
+                    className="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              {computedDiscountAmount > 0 && discountMode === "pct" && (
+                <p className="text-[10px] text-gray-400 mt-1">= {formatCurrency(computedDiscountAmount)} off</p>
+              )}
             </div>
           </div>
 
@@ -499,10 +566,10 @@ export function NewInvoiceForm({
                 <span className="font-medium text-gray-900">{formatCurrency(taxAmount)}</span>
               </div>
             )}
-            {Number(watchedDiscount) > 0 && (
+            {computedDiscountAmount > 0 && (
               <div className="flex justify-between text-gray-600">
-                <span>Discount</span>
-                <span className="font-medium text-red-600">−{formatCurrency(Number(watchedDiscount))}</span>
+                <span>Discount{discountMode === "pct" ? ` (${discountInput}%)` : ""}</span>
+                <span className="font-medium text-red-600">−{formatCurrency(computedDiscountAmount)}</span>
               </div>
             )}
             <div className="flex justify-between border-t pt-2 mt-1">

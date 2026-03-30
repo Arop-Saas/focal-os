@@ -108,11 +108,16 @@ function PhotographerRow({ p }: { p: any }) {
           </div>
         </td>
         <td className="px-4 py-3">
-          <span
-            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PAY_TYPE_COLORS[p.payType] ?? "bg-gray-100 text-gray-700"}`}
-          >
-            {PAY_TYPE_LABELS[p.payType] ?? p.payType}
-          </span>
+          <div className="flex flex-col gap-1">
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${PAY_TYPE_COLORS[p.payType] ?? "bg-gray-100 text-gray-700"}`}
+            >
+              {PAY_TYPE_LABELS[p.payType] ?? p.payType}
+            </span>
+            {p.mileageRate != null && (
+              <span className="text-[10px] text-gray-400">{formatCurrency(p.mileageRate)}/mi mileage</span>
+            )}
+          </div>
         </td>
         <td className="px-4 py-3 text-sm text-gray-700 text-center">{p.jobCount}</td>
         <td className="px-4 py-3 text-sm text-gray-700 text-center">{p.totalHours}h</td>
@@ -189,8 +194,8 @@ export default function PayoutsPage() {
       {/* Header */}
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Contractor Payouts</h1>
-          <p className="text-sm text-gray-500">1099 earnings breakdown by photographer</p>
+          <h1 className="text-xl font-bold text-gray-900">Staff Payouts</h1>
+          <p className="text-sm text-gray-500">Earnings breakdown by team member</p>
         </div>
         <button
           onClick={() => data?.payouts && exportCSV(data.payouts, dateFrom, dateTo)}
@@ -326,9 +331,9 @@ export default function PayoutsPage() {
           )}
         </div>
 
-        {/* 1099 note */}
+        {/* Note */}
         <p className="text-xs text-gray-400 text-center">
-          This report is for internal payout tracking. Consult your accountant for 1099-NEC filing requirements. Contractors earning $600+ per year must receive a 1099-NEC.
+          This report is for internal payout tracking. Consult your accountant or payroll provider for local contractor and employee tax filing requirements.
         </p>
       </div>
     </div>

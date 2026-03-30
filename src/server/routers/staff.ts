@@ -155,6 +155,7 @@ export const staffRouter = router({
         payType: z.enum(["HOURLY", "SALARY", "PER_JOB", "COMMISSION"]).optional(),
         payRate: z.number().optional(),
         commissionRate: z.number().min(0).max(100).optional(),
+        mileageRate: z.number().min(0).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -356,6 +357,7 @@ export const staffRouter = router({
           payType: sp.payType,
           payRate: sp.payRate,
           commissionRate: sp.commissionRate,
+          mileageRate: (sp as unknown as { mileageRate: number | null }).mileageRate ?? null,
           jobCount,
           totalRevenue,
           totalHours: Math.round(totalHours * 10) / 10,

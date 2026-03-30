@@ -183,6 +183,7 @@ model StaffProfile {
   payType         PayType  @default(HOURLY)
   payRate         Float?
   commissionRate  Float?   // Percentage 0-100
+  mileageRate     Float?   // Per-km/mile reimbursement rate
 
   workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   member          WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -237,6 +238,7 @@ model ServiceTerritory {
   color       String   @default("#3B82F6")
   description String?
   cities      String?  // comma-separated list of cities/regions
+  travelFee   Float?   // Optional flat travel fee charged for jobs in this territory
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 

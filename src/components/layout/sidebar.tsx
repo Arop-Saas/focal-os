@@ -22,6 +22,7 @@ import {
   Clock,
   MessageCircle,
   Puzzle,
+  Route,
 } from "lucide-react";
 import { MessagesUnreadBadge } from "@/components/messages/messages-unread-badge";
 import { HelpButton } from "./help-button";
@@ -66,6 +67,7 @@ const navGroups = [
     items: [
       { label: "Reports", href: "/reports", icon: BarChart3 },
       { label: "Payouts", href: "/reports/payouts", icon: DollarSign },
+      { label: "Mileage", href: "/reports/mileage", icon: Route },
     ],
   },
 ];
