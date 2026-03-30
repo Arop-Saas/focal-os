@@ -31,9 +31,12 @@ export function NotificationBell() {
     <Link
       href="/notifications"
       title="Notifications"
-      className="relative flex items-center justify-center h-8 w-8 rounded-md text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+      className="relative flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/[0.06] transition-colors"
     >
-      <Bell className="h-[15px] w-[15px]" />
+      <Bell
+        className="h-[18px] w-[18px] drop-shadow-sm"
+        style={{ color: "#F5C518", filter: "drop-shadow(0 0 4px rgba(245,197,24,0.55))" }}
+      />
       {unread > 0 && (
         <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white leading-none">
           {unread > 9 ? "9+" : unread}
