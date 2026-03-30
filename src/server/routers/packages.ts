@@ -29,6 +29,7 @@ export const packagesRouter = router({
         ]),
         basePrice: z.number().min(0),
         durationMins: z.number().default(60),
+        turnaroundHours: z.number().int().positive().optional(),
         isActive: z.boolean().default(true),
       })
     )
@@ -49,6 +50,7 @@ export const packagesRouter = router({
         description: z.string().optional(),
         basePrice: z.number().min(0).optional(),
         durationMins: z.number().optional(),
+        turnaroundHours: z.number().int().positive().nullable().optional(),
         isActive: z.boolean().optional(),
         sortOrder: z.number().optional(),
       })
@@ -91,8 +93,11 @@ export const packagesRouter = router({
         price: z.number().min(0),
         isActive: z.boolean().default(true),
         isPopular: z.boolean().default(false),
+        badgeLabel: z.string().optional(),
+        badgeColor: z.string().optional(),
         photoCount: z.number().int().positive().optional(),
         turnaroundDays: z.number().int().positive().optional(),
+        turnaroundHours: z.number().int().positive().optional(),
         items: z.array(
           z.object({
             serviceId: z.string(),
@@ -128,8 +133,11 @@ export const packagesRouter = router({
         price: z.number().min(0).optional(),
         isActive: z.boolean().optional(),
         isPopular: z.boolean().optional(),
+        badgeLabel: z.string().nullable().optional(),
+        badgeColor: z.string().nullable().optional(),
         photoCount: z.number().int().positive().nullable().optional(),
         turnaroundDays: z.number().int().positive().nullable().optional(),
+        turnaroundHours: z.number().int().positive().nullable().optional(),
         items: z
           .array(
             z.object({

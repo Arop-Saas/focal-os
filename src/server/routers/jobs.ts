@@ -414,7 +414,7 @@ export const jobsRouter = router({
     .input(
       z.object({
         id: z.string(),
-        scheduledAt: z.date().optional(),
+        scheduledAt: z.date().nullable().optional(),
         status: z
           .enum([
             "PENDING",

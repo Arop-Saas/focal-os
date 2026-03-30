@@ -297,9 +297,39 @@ function PortalPreview({ name, logoUrl, brandColor, bookingUrl, portalUrl }: {
   );
 }
 
+// ─── Settings Category Nav ────────────────────────────────────────────────────
+
+type SettingsCategory =
+  | "general"
+  | "branding"
+  | "links"
+  | "calendar"
+  | "notifications"
+  | "integrations"
+  | "team"
+  | "brokerage"
+  | "billing";
+
+const SETTINGS_CATEGORIES: Array<{
+  id: SettingsCategory;
+  label: string;
+  icon: React.ElementType;
+}> = [
+  { id: "general",       label: "General",          icon: Building2 },
+  { id: "branding",      label: "Branding",          icon: Palette },
+  { id: "links",         label: "Public Links",      icon: Link2 },
+  { id: "calendar",      label: "Calendar",          icon: Calendar },
+  { id: "notifications", label: "Notifications",     icon: Bell },
+  { id: "integrations",  label: "Integrations",      icon: Puzzle },
+  { id: "team",          label: "Team",              icon: Users },
+  { id: "brokerage",     label: "Brokerage Groups",  icon: Tag },
+  { id: "billing",       label: "Billing",           icon: CreditCard },
+];
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function SettingsTabs({ workspace }: SettingsTabsProps) {
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>("general");
   // Shared state — used by both the form and the live preview
   const [name,        setName]        = useState(workspace.name ?? "");
   const [phone,       setPhone]       = useState(workspace.phone ?? "");
@@ -395,12 +425,33 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   };
 
   return (
-    <div className="flex gap-8 p-6 max-w-[1200px] mx-auto w-full">
-      {/* ── Left: Settings sections ─────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 space-y-6">
+    <div className="flex h-full">
+      {/* ── Category Sidebar ──────────────────────────────────────────────── */}
+      <nav className="w-52 shrink-0 border-r bg-gray-50/60 p-3 space-y-0.5 overflow-y-auto">
+        {SETTINGS_CATEGORIES.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveCategory(id)}
+            className={cn(
+              "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left",
+              activeCategory === id
+                ? "bg-white text-blue-600 shadow-sm border border-blue-100"
+                : "text-gray-600 hover:text-gray-900 hover:bg-white"
+            )}
+          >
+            <Icon className={cn("w-4 h-4 shrink-0", activeCategory === id ? "text-blue-500" : "text-gray-400")} />
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* ── Right: Active section + preview ──────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex gap-8 p-6 max-w-[1100px]">
+          <div className="flex-1 min-w-0 space-y-6">
 
         {/* ── 1. Company ──────────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "general" && "hidden")}>
           <SectionHeading icon={Building2} title="Company Information" description="Your studio's public contact details" />
           <div className="space-y-4">
             <Field label="Studio Name">
@@ -478,7 +529,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
         </div>
 
         {/* ── 2. Appearance & Branding ────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "branding" && "hidden")}>
           <SectionHeading icon={Palette} title="Appearance & Branding" description="Logo, colors, and invoice formatting — reflects instantly in the preview" />
           <div className="space-y-5">
             {/* Logo */}
@@ -584,7 +635,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
         </div>
 
         {/* ── 3. Public Links ─────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "links" && "hidden")}>
           <SectionHeading icon={Link2} title="Public Links" description="Share these with clients" />
           <div className="space-y-4">
             <Field label="Client Portal" hint="Clients can view orders, galleries, invoices, and pay outstanding balances">
@@ -597,7 +648,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
         </div>
 
         {/* ── 4. Google Calendar ──────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "calendar" && "hidden")}>
           <SectionHeading icon={Calendar} title="Google Calendar Sync" description="Sync shoot appointments when jobs are assigned" />
           {gcalStatus === "connected" && (
             <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 mb-4">
@@ -623,13 +674,13 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
         </div>
 
         {/* ── 5. Integrations ─────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "integrations" && "hidden")}>
           <SectionHeading icon={Puzzle} title="Integrations" description="Connect Stripe, calendar, email, and more" />
           <IntegrationsTab />
         </div>
 
         {/* ── 6. Email Notifications ──────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "notifications" && "hidden")}>
           <SectionHeading icon={Bell} title="Email Notifications" description="Control which events send you an email as studio owner" />
           <div>
             <ToggleRow label="New booking received" description="When a client books via your booking page" checked={notifPrefs.newBooking} onChange={(v) => setNotifPrefs({ ...notifPrefs, newBooking: v })} />
@@ -646,19 +697,19 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
         </div>
 
         {/* ── 7. Brokerage Pricing Groups ─────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "brokerage" && "hidden")}>
           <SectionHeading icon={Tag} title="Brokerage Pricing Groups" description="Offer automatic discounts to agents from specific brokerages or corporate accounts" />
           <BrokerageGroupsManager />
         </div>
 
         {/* ── 8. Team Members ─────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "team" && "hidden")}>
           <SectionHeading icon={Users} title="Team Members" description="Manage who has access to your workspace and what they can do" />
           <TeamMembersTab />
         </div>
 
-        {/* ── 8. Billing ──────────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        {/* ── 9. Billing ──────────────────────────────────────────────── */}
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "billing" && "hidden")}>
           <SectionHeading icon={CreditCard} title="Billing & Subscription" />
           <div className={cn("rounded-xl p-4 border mb-5",
             workspace.subscriptionStatus === "ACTIVE"   ? "bg-blue-50 border-blue-200" :
@@ -692,17 +743,21 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
           </a>
         </div>
 
-      </div>
+          </div>
 
-      {/* ── Right: Live Preview panel ──────────────────────────────────────── */}
-      <div className="w-[320px] shrink-0 hidden xl:block">
-        <PortalPreview
-          name={name || workspace.name}
-          logoUrl={logoUrl}
-          brandColor={brandColor}
-          bookingUrl={bookingUrl}
-          portalUrl={portalUrl}
-        />
+          {/* ── Right: Live Preview panel (only visible in Branding category) ── */}
+          {activeCategory === "branding" && (
+            <div className="w-[300px] shrink-0 hidden xl:block">
+              <PortalPreview
+                name={name || workspace.name}
+                logoUrl={logoUrl}
+                brandColor={brandColor}
+                bookingUrl={bookingUrl}
+                portalUrl={portalUrl}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

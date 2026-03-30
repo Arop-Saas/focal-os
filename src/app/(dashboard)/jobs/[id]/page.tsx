@@ -16,6 +16,7 @@ import { JobAssignmentPicker } from "@/components/jobs/job-assignment-picker";
 import { JobMessageThread } from "@/components/messages/job-message-thread";
 import { JobChecklist } from "@/components/jobs/job-checklist";
 import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-button";
+import { JobScheduleEditor } from "@/components/jobs/job-schedule-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -126,22 +127,12 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                 <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" /> Schedule
                 </h2>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Scheduled</p>
-                    <p className="font-medium text-gray-900">
-                      {job.scheduledAt
-                        ? format(new Date(job.scheduledAt), "EEEE, MMM d, yyyy")
-                        : <span className="text-gray-400 italic">Not scheduled</span>}
-                    </p>
-                    {job.scheduledAt && (
-                      <p className="text-gray-600">{format(new Date(job.scheduledAt), "h:mm a")}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Duration</p>
-                    <p className="text-gray-700">{job.estimatedDurationMins} min estimated</p>
-                  </div>
+                <JobScheduleEditor
+                  jobId={job.id}
+                  scheduledAt={job.scheduledAt}
+                  estimatedDurationMins={job.estimatedDurationMins ?? 90}
+                />
+                <div className="grid grid-cols-2 gap-3 text-sm mt-4 pt-4 border-t">
                   <div>
                     <p className="text-xs text-gray-400 mb-1.5">Photographer</p>
                     <JobAssignmentPicker

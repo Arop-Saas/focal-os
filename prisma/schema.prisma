@@ -370,6 +370,7 @@ model Service {
   category      ServiceCategory
   basePrice     Float    @default(0)
   durationMins  Int      @default(60)
+  turnaroundHours Int?
   isActive      Boolean  @default(true)
   sortOrder     Int      @default(0)
 
@@ -404,8 +405,11 @@ model Package {
   price         Float
   isActive      Boolean  @default(true)
   isPopular     Boolean  @default(false)
+  badgeLabel    String?
+  badgeColor    String?
   photoCount    Int?
   turnaroundDays Int?
+  turnaroundHours Int?
   sortOrder     Int      @default(0)
 
   workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

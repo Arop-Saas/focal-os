@@ -39,6 +39,7 @@ type Service = {
   category: string;
   basePrice: number;
   durationMins: number;
+  turnaroundHours?: number | null;
   isActive: boolean;
   description?: string | null;
 };
@@ -50,8 +51,11 @@ type Package = {
   description?: string | null;
   isActive: boolean;
   isPopular: boolean;
+  badgeLabel?: string | null;
+  badgeColor?: string | null;
   photoCount?: number | null;
   turnaroundDays?: number | null;
+  turnaroundHours?: number | null;
   items: Array<{
     serviceId: string;
     quantity: number;
@@ -59,6 +63,16 @@ type Package = {
   }>;
   _count: { jobs: number };
 };
+
+const BADGE_COLOR_OPTIONS = [
+  { value: "#f59e0b", label: "Amber" },
+  { value: "#3b82f6", label: "Blue" },
+  { value: "#8b5cf6", label: "Purple" },
+  { value: "#10b981", label: "Green" },
+  { value: "#ef4444", label: "Red" },
+  { value: "#0891b2", label: "Cyan" },
+  { value: "#6b7280", label: "Gray" },
+];
 
 export function PackagesView() {
   const [activeTab, setActiveTab] = useState<"services" | "packages">("services");
@@ -72,6 +86,7 @@ export function PackagesView() {
   const [serviceCategory, setServiceCategory] = useState("PHOTOGRAPHY");
   const [servicePrice, setServicePrice] = useState("");
   const [serviceDuration, setServiceDuration] = useState("60");
+  const [serviceTurnaroundHours, setServiceTurnaroundHours] = useState("");
   const [serviceDescription, setServiceDescription] = useState("");
 
   // Package form state
@@ -79,8 +94,10 @@ export function PackagesView() {
   const [packagePrice, setPackagePrice] = useState("");
   const [packageDescription, setPackageDescription] = useState("");
   const [packageIsPopular, setPackageIsPopular] = useState(false);
+  const [packageBadgeLabel, setPackageBadgeLabel] = useState("");
+  const [packageBadgeColor, setPackageBadgeColor] = useState("#f59e0b");
   const [packagePhotoCount, setPackagePhotoCount] = useState("");
-  const [packageTurnaroundDays, setPackageTurnaroundDays] = useState("");
+  const [packageTurnaroundHours, setPackageTurnaroundHours] = useState("");
   const [packageServices, setPackageServices] = useState<Array<{ serviceId: string; quantity: number }>>([]);
 
   // Queries
@@ -98,6 +115,7 @@ export function PackagesView() {
     setServicePrice("");
     setServiceCategory("PHOTOGRAPHY");
     setServiceDuration("60");
+    setServiceTurnaroundHours("");
     setServiceDescription("");
     setEditingService(null);
     setShowServiceModal(false);
@@ -109,6 +127,7 @@ export function PackagesView() {
     setServiceCategory(service.category);
     setServicePrice(String(service.basePrice));
     setServiceDuration(String(service.durationMins));
+    setServiceTurnaroundHours(service.turnaroundHours ? String(service.turnaroundHours) : "");
     setServiceDescription(service.description ?? "");
     setShowServiceModal(true);
   };
@@ -126,6 +145,7 @@ export function PackagesView() {
           category: serviceCategory as any,
           basePrice: parseFloat(servicePrice),
           durationMins: parseInt(serviceDuration),
+          turnaroundHours: serviceTurnaroundHours ? parseInt(serviceTurnaroundHours) : null,
           description: serviceDescription || undefined,
         });
       } else {
@@ -134,6 +154,7 @@ export function PackagesView() {
           category: serviceCategory as any,
           basePrice: parseFloat(servicePrice),
           durationMins: parseInt(serviceDuration),
+          turnaroundHours: serviceTurnaroundHours ? parseInt(serviceTurnaroundHours) : undefined,
           description: serviceDescription || undefined,
           isActive: true,
         });
@@ -169,8 +190,10 @@ export function PackagesView() {
         description: packageDescription || undefined,
         isActive: true,
         isPopular: packageIsPopular,
+        badgeLabel: packageBadgeLabel || undefined,
+        badgeColor: packageBadgeLabel ? packageBadgeColor : undefined,
         photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : undefined,
-        turnaroundDays: packageTurnaroundDays ? parseInt(packageTurnaroundDays) : undefined,
+        turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : undefined,
         items: packageServices,
       });
       setShowPackageModal(false);
@@ -178,8 +201,10 @@ export function PackagesView() {
       setPackagePrice("");
       setPackageDescription("");
       setPackageIsPopular(false);
+      setPackageBadgeLabel("");
+      setPackageBadgeColor("#f59e0b");
       setPackagePhotoCount("");
-      setPackageTurnaroundDays("");
+      setPackageTurnaroundHours("");
       setPackageServices([]);
       await refetchPackages();
     } finally {
@@ -275,7 +300,10 @@ export function PackagesView() {
                     >
                       {CATEGORY_LABELS[service.category] || service.category}
                     </span>
-                    <span className="text-xs text-gray-500">{service.durationMins} mins</span>
+                    <span className="text-xs text-gray-500">{service.durationMins} min shoot</span>
+                    {service.turnaroundHours && (
+                      <span className="text-xs text-gray-500">{service.turnaroundHours}h turnaround</span>
+                    )}
                   </div>
 
                   <div className="pt-2 border-t flex items-center justify-between">
@@ -319,18 +347,28 @@ export function PackagesView() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-gray-900">{pkg.name}</h3>
-                        {pkg.isPopular && (
+                        {/* Custom badge — if set, overrides isPopular */}
+                        {pkg.badgeLabel ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full text-white"
+                            style={{ backgroundColor: pkg.badgeColor ?? "#f59e0b" }}
+                          >
+                            {pkg.badgeLabel}
+                          </span>
+                        ) : pkg.isPopular ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
                             <Star className="h-2.5 w-2.5" /> Most Popular
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       {pkg.description && (
                         <p className="text-xs text-gray-500 mt-0.5">{pkg.description}</p>
                       )}
-                      {pkg.turnaroundDays && (
+                      {(pkg.turnaroundHours || pkg.turnaroundDays) && (
                         <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
-                          <span>{pkg.turnaroundDays}d delivery</span>
+                          {pkg.turnaroundHours
+                            ? <span>{pkg.turnaroundHours}h turnaround</span>
+                            : <span>{pkg.turnaroundDays}d turnaround</span>}
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -396,7 +434,7 @@ export function PackagesView() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Duration (mins)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Shoot Duration (mins)</label>
                   <Input
                     type="number"
                     min="15"
@@ -407,6 +445,18 @@ export function PackagesView() {
                     disabled={isSubmitting}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turnaround Time (hours, optional)</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={serviceTurnaroundHours}
+                  onChange={(e) => setServiceTurnaroundHours(e.target.value)}
+                  placeholder="e.g. 24"
+                  disabled={isSubmitting}
+                />
               </div>
 
               <div>
@@ -493,15 +543,55 @@ export function PackagesView() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turnaround (days)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turnaround Time (hours, optional)</label>
                 <Input
                   type="number"
                   min="1"
-                  value={packageTurnaroundDays}
-                  onChange={(e) => setPackageTurnaroundDays(e.target.value)}
-                  placeholder="e.g. 2"
+                  value={packageTurnaroundHours}
+                  onChange={(e) => setPackageTurnaroundHours(e.target.value)}
+                  placeholder="e.g. 48"
                   disabled={isSubmitting}
                 />
+              </div>
+
+              {/* Custom badge */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Badge Label (optional)</label>
+                <Input
+                  type="text"
+                  value={packageBadgeLabel}
+                  onChange={(e) => setPackageBadgeLabel(e.target.value)}
+                  placeholder="e.g. Most Popular, Best Value, Featured…"
+                  disabled={isSubmitting}
+                />
+                {packageBadgeLabel && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-gray-500">Badge color:</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {BADGE_COLOR_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setPackageBadgeColor(opt.value)}
+                          title={opt.label}
+                          className={cn(
+                            "w-6 h-6 rounded-full border-2 transition-transform hover:scale-110",
+                            packageBadgeColor === opt.value ? "border-gray-800 scale-110" : "border-transparent"
+                          )}
+                          style={{ backgroundColor: opt.value }}
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-1">
+                      <span
+                        className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full text-white"
+                        style={{ backgroundColor: packageBadgeColor }}
+                      >
+                        {packageBadgeLabel}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <label className="flex items-center gap-2.5 cursor-pointer">
@@ -514,7 +604,7 @@ export function PackagesView() {
                 />
                 <div>
                   <span className="text-sm font-medium text-gray-700">Mark as Most Popular</span>
-                  <p className="text-xs text-gray-400">Shows a "Most Popular" badge on the booking page</p>
+                  <p className="text-xs text-gray-400">Fallback badge if no custom label is set above</p>
                 </div>
               </label>
 
