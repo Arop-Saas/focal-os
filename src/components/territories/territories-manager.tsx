@@ -360,7 +360,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
             )
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
