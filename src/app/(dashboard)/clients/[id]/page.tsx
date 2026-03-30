@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import { ArrowLeft, Mail, Phone, MapPin, ExternalLink, PlusCircle } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, ExternalLink, PlusCircle, Wallet, AlertCircle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PortalInviteButton } from "@/components/clients/portal-invite-button";
 import { ClientNotesEditor } from "@/components/clients/client-notes-editor";
@@ -63,6 +63,9 @@ export default async function ClientDetailPage({ params }: PageProps) {
       brokerageGroup: {
         select: { id: true, name: true, discountType: true, discountValue: true },
       },
+      team: {
+        select: { id: true, name: true, credits: true },
+      },
       jobs: {
         orderBy: { createdAt: "desc" },
         take: 10,
@@ -73,6 +76,11 @@ export default async function ClientDetailPage({ params }: PageProps) {
       },
     },
   });
+
+  // Compute outstanding balance from unpaid invoices
+  const outstandingBalance = client?.invoices
+    .filter((inv) => ["SENT", "VIEWED", "PARTIAL", "OVERDUE"].includes(inv.status))
+    .reduce((sum, inv) => sum + inv.amountDue, 0) ?? 0;
 
   if (!client || client.workspaceId !== workspaceId) {
     notFound();
@@ -178,22 +186,57 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl border p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Jobs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{client.totalJobs}</p>
+              <div className="flex items-center gap-1.5 mb-2">
+                <TrendingUp className="h-3.5 w-3.5 text-gray-400" />
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Jobs</p>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{client.totalJobs}</p>
             </div>
             <div className="bg-white rounded-xl border p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(client.totalRevenue)}</p>
+              <div className="flex items-center gap-1.5 mb-2">
+                <TrendingUp className="h-3.5 w-3.5 text-gray-400" />
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</p>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(client.totalRevenue)}</p>
             </div>
             <div className="bg-white rounded-xl border p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last Job</p>
-              <p className="text-base font-semibold text-gray-900 mt-2">
-                {client.lastJobAt ? formatDate(client.lastJobAt) : "—"}
+              <div className="flex items-center gap-1.5 mb-2">
+                <Wallet className="h-3.5 w-3.5 text-green-500" />
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Credits</p>
+              </div>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(client.creditBalance)}</p>
+              {client.team && client.team.credits > 0 && (
+                <p className="text-[10px] text-gray-400 mt-1">+{formatCurrency(client.team.credits)} team credits</p>
+              )}
+            </div>
+            <div className={cn("rounded-xl border p-4", outstandingBalance > 0 ? "bg-red-50 border-red-200" : "bg-white")}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <AlertCircle className={cn("h-3.5 w-3.5", outstandingBalance > 0 ? "text-red-500" : "text-gray-400")} />
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Outstanding</p>
+              </div>
+              <p className={cn("text-2xl font-bold", outstandingBalance > 0 ? "text-red-600" : "text-gray-900")}>
+                {formatCurrency(outstandingBalance)}
               </p>
+              {outstandingBalance > 0 && (
+                <p className="text-[10px] text-red-400 mt-1">Unpaid invoices</p>
+              )}
             </div>
           </div>
+
+          {/* Team badge */}
+          {client.team && (
+            <div className="bg-white rounded-xl border p-4 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                <svg className="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{client.team.name}</p>
+                <p className="text-xs text-gray-500">Customer team · {formatCurrency(client.team.credits)} team credits</p>
+              </div>
+            </div>
+          )}
 
           {/* Brokerage Pricing Group */}
           <BrokerageGroupSelector

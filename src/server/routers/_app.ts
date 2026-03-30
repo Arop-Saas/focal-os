@@ -14,6 +14,7 @@ import { territoriesRouter } from "./territories";
 import { messagesRouter } from "./messages";
 import { checklistRouter } from "./checklist";
 import { brokeragesRouter } from "./brokerages";
+import { teamsRouter } from "./teams";
 import { mobileRouter } from "./mobile";
 
 export const appRouter = router({
@@ -32,6 +33,7 @@ export const appRouter = router({
   messages: messagesRouter,
   checklist: checklistRouter,
   brokerages: brokeragesRouter,
+  teams: teamsRouter,
   mobile: mobileRouter,
 });
 

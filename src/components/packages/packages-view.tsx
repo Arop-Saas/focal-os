@@ -6,8 +6,9 @@ import { cn, formatCurrency } from "@/lib/utils";
 import {
   Plus, X, ToggleRight, ToggleLeft, Star, Pencil, Clock, Camera,
   Video, Plane, Boxes, FileText, Layers, Sunset, Share2, Zap,
-  HelpCircle, Timer, CheckCircle2, ChevronDown, Tag,
+  HelpCircle, Timer, CheckCircle2, ChevronDown, Tag, Building2,
 } from "lucide-react";
+import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -87,7 +88,7 @@ function PackageBadge({ pkg }: { pkg: Pick<Package, "badgeLabel" | "badgeColor" 
 
 /* ════════════════════════════════════════════════════════════════════ */
 export function PackagesView() {
-  const [activeTab, setActiveTab] = useState<"services" | "packages">("services");
+  const [activeTab, setActiveTab] = useState<"services" | "packages" | "brokerage">("services");
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -292,18 +293,22 @@ export function PackagesView() {
 
       {/* ── Tab bar ── */}
       <div className="flex gap-4 border-b">
-        {(["services", "packages"] as const).map((tab) => (
+        {([
+          { id: "services", label: "Services" },
+          { id: "packages", label: "Products" },
+          { id: "brokerage", label: "Brokerage Groups" },
+        ] as const).map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             className={cn(
               "px-4 py-3 font-medium text-sm border-b-2 -mb-px transition-colors",
-              activeTab === tab
+              activeTab === tab.id
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-gray-600 hover:text-gray-900"
             )}
           >
-            {tab === "services" ? "Services" : "Products"}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -487,6 +492,19 @@ export function PackagesView() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════ BROKERAGE GROUPS TAB ══════════════════════════════ */}
+      {activeTab === "brokerage" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <Building2 className="h-4 w-4 text-amber-600 shrink-0" />
+            <p className="text-sm text-amber-800">
+              Brokerage pricing groups let you offer automatic discounts to clients from specific brokerages or corporate accounts.
+            </p>
+          </div>
+          <BrokerageGroupsManager />
         </div>
       )}
 

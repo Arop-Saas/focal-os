@@ -696,10 +696,12 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
           </button>
         </div>
 
-        {/* ── 7. Brokerage Pricing Groups ─────────────────────────────── */}
+        {/* ── 7. Brokerage Pricing Groups — moved to Products/Services → Brokerage tab ─── */}
         <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "brokerage" && "hidden")}>
-          <SectionHeading icon={Tag} title="Brokerage Pricing Groups" description="Offer automatic discounts to agents from specific brokerages or corporate accounts" />
-          <BrokerageGroupsManager />
+          <SectionHeading icon={Tag} title="Brokerage Pricing Groups" description="Brokerage pricing groups have moved to the Products & Services section." />
+          <div className="mt-4 rounded-xl bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800">
+            Manage brokerage pricing groups under <strong>Products &amp; Services → Brokerage Groups</strong>.
+          </div>
         </div>
 
         {/* ── 8. Team Members ─────────────────────────────────────────── */}

@@ -80,6 +80,7 @@ model Workspace {
   hours            WorkspaceHours[]
   territories      ServiceTerritory[]
   brokerageGroups  BrokerageGroup[]
+  customerTeams    CustomerTeam[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -284,6 +285,11 @@ model Client {
   totalJobs     Int      @default(0)
   totalRevenue  Float    @default(0)
   lastJobAt     DateTime?
+  creditBalance Float    @default(0)
+
+  // Customer team
+  teamId        String?
+  team          CustomerTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   // Portal
   portalAccessedAt DateTime?
@@ -346,9 +352,30 @@ model BrokerageGroup {
 
   workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   clients       Client[]
+  teams         CustomerTeam[]
 
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  @@index([workspaceId])
+}
+
+model CustomerTeam {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  name             String
+  credits          Float    @default(0)
+  notes            String?
+
+  // Optional brokerage pricing group for the whole team
+  brokerageGroupId String?
+  brokerageGroup   BrokerageGroup? @relation(fields: [brokerageGroupId], references: [id], onDelete: SetNull)
+
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members          Client[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([workspaceId])
 }
