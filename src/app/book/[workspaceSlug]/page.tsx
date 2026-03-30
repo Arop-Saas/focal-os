@@ -62,15 +62,22 @@ const initialForm: FormData = {
   clientNotes: "",
 };
 
-// Generate 30-min time slots from 8am to 6pm
-const TIME_SLOTS = Array.from({ length: 21 }, (_, i) => {
-  const totalMins = 8 * 60 + i * 30;
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  const label = `${h > 12 ? h - 12 : h}:${m.toString().padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
-  const value = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-  return { label, value };
-});
+// Generate 30-min time slots between two "HH:MM" strings (24h)
+function generateTimeSlots(openTime: string, closeTime: string) {
+  const [oh, om] = openTime.split(":").map(Number);
+  const [ch, cm] = closeTime.split(":").map(Number);
+  const startMins = oh * 60 + (om ?? 0);
+  const endMins = ch * 60 + (cm ?? 0);
+  const slots: { label: string; value: string }[] = [];
+  for (let t = startMins; t < endMins; t += 30) {
+    const h = Math.floor(t / 60);
+    const m = t % 60;
+    const label = `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m.toString().padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+    const value = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+    slots.push({ label, value });
+  }
+  return slots;
+}
 
 // Property type labels
 const PROPERTY_TYPES = [
@@ -581,14 +588,19 @@ function Step3DateTime({
   setForm,
   workspaceSlug,
   brandColor,
+  hours,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   workspaceSlug: string;
   brandColor: string;
+  hours: { dayOfWeek: number; isOpen: boolean; openTime: string; closeTime: string }[];
 }) {
   const today = startOfDay(new Date());
   const days = Array.from({ length: 28 }, (_, i) => addDays(today, i + 1));
+
+  // Build a map of day-of-week → hours config for quick lookup
+  const hoursByDay = Object.fromEntries(hours.map((h) => [h.dayOfWeek, h]));
 
   // Fetch available photographers when a date is chosen
   const { data: photographersData, isLoading: photographersLoading } =
@@ -639,8 +651,21 @@ function Step3DateTime({
     }
   });
 
-  // Filter time slots to photographer's available window (if one selected)
-  const visibleSlots = TIME_SLOTS.filter((slot) => {
+  // Generate time slots based on workspace business hours for the selected day
+  const selectedDayOfWeek = form.scheduledDate
+    ? new Date(`${form.scheduledDate}T12:00:00`).getDay()
+    : null;
+  const todayHours =
+    selectedDayOfWeek !== null && hoursByDay[selectedDayOfWeek]
+      ? hoursByDay[selectedDayOfWeek]
+      : null;
+  const baseSlots =
+    todayHours && todayHours.isOpen
+      ? generateTimeSlots(todayHours.openTime, todayHours.closeTime)
+      : generateTimeSlots("09:00", "17:00"); // fallback if no hours configured
+
+  // Filter to photographer's available window if one is selected
+  const visibleSlots = baseSlots.filter((slot) => {
     if (!selectedPhotographer) return true;
     return slot.value >= selectedPhotographer.startTime && slot.value < selectedPhotographer.endTime;
   });
@@ -674,18 +699,22 @@ function Step3DateTime({
             const iso = format(day, "yyyy-MM-dd");
             const selected = form.scheduledDate === iso;
             const past = isBefore(day, today);
+            const dow = day.getDay();
+            const dayConfig = hoursByDay[dow];
+            const closed = dayConfig ? !dayConfig.isOpen : false;
+            const disabled = past || closed;
             return (
               <button
                 key={iso}
                 type="button"
-                disabled={past}
+                disabled={disabled}
                 onClick={() =>
                   setForm({ ...form, scheduledDate: iso, scheduledTime: "", photographerId: "" })
                 }
                 className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-medium transition-all ${
                   selected
                     ? "text-white font-semibold"
-                    : past
+                    : disabled
                     ? "text-gray-200 cursor-not-allowed"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
@@ -1093,7 +1122,7 @@ export default function BookingPage() {
           {step === 1 && <Step1Property form={form} setForm={setForm} />}
           {step === 2 && <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} />}
           {step === 3 && (
-            <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} />
+            <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} />
           )}
           {step === 4 && <Step4Contact form={form} setForm={setForm} />}
           {step === 5 && <Step5Review form={form} packages={packages} services={services ?? []} photographers={reviewPhotographers} />}
