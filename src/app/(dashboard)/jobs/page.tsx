@@ -16,9 +16,20 @@ interface PageProps {
     page?: string;
     status?: string;
     search?: string;
+    sort?: string;
     dateFrom?: string;
     dateTo?: string;
   };
+}
+
+function resolveOrderBy(sort?: string): object[] {
+  switch (sort) {
+    case "scheduled_asc":  return [{ scheduledAt: "asc"  }, { createdAt: "asc"  }];
+    case "created_desc":   return [{ createdAt: "desc" }];
+    case "created_asc":    return [{ createdAt: "asc"  }];
+    case "scheduled_desc":
+    default:               return [{ scheduledAt: "desc" }, { createdAt: "desc" }];
+  }
 }
 
 export default async function JobsPage({ searchParams }: PageProps) {
@@ -57,7 +68,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
         },
         invoice: { select: { status: true, totalAmount: true } },
       },
-      orderBy: [{ scheduledAt: "desc" }, { createdAt: "desc" }],
+      orderBy: resolveOrderBy(searchParams.sort) as any,
       skip,
       take: limit,
     }),
@@ -76,7 +87,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
         }
       />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-        <JobFilters currentStatus={searchParams.status} currentSearch={searchParams.search} />
+        <JobFilters currentStatus={searchParams.status} currentSearch={searchParams.search} currentSort={searchParams.sort} />
         <JobsTable
           jobs={jobs}
           total={total}

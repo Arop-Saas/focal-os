@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { scryptSync, randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 import { generatePortalToken, MAGIC_LINK_TTL_MS } from "@/lib/portal-auth";
+import { sendPortalWelcomeEmail } from "@/lib/resend";
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -32,13 +33,17 @@ export async function POST(req: NextRequest) {
     const normalizedEmail = email.toLowerCase().trim();
     const passwordHash = hashPassword(password);
 
+    // Check if this is a brand-new client
+    const existingClient = await prisma.client.findFirst({
+      where: { workspaceId: workspace.id, email: normalizedEmail },
+      select: { id: true },
+    });
+    const isNewClient = !existingClient;
+
     // Upsert client — if they already exist update their info + password
     const client = await prisma.client.upsert({
       where: {
-        id: (await prisma.client.findFirst({
-          where: { workspaceId: workspace.id, email: normalizedEmail },
-          select: { id: true },
-        }))?.id ?? "new",
+        id: existingClient?.id ?? "new",
       },
       update: {
         firstName,
@@ -70,6 +75,17 @@ export async function POST(req: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
     const magicLink = `${baseUrl}/api/portal/verify?token=${encodeURIComponent(token)}&slug=${workspaceSlug}`;
+    const portalUrl = `${baseUrl}/portal/${workspaceSlug}`;
+
+    // Send welcome email only to brand-new clients
+    if (isNewClient) {
+      sendPortalWelcomeEmail({
+        to: normalizedEmail,
+        clientName: `${firstName} ${lastName}`,
+        workspaceName: workspace.name,
+        portalUrl,
+      }).catch((err) => console.error("[portal/request-access] welcome email failed:", err));
+    }
 
     return NextResponse.json({ ok: true, redirectUrl: magicLink });
   } catch (err) {

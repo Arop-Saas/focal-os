@@ -70,6 +70,32 @@ function ctaButton(label: string, href: string) {
 
 // ─── Templates ───────────────────────────────────────────────────────────────
 
+/** Portal welcome / account created → client */
+export async function sendPortalWelcomeEmail({
+  to, clientName, workspaceName, portalUrl,
+}: {
+  to: string; clientName: string; workspaceName?: string; portalUrl: string;
+}) {
+  const brand = workspaceName ?? "Scalist";
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: `Welcome to your ${brand} client portal`,
+    html: emailWrapper(`
+      <h2 style="color:#1B4F9E;margin:0 0 8px;">Your account is ready 🎉</h2>
+      <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
+      <p style="color:#475569;">
+        Your client portal account has been created. You can now sign in to track your orders,
+        view and pay invoices, and download your delivered files.
+      </p>
+      ${ctaButton("Open my portal →", portalUrl)}
+      <p style="color:#94a3b8;font-size:12px;text-align:center;">
+        If you did not create this account, you can safely ignore this email.
+      </p>
+    `, workspaceName),
+  });
+}
+
 /** Booking confirmation → client */
 export async function sendJobConfirmationEmail({
   to, clientName, jobNumber, propertyAddress, scheduledAt, packageName, workspaceName,

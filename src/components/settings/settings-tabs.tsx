@@ -311,6 +311,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   const [invoicePrefix, setInvoicePrefix] = useState(workspace.invoicePrefix ?? "INV");
   const [autoCreateInvoice, setAutoCreateInvoice] = useState(workspace.autoCreateInvoice ?? false);
   const [invoiceDueDays, setInvoiceDueDays] = useState(String(workspace.invoiceDueDays ?? 30));
+  const [lockDownloads, setLockDownloads] = useState((workspace as any).lockDownloads ?? false);
   const [addressLine1, setAddressLine1] = useState(workspace.addressLine1 ?? "");
   const [addressCity, setAddressCity] = useState(workspace.city ?? "");
   const [addressState, setAddressState] = useState(workspace.state ?? "");
@@ -382,6 +383,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
       logoUrl: logoUrl || undefined,
       autoCreateInvoice,
       invoiceDueDays: parseInt(invoiceDueDays) || 30,
+      lockDownloads,
     }, {
       onSuccess: () => { setBrandingSaved(true); setTimeout(() => setBrandingSaved(false), 3000); },
     });
@@ -565,6 +567,12 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
                   />
                 </Field>
               )}
+              <ToggleRow
+                label="Lock downloads before payment"
+                description="Clients cannot download delivered files until their invoice is paid"
+                checked={lockDownloads}
+                onChange={setLockDownloads}
+              />
             </div>
 
             {brandingSaved && <SavedBanner />}

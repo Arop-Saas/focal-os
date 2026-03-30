@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatDate } from "@/lib/utils";
-import { Camera, LinkIcon, Eye, Plus, Copy, Check } from "lucide-react";
+import { Camera, LinkIcon, Eye, Plus, Check, Search, ArrowUpDown } from "lucide-react";
 
 const GALLERY_STATUS_COLORS: Record<string, string> = {
   PROCESSING: "bg-yellow-100 text-yellow-800",
@@ -14,14 +14,42 @@ const GALLERY_STATUS_COLORS: Record<string, string> = {
   ARCHIVED: "bg-gray-100 text-gray-500",
 };
 
+type SortOption = "created_desc" | "created_asc" | "name_asc" | "name_desc";
+
 export default function GalleryPage() {
   const [filter, setFilter] = useState<"all" | "PROCESSING" | "READY" | "DELIVERED" | "ARCHIVED">("all");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortOption>("created_desc");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const { data: galleries = [], isLoading } = trpc.gallery.list.useQuery();
 
-  const filtered = galleries.filter((g) => filter === "all" || g.status === filter);
+  const filtered = useMemo(() => {
+    let result = galleries.filter((g) => filter === "all" || g.status === filter);
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (g) =>
+          g.name.toLowerCase().includes(q) ||
+          g.job.propertyAddress?.toLowerCase().includes(q) ||
+          `${g.job.client.firstName} ${g.job.client.lastName}`.toLowerCase().includes(q)
+      );
+    }
+
+    result = [...result].sort((a, b) => {
+      switch (sort) {
+        case "created_asc":  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "name_asc":     return a.name.localeCompare(b.name);
+        case "name_desc":    return b.name.localeCompare(a.name);
+        case "created_desc":
+        default:             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+
+    return result;
+  }, [galleries, filter, search, sort]);
 
   const copyLink = (slug: string, id: string) => {
     const url = `${window.location.origin}/g/${slug}`;
@@ -50,21 +78,51 @@ export default function GalleryPage() {
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {/* Filters */}
-        <div className="flex gap-2 flex-wrap">
-          {(["all", "PROCESSING", "READY", "DELIVERED", "ARCHIVED"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                filter === f
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-              )}
-            >
-              {f === "all" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
-            </button>
-          ))}
+        <div className="flex flex-col gap-3">
+          {/* Search + Sort row */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search galleries, addresses, clients…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="relative">
+              <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortOption)}
+                className="pl-9 pr-8 py-2 rounded-lg border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer text-gray-700"
+              >
+                <option value="created_desc">Created: Newest</option>
+                <option value="created_asc">Created: Oldest</option>
+                <option value="name_asc">Name: A → Z</option>
+                <option value="name_desc">Name: Z → A</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Status pills */}
+          <div className="flex gap-2 flex-wrap">
+            {(["all", "PROCESSING", "READY", "DELIVERED", "ARCHIVED"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+                  filter === f
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                )}
+              >
+                {f === "all" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
         </div>
 
         {isLoading ? (

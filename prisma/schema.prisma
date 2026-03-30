@@ -62,6 +62,7 @@ model Workspace {
   brandColor            String   @default("#1B4F9E")
   autoCreateInvoice     Boolean  @default(false)
   invoiceDueDays        Int      @default(30)
+  lockDownloads         Boolean  @default(false)
 
   // Relations
   members          WorkspaceMember[]
