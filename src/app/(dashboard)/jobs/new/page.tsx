@@ -6,7 +6,7 @@ import { NewJobForm } from "@/components/jobs/new-job-form";
 
 export const metadata = { title: "New Job" };
 
-export default async function NewJobPage() {
+export default async function NewJobPage({ searchParams }: { searchParams: { clientId?: string } }) {
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
@@ -43,6 +43,7 @@ export default async function NewJobPage() {
           packages={packages}
           services={services}
           staff={staff}
+          defaultClientId={searchParams.clientId}
         />
       </div>
     </div>

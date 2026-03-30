@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import { ArrowLeft, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, ExternalLink, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PortalInviteButton } from "@/components/clients/portal-invite-button";
 import { ClientNotesEditor } from "@/components/clients/client-notes-editor";
@@ -93,6 +93,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </h1>
           <p className="text-xs text-muted-foreground">{client.company || client.type}</p>
         </div>
+        <Button asChild>
+          <Link href={`/jobs/new?clientId=${client.id}`}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Create Order
+          </Link>
+        </Button>
       </div>
 
       {/* Content */}
@@ -141,6 +147,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
                   <p className="text-sm text-gray-900">
                     {client.addressLine1}{client.city && `, ${client.city}`}
                     {client.state && `, ${client.state}`} {client.postalCode}
+                    {client.country && `, ${client.country}`}
                   </p>
                 </div>
               )}

@@ -60,6 +60,8 @@ model Workspace {
   invoicePrefix         String   @default("INV")
   invoiceNextNumber     Int      @default(1001)
   brandColor            String   @default("#1B4F9E")
+  autoCreateInvoice     Boolean  @default(false)
+  invoiceDueDays        Int      @default(30)
 
   // Relations
   members          WorkspaceMember[]
@@ -264,6 +266,7 @@ model Client {
   city          String?
   state         String?
   postalCode    String?
+  country       String?
 
   // CRM
   status        ClientStatus @default(ACTIVE)

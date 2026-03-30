@@ -22,6 +22,7 @@ export default function NewClientPage() {
     type: "AGENT" as const,
     city: "",
     state: "",
+    country: "",
     notes: "",
   });
 
@@ -94,7 +95,7 @@ export default function NewClientPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-gray-700">City</label>
                 <input name="city" value={form.city} onChange={handleChange} placeholder="Nashville" className={inputCls} />
@@ -102,6 +103,10 @@ export default function NewClientPage() {
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-gray-700">State</label>
                 <input name="state" value={form.state} onChange={handleChange} placeholder="TN" className={inputCls} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-gray-700">Country</label>
+                <input name="country" value={form.country} onChange={handleChange} placeholder="US" className={inputCls} />
               </div>
             </div>
 

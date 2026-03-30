@@ -11,7 +11,7 @@ export interface PortalSession {
 
 export const PORTAL_COOKIE = "scalist_portal_session";
 export const PORTAL_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-export const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
+export const MAGIC_LINK_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 
 export function generatePortalToken(session: PortalSession): string {
   const payload = Buffer.from(JSON.stringify(session)).toString("base64url");

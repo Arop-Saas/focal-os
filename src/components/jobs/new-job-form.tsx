@@ -44,9 +44,10 @@ interface NewJobFormProps {
   packages: Package[];
   services: Service[];
   staff: Staff[];
+  defaultClientId?: string;
 }
 
-export function NewJobForm({ clients, packages, services, staff }: NewJobFormProps) {
+export function NewJobForm({ clients, packages, services, staff, defaultClientId }: NewJobFormProps) {
   const router = useRouter();
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
 
@@ -62,7 +63,7 @@ export function NewJobForm({ clients, packages, services, staff }: NewJobFormPro
     watch,
     setValue,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { clientId: defaultClientId ?? "" } });
 
   const selectedPackage = watch("packageId");
   const pkg = packages.find((p) => p.id === selectedPackage);

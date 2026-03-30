@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api } from "@/lib/trpc/client";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, Search, ChevronDown, BookOpen } from "lucide-react";
 
 const lineItemSchema = z.object({
   description: z.string().min(1, "Required"),
@@ -34,18 +34,229 @@ type Client = {
   company?: string | null;
 };
 
+type Service = {
+  id: string;
+  name: string;
+  basePrice: number;
+  category: string;
+};
+
 interface NewInvoiceFormProps {
   clients: Client[];
+  services?: Service[];
   prefillClientId?: string;
   prefillJobId?: string;
   prefillLineItems?: { description: string; quantity: number; unitPrice: number }[];
+  defaultDueDate?: string;
+}
+
+// Searchable client picker component
+function ClientPicker({
+  clients,
+  value,
+  onChange,
+  error,
+}: {
+  clients: Client[];
+  value: string;
+  onChange: (id: string) => void;
+  error?: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selectedClient = clients.find((c) => c.id === value);
+
+  const filtered = clients.filter((c) => {
+    const q = search.toLowerCase();
+    return (
+      c.firstName.toLowerCase().includes(q) ||
+      c.lastName.toLowerCase().includes(q) ||
+      c.email.toLowerCase().includes(q) ||
+      (c.company?.toLowerCase().includes(q) ?? false)
+    );
+  });
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center justify-between border rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          error ? "border-red-300" : "border-gray-200"
+        } bg-white`}
+      >
+        {selectedClient ? (
+          <span className="text-gray-900">
+            {selectedClient.firstName} {selectedClient.lastName}
+            {selectedClient.company ? ` — ${selectedClient.company}` : ""}
+          </span>
+        ) : (
+          <span className="text-gray-400">Select a client…</span>
+        )}
+        <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          {/* Search */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search clients…"
+              className="flex-1 text-sm outline-none placeholder:text-gray-400"
+            />
+          </div>
+
+          {/* Results */}
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No clients found</p>
+            ) : (
+              filtered.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(c.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className={`w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 ${
+                    c.id === value ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700"
+                  }`}
+                >
+                  <span>
+                    {c.firstName} {c.lastName}
+                    {c.company && (
+                      <span className="text-gray-400 font-normal"> — {c.company}</span>
+                    )}
+                  </span>
+                  <span className="text-xs text-gray-400 shrink-0">{c.email}</span>
+                </button>
+              ))
+            )}
+          </div>
+
+          {/* Add new client shortcut */}
+          <div className="border-t border-gray-100">
+            <a
+              href="/clients/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 hover:bg-blue-50 transition-colors font-medium"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add new client
+            </a>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
+// Service picker dropdown
+function ServicePicker({
+  services,
+  onAdd,
+}: {
+  services: Service[];
+  onAdd: (s: Service) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = services.filter((s) =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.category.toLowerCase().includes(search.toLowerCase())
+  );
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  if (!services.length) return null;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 font-medium"
+      >
+        <BookOpen className="w-3.5 h-3.5" /> Add from catalog
+      </button>
+
+      {open && (
+        <div className="absolute z-20 top-full mt-1 left-0 w-64 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search services…"
+              className="flex-1 text-sm outline-none placeholder:text-gray-400"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No services found</p>
+            ) : (
+              filtered.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    onAdd(s);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
+                >
+                  <span className="text-gray-700">{s.name}</span>
+                  <span className="text-xs text-gray-400 shrink-0">{formatCurrency(s.basePrice)}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function NewInvoiceForm({
   clients,
+  services = [],
   prefillClientId,
   prefillJobId,
   prefillLineItems = [],
+  defaultDueDate,
 }: NewInvoiceFormProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState("");
@@ -55,6 +266,7 @@ export function NewInvoiceForm({
     control,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -66,7 +278,7 @@ export function NewInvoiceForm({
           : [{ description: "", quantity: 1, unitPrice: 0 }],
       taxRate: 0,
       discountAmount: 0,
-      dueAt: "",
+      dueAt: defaultDueDate ?? "",
       notes: "",
     },
   });
@@ -86,6 +298,7 @@ export function NewInvoiceForm({
   const watchedItems = watch("lineItems");
   const watchedTax = watch("taxRate") ?? 0;
   const watchedDiscount = watch("discountAmount") ?? 0;
+  const clientId = watch("clientId");
 
   const subtotal = watchedItems.reduce(
     (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
@@ -114,30 +327,22 @@ export function NewInvoiceForm({
     [createInvoice, prefillJobId]
   );
 
+  function addServiceAsLineItem(service: Service) {
+    append({ description: service.name, quantity: 1, unitPrice: service.basePrice });
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl space-y-5">
 
       {/* Client */}
       <div className="bg-white rounded-xl border p-5 space-y-3">
         <h2 className="text-sm font-semibold text-gray-900">Client</h2>
-        <div>
-          <select
-            {...register("clientId")}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select a client…</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.firstName} {c.lastName}
-                {c.company ? ` — ${c.company}` : ""}
-                {" "}({c.email})
-              </option>
-            ))}
-          </select>
-          {errors.clientId && (
-            <p className="text-xs text-red-500 mt-1">{errors.clientId.message}</p>
-          )}
-        </div>
+        <ClientPicker
+          clients={clients}
+          value={clientId}
+          onChange={(id) => setValue("clientId", id, { shouldValidate: true })}
+          error={errors.clientId?.message}
+        />
       </div>
 
       {/* Line Items */}
@@ -210,13 +415,16 @@ export function NewInvoiceForm({
           })}
         </div>
 
-        <button
-          type="button"
-          onClick={() => append({ description: "", quantity: 1, unitPrice: 0 })}
-          className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium"
-        >
-          <Plus className="w-3.5 h-3.5" /> Add line item
-        </button>
+        <div className="flex items-center gap-4 flex-wrap">
+          <button
+            type="button"
+            onClick={() => append({ description: "", quantity: 1, unitPrice: 0 })}
+            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add line item
+          </button>
+          <ServicePicker services={services} onAdd={addServiceAsLineItem} />
+        </div>
 
         {errors.lineItems && typeof errors.lineItems.message === "string" && (
           <p className="text-xs text-red-500">{errors.lineItems.message}</p>

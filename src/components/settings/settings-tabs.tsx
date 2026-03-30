@@ -308,6 +308,8 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   const [currency,    setCurrency]    = useState(workspace.currency ?? "CAD");
   const [taxRate,     setTaxRate]     = useState(String(workspace.defaultTaxRate ?? 0));
   const [invoicePrefix, setInvoicePrefix] = useState(workspace.invoicePrefix ?? "INV");
+  const [autoCreateInvoice, setAutoCreateInvoice] = useState(workspace.autoCreateInvoice ?? false);
+  const [invoiceDueDays, setInvoiceDueDays] = useState(String(workspace.invoiceDueDays ?? 30));
   const [brandColor,  setBrandColor]  = useState(workspace.brandColor ?? "#1B4F9E");
   const [colorText,   setColorText]   = useState(workspace.brandColor ?? "#1B4F9E");
   const [logoUrl,     setLogoUrl]     = useState(workspace.logoUrl ?? "");
@@ -369,6 +371,8 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
       brandColor: finalColor,
       invoicePrefix: invoicePrefix || undefined,
       logoUrl: logoUrl || undefined,
+      autoCreateInvoice,
+      invoiceDueDays: parseInt(invoiceDueDays) || 30,
     }, {
       onSuccess: () => { setBrandingSaved(true); setTimeout(() => setBrandingSaved(false), 3000); },
     });
@@ -380,7 +384,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   };
 
   return (
-    <div className="flex gap-8 p-6 max-w-[1200px]">
+    <div className="flex gap-8 p-6 max-w-[1200px] mx-auto w-full">
       {/* ── Left: Settings sections ─────────────────────────────────────── */}
       <div className="flex-1 min-w-0 space-y-6">
 
@@ -498,6 +502,25 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
               <p className="text-xs text-gray-400">
                 Example: <span className="font-mono font-semibold">{invoicePrefix || "INV"}-{String(workspace.invoiceNextNumber).padStart(4, "0")}</span>
               </p>
+              <ToggleRow
+                label="Auto-create invoice on new order"
+                description="Automatically generate a draft invoice whenever a new order is created"
+                checked={autoCreateInvoice}
+                onChange={setAutoCreateInvoice}
+              />
+              {autoCreateInvoice && (
+                <Field label="Default payment terms (days)" hint="Invoice due date is set this many days after order creation">
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={invoiceDueDays}
+                    onChange={(e) => setInvoiceDueDays(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="30"
+                  />
+                </Field>
+              )}
             </div>
 
             {brandingSaved && <SavedBanner />}

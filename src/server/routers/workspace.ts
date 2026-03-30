@@ -127,6 +127,8 @@ export const workspaceRouter = router({
         invoicePrefix: z.string().max(10).optional(),
         brandColor: z.string().optional(),
         logoUrl: z.string().url().optional(),
+        autoCreateInvoice: z.boolean().optional(),
+        invoiceDueDays: z.number().int().min(0).max(365).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

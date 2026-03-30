@@ -120,6 +120,7 @@ export const clientsRouter = router({
         city: z.string().optional(),
         state: z.string().optional(),
         postalCode: z.string().optional(),
+        country: z.string().optional(),
         source: z.string().optional(),
         notes: z.string().optional(),
         tags: z.array(z.string()).default([]),
@@ -175,6 +176,7 @@ export const clientsRouter = router({
         city: z.string().optional(),
         state: z.string().optional(),
         postalCode: z.string().optional(),
+        country: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

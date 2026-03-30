@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    // Generate a 15-minute magic link
+    // Generate a magic link (valid 72 hours)
     const token = generatePortalToken({
       clientId: client.id,
       email: client.email,
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     await resend.emails.send({
       from: process.env.EMAIL_FROM ?? `${workspace.name} <onboarding@resend.dev>`,
       to: client.email,
-      subject: `You've been invited to the ${workspace.name} client portal`,
+      subject: `Access your ${workspace.name} client portal`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 20px; background: #ffffff;">
           <div style="margin-bottom: 32px;">
@@ -69,12 +69,12 @@ export async function POST(req: NextRequest) {
               <span style="color: white; font-size: 20px;">📷</span>
             </div>
           </div>
-          <h2 style="color: #0f172a; font-size: 22px; font-weight: 700; margin: 0 0 8px;">You're invited to your client portal</h2>
-          <p style="color: #64748b; margin: 0 0 24px;">Hi ${client.firstName}, <strong>${workspace.name}</strong> has invited you to your dedicated client portal — where you can view your orders, galleries, and invoices all in one place.</p>
+          <h2 style="color: #0f172a; font-size: 22px; font-weight: 700; margin: 0 0 8px;">Your client portal is ready</h2>
+          <p style="color: #64748b; margin: 0 0 24px;">Hi ${client.firstName}, click the button below to access your <strong>${workspace.name}</strong> client portal — where you can view your orders, galleries, and invoices all in one place.</p>
           <a href="${magicLink}" style="display: inline-block; background: ${workspace.brandColor ?? "#1B4F9E"}; color: white; padding: 13px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; margin-bottom: 24px;">
-            Access your portal →
+            Open my portal →
           </a>
-          <p style="color: #94a3b8; font-size: 13px; margin: 0 0 8px;">This link expires in 15 minutes. After signing in you'll stay logged in for 7 days.</p>
+          <p style="color: #94a3b8; font-size: 13px; margin: 0 0 8px;">This link is valid for 72 hours. Once you sign in, you'll stay logged in for 7 days.</p>
           <p style="color: #94a3b8; font-size: 13px; margin: 0;">If you didn't expect this email, you can safely ignore it.</p>
         </div>
       `,

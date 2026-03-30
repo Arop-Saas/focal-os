@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, workspaceProcedure } from "../trpc";
-import { generateJobNumber } from "@/lib/utils";
+import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
 import {
   notifyJobBooked,
   notifyJobConfirmed,
@@ -344,6 +344,65 @@ export const jobsRouter = router({
           propertyAddress: job.propertyAddress,
           scheduledAt: job.scheduledAt,
           packageName: job.services[0]?.service?.name ?? "Photography",
+        });
+      }
+
+      // Auto-create invoice if workspace setting is enabled
+      const wsSettings = await ctx.prisma.workspace.findUnique({
+        where: { id: ctx.workspace.id },
+        select: { autoCreateInvoice: true, invoiceDueDays: true, invoicePrefix: true, invoiceNextNumber: true },
+      });
+
+      if (wsSettings?.autoCreateInvoice && job.totalAmount > 0) {
+        const invoiceNumber = generateInvoiceNumber(
+          wsSettings.invoicePrefix ?? "INV",
+          wsSettings.invoiceNextNumber ?? 1001
+        );
+
+        const dueDays = wsSettings.invoiceDueDays ?? 30;
+        const dueAt = new Date();
+        dueAt.setDate(dueAt.getDate() + dueDays);
+
+        // Build line items from services or package
+        const lineItems = job.services.length > 0
+          ? job.services.map((s, i) => ({
+              description: s.service.name,
+              quantity: s.quantity,
+              unitPrice: Number(s.unitPrice),
+              totalPrice: Number(s.totalPrice),
+              sortOrder: i,
+            }))
+          : [{
+              description: job.propertyAddress,
+              quantity: 1,
+              unitPrice: Number(job.totalAmount),
+              totalPrice: Number(job.totalAmount),
+              sortOrder: 0,
+            }];
+
+        await ctx.prisma.$transaction(async (tx) => {
+          await tx.workspace.update({
+            where: { id: ctx.workspace.id },
+            data: { invoiceNextNumber: { increment: 1 } },
+          });
+
+          await tx.invoice.create({
+            data: {
+              workspaceId: ctx.workspace.id,
+              invoiceNumber,
+              clientId: job.clientId,
+              jobId: job.id,
+              subtotal: Number(job.subtotal),
+              taxRate: Number(job.taxAmount > 0 ? (job.taxAmount / job.subtotal) * 100 : 0),
+              taxAmount: Number(job.taxAmount),
+              discountAmount: 0,
+              totalAmount: Number(job.totalAmount),
+              amountDue: Number(job.totalAmount),
+              dueAt,
+              status: "DRAFT",
+              lineItems: { create: lineItems },
+            },
+          });
         });
       }
 

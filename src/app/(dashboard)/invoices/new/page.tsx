@@ -18,11 +18,21 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
 
   const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
 
-  const [clients, prefillJob] = await Promise.all([
+  const workspace = await prisma.workspace.findUniqueOrThrow({
+    where: { id: workspaceId },
+    select: { invoiceDueDays: true },
+  });
+
+  const [clients, services, prefillJob] = await Promise.all([
     prisma.client.findMany({
       where: { workspaceId, status: "ACTIVE" },
       select: { id: true, firstName: true, lastName: true, email: true, company: true },
       orderBy: { lastName: "asc" },
+    }),
+    prisma.service.findMany({
+      where: { workspaceId, isActive: true },
+      select: { id: true, name: true, basePrice: true, category: true },
+      orderBy: [{ category: "asc" }, { name: "asc" }],
     }),
     searchParams.jobId
       ? prisma.job.findFirst({
@@ -42,6 +52,12 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
     unitPrice: Number(s.totalPrice) / s.quantity,
   })) ?? [];
 
+  // Auto due date based on workspace setting
+  const dueDays = workspace.invoiceDueDays ?? 30;
+  const defaultDueDate = new Date();
+  defaultDueDate.setDate(defaultDueDate.getDate() + dueDays);
+  const defaultDueDateStr = defaultDueDate.toISOString().split("T")[0];
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header
@@ -59,9 +75,11 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
       <div className="flex-1 overflow-y-auto p-6">
         <NewInvoiceForm
           clients={clients}
+          services={services}
           prefillClientId={prefillJob?.clientId}
           prefillJobId={prefillJob?.id}
           prefillLineItems={prefillLineItems}
+          defaultDueDate={defaultDueDateStr}
         />
       </div>
     </div>

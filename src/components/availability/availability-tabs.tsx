@@ -34,7 +34,7 @@ export function AvailabilityTabs({ initialHours, initialTerritories }: Props) {
   const [activeTab, setActiveTab] = useState<"hours" | "territories">("hours");
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl mx-auto space-y-5">
       {/* Tab bar */}
       <div className="flex gap-1 bg-white border rounded-xl p-1 w-fit">
         {TABS.map((tab) => {
