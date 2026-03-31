@@ -4,6 +4,8 @@
  * Throws clearly at startup if a required variable is missing.
  */
 
+// Only vars that are truly required to boot — checked at runtime, not build time.
+// Stripe price IDs are optional at boot (only needed when a user subscribes).
 const REQUIRED_VARS = [
   "DATABASE_URL",
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -11,9 +13,6 @@ const REQUIRED_VARS = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_PRICE_STARTER",
-  "STRIPE_PRICE_PRO",
-  "STRIPE_PRICE_AGENCY",
   "RESEND_API_KEY",
   "EMAIL_FROM",
   "NEXT_PUBLIC_APP_URL",
