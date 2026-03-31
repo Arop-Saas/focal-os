@@ -499,7 +499,7 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
   const servicesTotal = selectedServices.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl">
+    <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl mx-auto">
       <StepIndicator current={step} />
 
       {createJob.error && (
