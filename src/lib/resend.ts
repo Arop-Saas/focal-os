@@ -275,3 +275,53 @@ export async function sendPaymentReceiptEmail({
     `, workspaceName),
   });
 }
+
+/** Welcome email → new workspace owner after signup */
+export async function sendWelcomeEmail({
+  to, ownerName, workspaceName, workspaceSlug,
+}: {
+  to: string; ownerName: string; workspaceName: string; workspaceSlug: string;
+}) {
+  const dashboardUrl = `${APP_URL}/dashboard`;
+  const bookingUrl = `${APP_URL}/book/${workspaceSlug}`;
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: `Welcome to Scalist — let's get ${workspaceName} set up 🎉`,
+    html: emailWrapper(`
+      <h2 style="color:#1B4F9E;margin:0 0 8px;">Welcome to Scalist, ${ownerName}! 👋</h2>
+      <p style="color:#475569;margin:0 0 16px;">
+        Your studio <strong>${workspaceName}</strong> is live and your 14-day free trial has started. Here's how to hit the ground running:
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;">
+          <span style="color:#1B4F9E;font-weight:600;">1.</span>
+          <span style="color:#334155;margin-left:8px;">Add your services &amp; packages under <strong>Products</strong></span>
+        </td></tr>
+        <tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;">
+          <span style="color:#1B4F9E;font-weight:600;">2.</span>
+          <span style="color:#334155;margin-left:8px;">Set your business hours under <strong>Availability</strong></span>
+        </td></tr>
+        <tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;">
+          <span style="color:#1B4F9E;font-weight:600;">3.</span>
+          <span style="color:#334155;margin-left:8px;">Share your booking page with clients</span>
+        </td></tr>
+        <tr><td style="padding:8px 0;">
+          <span style="color:#1B4F9E;font-weight:600;">4.</span>
+          <span style="color:#334155;margin-left:8px;">Create your first job or let clients book themselves</span>
+        </td></tr>
+      </table>
+      <p style="margin:0 0 8px;">
+        <a href="${bookingUrl}" style="color:#94a3b8;font-size:13px;">
+          📎 Your booking page: ${bookingUrl}
+        </a>
+      </p>
+      <a href="${dashboardUrl}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#1B4F9E;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">
+        Go to Dashboard →
+      </a>
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px;">
+        Questions? Just reply to this email — we're here to help.
+      </p>
+    `),
+  });
+}

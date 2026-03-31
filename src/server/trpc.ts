@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import type { MemberRole } from "@prisma/client";
 import { ROLE_HIERARCHY, hasRole } from "@/lib/roles";
+import "@/lib/env"; // validates required env vars on startup
 
 export { ROLE_HIERARCHY, hasRole };
 

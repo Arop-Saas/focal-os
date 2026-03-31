@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, workspaceProcedure, adminProcedure, ownerProcedure } from "../trpc";
 import { slugify } from "@/lib/utils";
+import { sendWelcomeEmail } from "@/lib/resend";
 
 export const workspaceRouter = router({
   // Get current workspace
@@ -95,6 +96,14 @@ export const workspaceRouter = router({
 
         return ws;
       });
+
+      // Send welcome email (non-blocking — don't fail signup if email errors)
+      sendWelcomeEmail({
+        to: ctx.user.email,
+        ownerName: ctx.user.fullName ?? ctx.user.email,
+        workspaceName: workspace.name,
+        workspaceSlug: workspace.slug,
+      }).catch((err) => console.error("[workspace.create] welcome email failed:", err));
 
       return workspace;
     }),

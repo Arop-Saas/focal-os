@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const SECRET = process.env.CRON_SECRET ?? "scalist-portal-secret";
+const SECRET = process.env.PORTAL_TOKEN_SECRET ?? process.env.CRON_SECRET;
+if (!SECRET) {
+  throw new Error(
+    "Missing PORTAL_TOKEN_SECRET environment variable. Generate one with: openssl rand -base64 32"
+  );
+}
 
 export interface PortalSession {
   clientId: string;
