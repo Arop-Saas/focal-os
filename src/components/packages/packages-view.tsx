@@ -533,16 +533,12 @@ export function PackagesView() {
                 {/* Left: form */}
                 <form id="service-form" onSubmit={handleCreateService} className="sm:col-span-3 p-6 space-y-4 border-r">
 
-                  {/* Name */}
+                  {/* Service Name + Category — merged */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Service Name <span className="text-red-500">*</span></label>
-                    <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="e.g. HDR Photography" disabled={isSubmitting} className="h-10" />
-                  </div>
-
-                  {/* Category — visual grid */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Service Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 mb-2.5">
                       {Object.entries(CATEGORY_META).map(([key, meta]) => {
                         const Icon = meta.icon;
                         const selected = serviceCategory === key;
@@ -550,7 +546,16 @@ export function PackagesView() {
                           <button
                             key={key}
                             type="button"
-                            onClick={() => setServiceCategory(key)}
+                            onClick={() => {
+                              setServiceCategory(key);
+                              // Auto-fill name if blank or still matches a category label
+                              const currentIsCategory = Object.values(CATEGORY_META).some(
+                                (m) => m.label === serviceName
+                              );
+                              if (!serviceName || currentIsCategory) {
+                                setServiceName(meta.label);
+                              }
+                            }}
                             className={cn(
                               "flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-xs font-medium transition-all",
                               selected
@@ -565,6 +570,7 @@ export function PackagesView() {
                         );
                       })}
                     </div>
+                    <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="or type a custom name…" disabled={isSubmitting} className="h-10" />
                   </div>
 
                   {/* Price + Duration */}
