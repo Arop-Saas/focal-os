@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, workspaceProcedure, adminProcedure, ownerProcedure } from "../trpc";
 import { slugify } from "@/lib/utils";
 import { sendWelcomeEmail } from "@/lib/resend";
+import { type BookingFormSettings, DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
 
 export const workspaceRouter = router({
   // Get current workspace
@@ -383,33 +384,6 @@ export const workspaceRouter = router({
     }),
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-export interface BookingFormSettings {
-  welcomeMessage?: string;
-  fields: {
-    propertyType: { visible: boolean; required: boolean };
-    sqft:         { visible: boolean; required: boolean };
-    beds:         { visible: boolean; required: boolean };
-    baths:        { visible: boolean; required: boolean };
-    mlsNumber:    { visible: boolean; required: boolean };
-    accessNotes:  { visible: boolean; required: boolean };
-    phone:        { visible: boolean; required: boolean };
-    company:      { visible: boolean; required: boolean };
-    clientNotes:  { visible: boolean; required: boolean };
-  };
-}
-
-export const DEFAULT_BOOKING_FORM_SETTINGS: BookingFormSettings = {
-  welcomeMessage: "",
-  fields: {
-    propertyType: { visible: true,  required: false },
-    sqft:         { visible: true,  required: false },
-    beds:         { visible: true,  required: false },
-    baths:        { visible: true,  required: false },
-    mlsNumber:    { visible: true,  required: false },
-    accessNotes:  { visible: true,  required: false },
-    phone:        { visible: true,  required: false },
-    company:      { visible: true,  required: false },
-    clientNotes:  { visible: true,  required: false },
-  },
-};
+// Re-export from shared types file so existing imports still work
+export type { BookingFormSettings } from "@/lib/booking-form-types";
+export { DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";

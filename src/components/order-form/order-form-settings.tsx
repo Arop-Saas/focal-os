@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/trpc/client";
 import { Loader2, Save, Eye, EyeOff, AlertCircle, CheckCircle2, ExternalLink } from "lucide-react";
-import { DEFAULT_BOOKING_FORM_SETTINGS, type BookingFormSettings } from "@/server/routers/workspace";
+import { DEFAULT_BOOKING_FORM_SETTINGS, type BookingFormSettings } from "@/lib/booking-form-types";
 
 type FieldKey = keyof BookingFormSettings["fields"];
 

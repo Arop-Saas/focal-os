@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
-import { type BookingFormSettings, DEFAULT_BOOKING_FORM_SETTINGS } from "@/server/routers/workspace";
+import { type BookingFormSettings, DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
