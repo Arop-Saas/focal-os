@@ -345,4 +345,68 @@ export const workspaceRouter = router({
     });
     return { ok: true };
   }),
+
+  // ─── Order Form Settings ───────────────────────────────────────────────────
+
+  getBookingFormSettings: workspaceProcedure.query(async ({ ctx }) => {
+    const ws = await ctx.prisma.workspace.findUnique({
+      where: { id: ctx.workspace.id },
+      select: { bookingFormSettings: true },
+    });
+    return { settings: (ws?.bookingFormSettings ?? null) as BookingFormSettings | null };
+  }),
+
+  saveBookingFormSettings: ownerProcedure
+    .input(z.object({
+      welcomeMessage: z.string().max(500).optional(),
+      fields: z.object({
+        propertyType: z.object({ visible: z.boolean(), required: z.boolean() }),
+        sqft:         z.object({ visible: z.boolean(), required: z.boolean() }),
+        beds:         z.object({ visible: z.boolean(), required: z.boolean() }),
+        baths:        z.object({ visible: z.boolean(), required: z.boolean() }),
+        mlsNumber:    z.object({ visible: z.boolean(), required: z.boolean() }),
+        accessNotes:  z.object({ visible: z.boolean(), required: z.boolean() }),
+        phone:        z.object({ visible: z.boolean(), required: z.boolean() }),
+        company:      z.object({ visible: z.boolean(), required: z.boolean() }),
+        clientNotes:  z.object({ visible: z.boolean(), required: z.boolean() }),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.workspace.update({
+        where: { id: ctx.workspace.id },
+        data: { bookingFormSettings: input },
+      });
+      return { ok: true };
+    }),
 });
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+export interface BookingFormSettings {
+  welcomeMessage?: string;
+  fields: {
+    propertyType: { visible: boolean; required: boolean };
+    sqft:         { visible: boolean; required: boolean };
+    beds:         { visible: boolean; required: boolean };
+    baths:        { visible: boolean; required: boolean };
+    mlsNumber:    { visible: boolean; required: boolean };
+    accessNotes:  { visible: boolean; required: boolean };
+    phone:        { visible: boolean; required: boolean };
+    company:      { visible: boolean; required: boolean };
+    clientNotes:  { visible: boolean; required: boolean };
+  };
+}
+
+export const DEFAULT_BOOKING_FORM_SETTINGS: BookingFormSettings = {
+  welcomeMessage: "",
+  fields: {
+    propertyType: { visible: true,  required: false },
+    sqft:         { visible: true,  required: false },
+    beds:         { visible: true,  required: false },
+    baths:        { visible: true,  required: false },
+    mlsNumber:    { visible: true,  required: false },
+    accessNotes:  { visible: true,  required: false },
+    phone:        { visible: true,  required: false },
+    company:      { visible: true,  required: false },
+    clientNotes:  { visible: true,  required: false },
+  },
+};

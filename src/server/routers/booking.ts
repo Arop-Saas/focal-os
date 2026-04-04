@@ -26,6 +26,7 @@ export const bookingRouter = router({
             select: { dayOfWeek: true, isOpen: true, openTime: true, closeTime: true },
             orderBy: { dayOfWeek: "asc" },
           },
+          bookingFormSettings: true,
         },
       });
 

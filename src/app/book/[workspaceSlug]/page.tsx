@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
+import { type BookingFormSettings, DEFAULT_BOOKING_FORM_SETTINGS } from "@/server/routers/workspace";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -299,8 +300,17 @@ function Select({
 
 // ─── Step 1: Property ─────────────────────────────────────────────────────────
 
-function Step1Property({ form, setForm }: { form: FormData; setForm: (f: FormData) => void }) {
+function Step1Property({
+  form,
+  setForm,
+  settings,
+}: {
+  form: FormData;
+  setForm: (f: FormData) => void;
+  settings: BookingFormSettings;
+}) {
   const set = (key: keyof FormData) => (v: string) => setForm({ ...form, [key]: v });
+  const f = settings.fields;
   return (
     <div className="space-y-4">
       <div>
@@ -342,32 +352,47 @@ function Step1Property({ form, setForm }: { form: FormData; setForm: (f: FormDat
           </Field>
         </div>
       </div>
-      <Field label="Property Type">
-        <Select value={form.propertyType} onChange={set("propertyType")} options={PROPERTY_TYPES} />
-      </Field>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Sq Ft">
-          <Input value={form.squareFootage} onChange={set("squareFootage")} placeholder="2,400" type="number" />
+      {f.propertyType.visible && (
+        <Field label="Property Type" required={f.propertyType.required}>
+          <Select value={form.propertyType} onChange={set("propertyType")} options={PROPERTY_TYPES} />
         </Field>
-        <Field label="Beds">
-          <Input value={form.bedrooms} onChange={set("bedrooms")} placeholder="3" type="number" />
+      )}
+      {(f.sqft.visible || f.beds.visible || f.baths.visible) && (
+        <div className="grid grid-cols-3 gap-3">
+          {f.sqft.visible && (
+            <Field label="Sq Ft" required={f.sqft.required}>
+              <Input value={form.squareFootage} onChange={set("squareFootage")} placeholder="2,400" type="number" required={f.sqft.required} />
+            </Field>
+          )}
+          {f.beds.visible && (
+            <Field label="Beds" required={f.beds.required}>
+              <Input value={form.bedrooms} onChange={set("bedrooms")} placeholder="3" type="number" required={f.beds.required} />
+            </Field>
+          )}
+          {f.baths.visible && (
+            <Field label="Baths" required={f.baths.required}>
+              <Input value={form.bathrooms} onChange={set("bathrooms")} placeholder="2" type="number" required={f.baths.required} />
+            </Field>
+          )}
+        </div>
+      )}
+      {f.mlsNumber.visible && (
+        <Field label="MLS #" required={f.mlsNumber.required}>
+          <Input value={form.mlsNumber} onChange={set("mlsNumber")} placeholder="Optional" required={f.mlsNumber.required} />
         </Field>
-        <Field label="Baths">
-          <Input value={form.bathrooms} onChange={set("bathrooms")} placeholder="2" type="number" />
+      )}
+      {f.accessNotes.visible && (
+        <Field label="Access Notes" hint="Lock box codes, gate codes, or special instructions for the photographer." required={f.accessNotes.required}>
+          <textarea
+            value={form.accessNotes}
+            onChange={(e) => set("accessNotes")(e.target.value)}
+            placeholder="e.g., Lock box on front door, code 1234. Dog-friendly yard."
+            rows={3}
+            required={f.accessNotes.required}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
         </Field>
-      </div>
-      <Field label="MLS #">
-        <Input value={form.mlsNumber} onChange={set("mlsNumber")} placeholder="Optional" />
-      </Field>
-      <Field label="Access Notes" hint="Lock box codes, gate codes, or special instructions for the photographer.">
-        <textarea
-          value={form.accessNotes}
-          onChange={(e) => set("accessNotes")(e.target.value)}
-          placeholder="e.g., Lock box on front door, code 1234. Dog-friendly yard."
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-        />
-      </Field>
+      )}
     </div>
   );
 }
@@ -841,8 +866,17 @@ function Step3DateTime({
 
 // ─── Step 4: Contact Info ─────────────────────────────────────────────────────
 
-function Step4Contact({ form, setForm }: { form: FormData; setForm: (f: FormData) => void }) {
+function Step4Contact({
+  form,
+  setForm,
+  settings,
+}: {
+  form: FormData;
+  setForm: (f: FormData) => void;
+  settings: BookingFormSettings;
+}) {
   const set = (key: keyof FormData) => (v: string) => setForm({ ...form, [key]: v });
+  const f = settings.fields;
   return (
     <div className="space-y-4">
       <div>
@@ -861,21 +895,28 @@ function Step4Contact({ form, setForm }: { form: FormData; setForm: (f: FormData
       <Field label="Email" required>
         <Input value={form.email} onChange={set("email")} placeholder="jane@realty.com" type="email" required />
       </Field>
-      <Field label="Phone">
-        <Input value={form.phone} onChange={set("phone")} placeholder="(512) 555-0100" type="tel" />
-      </Field>
-      <Field label="Company / Brokerage">
-        <Input value={form.company} onChange={set("company")} placeholder="Austin Premier Realty" />
-      </Field>
-      <Field label="Notes for us" hint="Anything specific you'd like us to know about the shoot.">
-        <textarea
-          value={form.clientNotes}
-          onChange={(e) => set("clientNotes")(e.target.value)}
-          placeholder="e.g., Please focus on the backyard pool. The kitchen was just renovated."
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-        />
-      </Field>
+      {f.phone.visible && (
+        <Field label="Phone" required={f.phone.required}>
+          <Input value={form.phone} onChange={set("phone")} placeholder="(512) 555-0100" type="tel" required={f.phone.required} />
+        </Field>
+      )}
+      {f.company.visible && (
+        <Field label="Company / Brokerage" required={f.company.required}>
+          <Input value={form.company} onChange={set("company")} placeholder="Austin Premier Realty" required={f.company.required} />
+        </Field>
+      )}
+      {f.clientNotes.visible && (
+        <Field label="Notes for us" hint="Anything specific you'd like us to know about the shoot." required={f.clientNotes.required}>
+          <textarea
+            value={form.clientNotes}
+            onChange={(e) => set("clientNotes")(e.target.value)}
+            placeholder="e.g., Please focus on the backyard pool. The kitchen was just renovated."
+            rows={3}
+            required={f.clientNotes.required}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+        </Field>
+      )}
     </div>
   );
 }
@@ -1089,6 +1130,10 @@ export default function BookingPage() {
 
   const { workspace, packages, services } = data;
   const brandColor = workspace.brandColor ?? "#1B4F9E";
+  // Merge saved bookingFormSettings with defaults so all fields always have a config
+  const formSettings: BookingFormSettings = workspace.bookingFormSettings
+    ? { ...DEFAULT_BOOKING_FORM_SETTINGS, ...(workspace.bookingFormSettings as BookingFormSettings), fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...((workspace.bookingFormSettings as BookingFormSettings).fields ?? {}) } }
+    : DEFAULT_BOOKING_FORM_SETTINGS;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1119,12 +1164,12 @@ export default function BookingPage() {
         <StepIndicator current={step} total={5} brandColor={brandColor} />
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-          {step === 1 && <Step1Property form={form} setForm={setForm} />}
+          {step === 1 && <Step1Property form={form} setForm={setForm} settings={formSettings} />}
           {step === 2 && <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} />}
           {step === 3 && (
             <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} />
           )}
-          {step === 4 && <Step4Contact form={form} setForm={setForm} />}
+          {step === 4 && <Step4Contact form={form} setForm={setForm} settings={formSettings} />}
           {step === 5 && <Step5Review form={form} packages={packages} services={services ?? []} photographers={reviewPhotographers} />}
 
           {error && (

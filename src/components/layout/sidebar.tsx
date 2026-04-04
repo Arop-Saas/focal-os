@@ -23,6 +23,7 @@ import {
   MessageCircle,
   Puzzle,
   Route,
+  ClipboardList,
 } from "lucide-react";
 import { MessagesUnreadBadge } from "@/components/messages/messages-unread-badge";
 import { HelpButton } from "./help-button";
@@ -59,6 +60,7 @@ const navGroups = [
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Listings", href: "/gallery", icon: Image },
       { label: "Availability", href: "/availability", icon: Clock },
+      { label: "Order Form", href: "/order-form", icon: ClipboardList },
       { label: "Integrations", href: "/integrations", icon: Puzzle },
     ],
   },

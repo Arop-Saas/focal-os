@@ -63,6 +63,7 @@ model Workspace {
   autoCreateInvoice     Boolean  @default(false)
   invoiceDueDays        Int      @default(30)
   lockDownloads         Boolean  @default(false)
+  bookingFormSettings   Json?    // Serialized BookingFormSettings object
 
   // Relations
   members          WorkspaceMember[]
