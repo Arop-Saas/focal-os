@@ -351,9 +351,12 @@ export const workspaceRouter = router({
   getBookingFormSettings: workspaceProcedure.query(async ({ ctx }) => {
     const ws = await ctx.prisma.workspace.findUnique({
       where: { id: ctx.workspace.id },
-      select: { bookingFormSettings: true },
+      select: { bookingFormSettings: true, slug: true },
     });
-    return { settings: (ws?.bookingFormSettings ?? null) as BookingFormSettings | null };
+    return {
+      settings: (ws?.bookingFormSettings ?? null) as BookingFormSettings | null,
+      slug: ws?.slug ?? "",
+    };
   }),
 
   saveBookingFormSettings: ownerProcedure

@@ -39,7 +39,7 @@ function deepMerge(defaults: BookingFormSettings, saved: Partial<BookingFormSett
   };
 }
 
-export function OrderFormSettings({ workspaceSlug }: { workspaceSlug: string }) {
+export function OrderFormSettings() {
   const { data, isLoading } = api.workspace.getBookingFormSettings.useQuery();
   const saveMutation = api.workspace.saveBookingFormSettings.useMutation();
 
@@ -74,7 +74,7 @@ export function OrderFormSettings({ workspaceSlug }: { workspaceSlug: string }) 
     setTimeout(() => setSaved(false), 3000);
   }
 
-  const bookingUrl = `https://www.scalist.io/book/${workspaceSlug}`;
+  const bookingUrl = `https://www.scalist.io/book/${data?.slug ?? ""}`;
 
   const propertyFields = FIELD_CONFIGS.filter((f) => f.section === "property");
   const contactFields  = FIELD_CONFIGS.filter((f) => f.section === "contact");
