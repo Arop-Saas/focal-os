@@ -1,17 +1,17 @@
 import { Header } from "@/components/layout/header";
-import { OrderFormSettings } from "@/components/order-form/order-form-settings";
+import { OrderFormList } from "@/components/order-form/order-form-list";
 
-export const metadata = { title: "Order Form" };
+export const metadata = { title: "Order Forms" };
 
-export default function OrderFormPage() {
+export default function OrderFormsPage() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header
-        title="Order Form"
-        description="Customize the fields shown on your client-facing booking page"
+        title="Order Forms"
+        description="Create and manage client-facing booking forms"
       />
       <div className="flex-1 overflow-y-auto p-6">
-        <OrderFormSettings />
+        <OrderFormList />
       </div>
     </div>
   );

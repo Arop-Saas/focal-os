@@ -82,11 +82,45 @@ model Workspace {
   territories      ServiceTerritory[]
   brokerageGroups  BrokerageGroup[]
   customerTeams    CustomerTeam[]
+  orderForms       OrderForm[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([slug])
+}
+
+// ─────────────────────────────────────────────────────────────
+// ORDER FORMS
+// ─────────────────────────────────────────────────────────────
+
+model OrderForm {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  title           String
+  isPublic        Boolean @default(true)
+  welcomeMessage  String?
+
+  // Field visibility (mirrors BookingFormSettings.fields)
+  fieldSettings   Json?
+
+  // Scheduling
+  confirmationMode    String  @default("IMMEDIATE")   // IMMEDIATE | MANUAL
+  assignmentStrategy  String  @default("ROUND_ROBIN") // ROUND_ROBIN | CLOSEST | PRIORITY | AUTO
+  allowCustomerChoice Boolean @default(false)
+  timeSlotInterval    Int     @default(30)             // minutes
+
+  // Payment
+  paymentMode    String @default("NONE")  // NONE | FULL | PARTIAL
+  depositPercent Int?                     // e.g. 25 = 25% deposit
+
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
 enum SubscriptionStatus {

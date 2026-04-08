@@ -10,7 +10,7 @@ import { notifyJobBooked } from "@/lib/notify";
 export const bookingRouter = router({
   // Fetch workspace info + active packages for the booking form
   getWorkspaceInfo: publicProcedure
-    .input(z.object({ slug: z.string() }))
+    .input(z.object({ slug: z.string(), formId: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const workspace = await ctx.prisma.workspace.findUnique({
         where: { slug: input.slug },
@@ -34,6 +34,26 @@ export const bookingRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Booking page not found." });
       }
 
+      // If a specific order form was requested, load its settings
+      let orderForm = null;
+      if (input.formId) {
+        orderForm = await ctx.prisma.orderForm.findFirst({
+          where: { id: input.formId, workspaceId: workspace.id, isPublic: true },
+          select: {
+            id: true,
+            title: true,
+            welcomeMessage: true,
+            fieldSettings: true,
+            confirmationMode: true,
+            assignmentStrategy: true,
+            allowCustomerChoice: true,
+            timeSlotInterval: true,
+            paymentMode: true,
+            depositPercent: true,
+          },
+        });
+      }
+
       const packages = await ctx.prisma.package.findMany({
         where: { workspaceId: workspace.id, isActive: true },
         include: {
@@ -50,7 +70,7 @@ export const bookingRouter = router({
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       });
 
-      return { workspace, packages, services };
+      return { workspace, orderForm, packages, services };
     }),
 
   // Get available photographers for a given date

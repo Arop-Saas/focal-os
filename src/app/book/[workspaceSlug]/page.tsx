@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
@@ -1011,14 +1011,16 @@ function Step5Review({
 export default function BookingPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const workspaceSlug = params?.workspaceSlug as string;
+  const formId = searchParams.get("form") ?? undefined;
 
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(initialForm);
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading, isError } = trpc.booking.getWorkspaceInfo.useQuery(
-    { slug: workspaceSlug },
+    { slug: workspaceSlug, formId },
     { enabled: !!workspaceSlug }
   );
 
@@ -1130,9 +1132,10 @@ export default function BookingPage() {
 
   const { workspace, packages, services } = data;
   const brandColor = workspace.brandColor ?? "#1B4F9E";
-  // Merge saved bookingFormSettings with defaults so all fields always have a config
-  const formSettings: BookingFormSettings = workspace.bookingFormSettings
-    ? { ...DEFAULT_BOOKING_FORM_SETTINGS, ...(workspace.bookingFormSettings as BookingFormSettings), fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...((workspace.bookingFormSettings as BookingFormSettings).fields ?? {}) } }
+  // Prefer per-form field settings (when ?form= is set), fall back to workspace-level settings
+  const rawSettings = data?.orderForm?.fieldSettings ?? workspace.bookingFormSettings;
+  const formSettings: BookingFormSettings = rawSettings
+    ? { ...DEFAULT_BOOKING_FORM_SETTINGS, ...(rawSettings as BookingFormSettings), fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...((rawSettings as BookingFormSettings).fields ?? {}) } }
     : DEFAULT_BOOKING_FORM_SETTINGS;
 
   return (

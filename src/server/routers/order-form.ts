@@ -1,0 +1,128 @@
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { router, workspaceProcedure, ownerProcedure } from "../trpc";
+import { DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
+
+const fieldSettingsSchema = z.object({
+  propertyType: z.object({ visible: z.boolean(), required: z.boolean() }),
+  sqft:         z.object({ visible: z.boolean(), required: z.boolean() }),
+  beds:         z.object({ visible: z.boolean(), required: z.boolean() }),
+  baths:        z.object({ visible: z.boolean(), required: z.boolean() }),
+  mlsNumber:    z.object({ visible: z.boolean(), required: z.boolean() }),
+  accessNotes:  z.object({ visible: z.boolean(), required: z.boolean() }),
+  phone:        z.object({ visible: z.boolean(), required: z.boolean() }),
+  company:      z.object({ visible: z.boolean(), required: z.boolean() }),
+  clientNotes:  z.object({ visible: z.boolean(), required: z.boolean() }),
+}).optional();
+
+export const orderFormRouter = router({
+
+  // ─── List all order forms for workspace ─────────────────────────────────────
+  list: workspaceProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.orderForm.findMany({
+      where: { workspaceId: ctx.workspace.id },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+  }),
+
+  // ─── Get a single order form ─────────────────────────────────────────────────
+  get: workspaceProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const form = await ctx.prisma.orderForm.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspace.id },
+      });
+      if (!form) throw new TRPCError({ code: "NOT_FOUND" });
+      return form;
+    }),
+
+  // ─── Create ──────────────────────────────────────────────────────────────────
+  create: ownerProcedure
+    .input(z.object({ title: z.string().min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      const count = await ctx.prisma.orderForm.count({
+        where: { workspaceId: ctx.workspace.id },
+      });
+      return ctx.prisma.orderForm.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          title: input.title,
+          fieldSettings: DEFAULT_BOOKING_FORM_SETTINGS.fields,
+          sortOrder: count,
+        },
+      });
+    }),
+
+  // ─── Update general settings ─────────────────────────────────────────────────
+  updateGeneral: ownerProcedure
+    .input(z.object({
+      id:             z.string(),
+      title:          z.string().min(1).max(100).optional(),
+      welcomeMessage: z.string().max(500).optional(),
+      isPublic:       z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      await assertOwns(ctx, id);
+      return ctx.prisma.orderForm.update({ where: { id }, data });
+    }),
+
+  // ─── Update field visibility ──────────────────────────────────────────────────
+  updateFields: ownerProcedure
+    .input(z.object({ id: z.string(), fieldSettings: fieldSettingsSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwns(ctx, input.id);
+      return ctx.prisma.orderForm.update({
+        where: { id: input.id },
+        data: { fieldSettings: input.fieldSettings },
+      });
+    }),
+
+  // ─── Update scheduling settings ───────────────────────────────────────────────
+  updateScheduling: ownerProcedure
+    .input(z.object({
+      id:                  z.string(),
+      confirmationMode:    z.enum(["IMMEDIATE", "MANUAL"]).optional(),
+      assignmentStrategy:  z.enum(["ROUND_ROBIN", "CLOSEST", "PRIORITY", "AUTO"]).optional(),
+      allowCustomerChoice: z.boolean().optional(),
+      timeSlotInterval:    z.number().int().min(15).max(120).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      await assertOwns(ctx, id);
+      return ctx.prisma.orderForm.update({ where: { id }, data });
+    }),
+
+  // ─── Update payment settings ──────────────────────────────────────────────────
+  updatePayment: ownerProcedure
+    .input(z.object({
+      id:            z.string(),
+      paymentMode:   z.enum(["NONE", "FULL", "PARTIAL"]),
+      depositPercent: z.number().int().min(1).max(99).optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      await assertOwns(ctx, id);
+      return ctx.prisma.orderForm.update({ where: { id }, data });
+    }),
+
+  // ─── Delete ───────────────────────────────────────────────────────────────────
+  delete: ownerProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwns(ctx, input.id);
+      await ctx.prisma.orderForm.delete({ where: { id: input.id } });
+      return { ok: true };
+    }),
+});
+
+async function assertOwns(
+  ctx: { prisma: typeof import("@/lib/prisma").default; workspace: { id: string } },
+  formId: string
+) {
+  const form = await ctx.prisma.orderForm.findFirst({
+    where: { id: formId, workspaceId: ctx.workspace.id },
+    select: { id: true },
+  });
+  if (!form) throw new TRPCError({ code: "NOT_FOUND" });
+}

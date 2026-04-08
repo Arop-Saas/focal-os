@@ -16,6 +16,7 @@ import { checklistRouter } from "./checklist";
 import { brokeragesRouter } from "./brokerages";
 import { teamsRouter } from "./teams";
 import { mobileRouter } from "./mobile";
+import { orderFormRouter } from "./order-form";
 
 export const appRouter = router({
   workspace: workspaceRouter,
@@ -35,6 +36,7 @@ export const appRouter = router({
   brokerages: brokeragesRouter,
   teams: teamsRouter,
   mobile: mobileRouter,
+  orderForm: orderFormRouter,
 });
 
 export type AppRouter = typeof appRouter;
