@@ -138,6 +138,30 @@ export const orderFormRouter = router({
       return ctx.prisma.orderForm.update({ where: { id }, data });
     }),
 
+  // ─── Update custom fields ──────────────────────────────────────────────────────
+  updateCustomFields: ownerProcedure
+    .input(z.object({
+      id: z.string(),
+      customFields: z.array(z.object({
+        id:          z.string(),
+        type:        z.enum(["text", "textarea", "dropdown", "checkbox", "select", "multiselect", "description", "number", "date"]),
+        label:       z.string().min(1).max(200),
+        placeholder: z.string().max(200).optional(),
+        helpText:    z.string().max(500).optional(),
+        required:    z.boolean(),
+        options:     z.array(z.string().max(200)).max(50).optional(),
+        step:        z.number().int().min(1).max(5),
+        sortOrder:   z.number().int(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwns(ctx, input.id);
+      return ctx.prisma.orderForm.update({
+        where: { id: input.id },
+        data: { customFields: input.customFields },
+      });
+    }),
+
   // ─── Delete ───────────────────────────────────────────────────────────────────
   delete: ownerProcedure
     .input(z.object({ id: z.string() }))

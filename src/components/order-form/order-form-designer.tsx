@@ -10,7 +10,8 @@ import {
   Settings2, Eye, MapPin, ShoppingBag, CalendarClock, UserCircle,
   CheckSquare, Zap,
 } from "lucide-react";
-import { DEFAULT_BOOKING_FORM_SETTINGS, type BookingFormSettings } from "@/lib/booking-form-types";
+import { DEFAULT_BOOKING_FORM_SETTINGS, type BookingFormSettings, type CustomField } from "@/lib/booking-form-types";
+import { CustomFieldBuilder } from "./custom-field-builder";
 
 type FieldKey = keyof BookingFormSettings["fields"];
 type PreviewSize = "mobile" | "tablet" | "desktop";
@@ -110,7 +111,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const updateScheduling = api.orderForm.updateScheduling.useMutation();
   const updatePayment    = api.orderForm.updatePayment.useMutation();
   const updateAppearance = api.orderForm.updateAppearance.useMutation();
-  const updateSeo        = api.orderForm.updateSeo.useMutation();
+  const updateSeo          = api.orderForm.updateSeo.useMutation();
+  const updateCustomFields = api.orderForm.updateCustomFields.useMutation();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<SidebarSection>("general");
@@ -155,6 +157,10 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const [savedPayment, setSavedPayment]       = useState(false);
   const [savedAppearance, setSavedAppearance] = useState(false);
   const [savedSeo, setSavedSeo]               = useState(false);
+  const [savedCustom, setSavedCustom]         = useState(false);
+
+  // Custom fields
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
   // ── Populate ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -178,6 +184,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setSeoTitle((form as any).seoTitle ?? "");
     setSeoDesc((form as any).seoDescription ?? "");
     setSeoImage((form as any).seoImage ?? "");
+    setCustomFields(((form as any).customFields as CustomField[]) ?? []);
     if (form.fieldSettings) {
       setFields({ ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...(form.fieldSettings as BookingFormSettings["fields"]) });
     }
@@ -254,6 +261,30 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     await updateSeo.mutateAsync({ id: formId, seoTitle: seoTitle || null, seoDescription: seoDesc || null, seoImage: seoImage || null });
     setSavedSeo(true);
     setTimeout(() => setSavedSeo(false), 3000);
+  }
+  async function saveCustomFields() {
+    await updateCustomFields.mutateAsync({ id: formId, customFields });
+    setSavedCustom(true); refreshPreview();
+    setTimeout(() => setSavedCustom(false), 3000);
+  }
+
+  // ── Live sync: send state to iframe whenever fields/customFields change ───
+  const sendLiveUpdate = useCallback(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: "DESIGNER_LIVE_UPDATE",
+        fieldSettings: fields,
+        customFields,
+      }, "*");
+    }
+  }, [fields, customFields]);
+
+  useEffect(() => { sendLiveUpdate(); }, [sendLiveUpdate]);
+
+  // Helper for custom fields onChange — mark dirty + trigger live update
+  function handleCustomFieldsChange(updated: CustomField[]) {
+    setCustomFields(updated);
+    setSavedCustom(false);
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -375,26 +406,36 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           )}
 
           {activeSection === "step-1" && (
-            <Panel title="Step 1 — Address" desc="Which property fields are shown">
+            <Panel title="Step 1 — Address" desc="Built-in property fields and custom fields">
               <FieldTable fields={PROPERTY_FIELDS} values={fields} onToggle={setField} />
               <SaveBar><SavePill loading={updateFields.isPending} saved={savedFields} onClick={saveFields} /></SaveBar>
+              <Divider label="Custom Fields" />
+              <CustomFieldBuilder step={1} fields={customFields} onChange={handleCustomFieldsChange} />
+              {customFields.some((f) => f.step === 1) && (
+                <SaveBar><SavePill loading={updateCustomFields.isPending} saved={savedCustom} onClick={saveCustomFields} /></SaveBar>
+              )}
             </Panel>
           )}
 
           {activeSection === "step-2" && (
-            <Panel title="Step 2 — Services" desc="Packages and add-ons">
+            <Panel title="Step 2 — Services" desc="Packages, add-ons, and custom fields">
               <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4">
                 <p className="text-sm text-blue-800 font-medium">Products are managed separately</p>
-                <p className="text-xs text-blue-600 mt-1">Active packages and services automatically appear on the booking form.</p>
+                <p className="text-xs text-blue-600 mt-1">Active packages and services appear automatically.</p>
                 <button onClick={() => router.push("/products")} className="mt-3 text-xs font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2">
                   Go to Products &rarr;
                 </button>
               </div>
+              <Divider label="Custom Fields" />
+              <CustomFieldBuilder step={2} fields={customFields} onChange={handleCustomFieldsChange} />
+              {customFields.some((f) => f.step === 2) && (
+                <SaveBar><SavePill loading={updateCustomFields.isPending} saved={savedCustom} onClick={saveCustomFields} /></SaveBar>
+              )}
             </Panel>
           )}
 
           {activeSection === "step-3" && (
-            <Panel title="Step 3 — Scheduling" desc="Time slots and photographer selection">
+            <Panel title="Step 3 — Scheduling" desc="Time slots, photographer selection, and custom fields">
               <div>
                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Time Slot Interval</label>
                 <select value={slotInterval} onChange={(e) => { setSlotInterval(Number(e.target.value)); setSavedScheduling(false); }}
@@ -408,21 +449,36 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               </div>
               <ToggleRow label="Photographer Choice" desc="Let clients pick their photographer" value={allowChoice} onChange={(v) => { setAllowChoice(v); setSavedScheduling(false); }} />
               <SaveBar><SavePill loading={updateScheduling.isPending} saved={savedScheduling} onClick={saveScheduling} /></SaveBar>
+              <Divider label="Custom Fields" />
+              <CustomFieldBuilder step={3} fields={customFields} onChange={handleCustomFieldsChange} />
+              {customFields.some((f) => f.step === 3) && (
+                <SaveBar><SavePill loading={updateCustomFields.isPending} saved={savedCustom} onClick={saveCustomFields} /></SaveBar>
+              )}
             </Panel>
           )}
 
           {activeSection === "step-4" && (
-            <Panel title="Step 4 — Contact" desc="Client info fields">
+            <Panel title="Step 4 — Contact" desc="Client info and custom fields">
               <FieldTable fields={CONTACT_FIELDS} values={fields} onToggle={setField} />
               <SaveBar><SavePill loading={updateFields.isPending} saved={savedFields} onClick={saveFields} /></SaveBar>
+              <Divider label="Custom Fields" />
+              <CustomFieldBuilder step={4} fields={customFields} onChange={handleCustomFieldsChange} />
+              {customFields.some((f) => f.step === 4) && (
+                <SaveBar><SavePill loading={updateCustomFields.isPending} saved={savedCustom} onClick={saveCustomFields} /></SaveBar>
+              )}
             </Panel>
           )}
 
           {activeSection === "step-5" && (
-            <Panel title="Step 5 — Confirmation" desc="Order review before submission">
+            <Panel title="Step 5 — Confirmation" desc="Review and any final custom fields">
               <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
-                <p className="text-sm text-gray-600">Clients review their full order here before booking. No extra configuration needed.</p>
+                <p className="text-sm text-gray-600">Clients review their full order here before booking.</p>
               </div>
+              <Divider label="Custom Fields" />
+              <CustomFieldBuilder step={5} fields={customFields} onChange={handleCustomFieldsChange} />
+              {customFields.some((f) => f.step === 5) && (
+                <SaveBar><SavePill loading={updateCustomFields.isPending} saved={savedCustom} onClick={saveCustomFields} /></SaveBar>
+              )}
             </Panel>
           )}
 
@@ -661,6 +717,16 @@ function RadioCard({ selected, onClick, label, desc }: { selected: boolean; onCl
 
 function SaveBar({ children }: { children: React.ReactNode }) {
   return <div className="flex justify-end pt-4 mt-4 border-t border-gray-100">{children}</div>;
+}
+
+function Divider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-4 mt-2">
+      <div className="flex-1 h-px bg-gray-200" />
+      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</span>
+      <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  );
 }
 
 function FieldTable({ fields, values, onToggle }: {

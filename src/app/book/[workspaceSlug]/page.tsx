@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
-import { type BookingFormSettings, DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
+import { type BookingFormSettings, type CustomField, DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -921,6 +921,163 @@ function Step4Contact({
   );
 }
 
+// ─── Custom Fields Renderer ──────────────────────────────────────────────────
+
+function CustomFieldsRenderer({
+  step,
+  fields,
+  values,
+  onChange,
+}: {
+  step: number;
+  fields: CustomField[];
+  values: Record<string, string | string[] | boolean>;
+  onChange: (v: Record<string, string | string[] | boolean>) => void;
+}) {
+  const stepFields = fields
+    .filter((f) => f.step === step)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  if (stepFields.length === 0) return null;
+
+  const setValue = (id: string, val: string | string[] | boolean) => {
+    onChange({ ...values, [id]: val });
+  };
+
+  return (
+    <div className="space-y-4 mt-6 pt-6 border-t border-gray-100">
+      {stepFields.map((field) => {
+        const val = values[field.id];
+
+        // Description — read-only text block
+        if (field.type === "description") {
+          return (
+            <div key={field.id} className="rounded-lg bg-blue-50 border border-blue-100 p-4">
+              <p className="text-sm text-blue-800 whitespace-pre-wrap">{field.helpText || field.label}</p>
+            </div>
+          );
+        }
+
+        // Checkbox
+        if (field.type === "checkbox") {
+          return (
+            <label key={field.id} className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={!!val}
+                onChange={(e) => setValue(field.id, e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                  {field.label}
+                  {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                </span>
+                {field.helpText && <p className="text-xs text-gray-400 mt-0.5">{field.helpText}</p>}
+              </div>
+            </label>
+          );
+        }
+
+        // All other fields wrapped in Field component
+        return (
+          <Field key={field.id} label={field.label} required={field.required} hint={field.helpText || undefined}>
+            {field.type === "text" && (
+              <Input
+                value={(val as string) ?? ""}
+                onChange={(v) => setValue(field.id, v)}
+                placeholder={field.placeholder}
+                required={field.required}
+              />
+            )}
+            {field.type === "number" && (
+              <Input
+                value={(val as string) ?? ""}
+                onChange={(v) => setValue(field.id, v)}
+                placeholder={field.placeholder}
+                type="number"
+                required={field.required}
+              />
+            )}
+            {field.type === "date" && (
+              <Input
+                value={(val as string) ?? ""}
+                onChange={(v) => setValue(field.id, v)}
+                type="date"
+                required={field.required}
+              />
+            )}
+            {field.type === "textarea" && (
+              <textarea
+                value={(val as string) ?? ""}
+                onChange={(e) => setValue(field.id, e.target.value)}
+                placeholder={field.placeholder}
+                rows={3}
+                required={field.required}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            )}
+            {field.type === "dropdown" && (
+              <select
+                value={(val as string) ?? ""}
+                onChange={(e) => setValue(field.id, e.target.value)}
+                required={field.required}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">{field.placeholder || "Select..."}</option>
+                {(field.options ?? []).map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            )}
+            {field.type === "select" && (
+              <div className="space-y-2">
+                {(field.options ?? []).map((opt) => (
+                  <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={field.id}
+                      value={opt}
+                      checked={val === opt}
+                      onChange={() => setValue(field.id, opt)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">{opt}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {field.type === "multiselect" && (
+              <div className="space-y-2">
+                {(field.options ?? []).map((opt) => {
+                  const selected = Array.isArray(val) ? val : [];
+                  const checked = selected.includes(opt);
+                  return (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const next = checked
+                            ? selected.filter((v) => v !== opt)
+                            : [...selected, opt];
+                          setValue(field.id, next);
+                        }}
+                        className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{opt}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </Field>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Step 5: Review ───────────────────────────────────────────────────────────
 
 function Step5Review({
@@ -1019,12 +1176,21 @@ export default function BookingPage() {
   const [form, setForm] = useState<FormData>(initialForm);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Listen for designer postMessage to jump to a step ─────────────────────
+  // ── Live designer state (overrides from postMessage) ─────────────────────
+  const [liveFieldSettings, setLiveFieldSettings] = useState<BookingFormSettings["fields"] | null>(null);
+  const [liveCustomFields, setLiveCustomFields] = useState<CustomField[] | null>(null);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
+
+  // ── Listen for designer postMessages ─────────────────────────────────────
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
       if (e.data?.type === "DESIGNER_SET_STEP" && typeof e.data.step === "number") {
         const s = e.data.step as Step;
         if (s >= 1 && s <= 5) setStep(s);
+      }
+      if (e.data?.type === "DESIGNER_LIVE_UPDATE") {
+        if (e.data.fieldSettings) setLiveFieldSettings(e.data.fieldSettings);
+        if (e.data.customFields) setLiveCustomFields(e.data.customFields);
       }
     }
     window.addEventListener("message", handleMessage);
@@ -1146,9 +1312,17 @@ export default function BookingPage() {
   const brandColor = workspace.brandColor ?? "#1B4F9E";
   // Prefer per-form field settings (when ?form= is set), fall back to workspace-level settings
   const rawSettings = data?.orderForm?.fieldSettings ?? workspace.bookingFormSettings;
-  const formSettings: BookingFormSettings = rawSettings
+  const baseSettings: BookingFormSettings = rawSettings
     ? { ...DEFAULT_BOOKING_FORM_SETTINGS, ...(rawSettings as BookingFormSettings), fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...((rawSettings as BookingFormSettings).fields ?? {}) } }
     : DEFAULT_BOOKING_FORM_SETTINGS;
+  // Live designer overrides field settings in real-time
+  const formSettings: BookingFormSettings = liveFieldSettings
+    ? { ...baseSettings, fields: liveFieldSettings }
+    : baseSettings;
+  // Custom fields: live override > saved on form > empty
+  const customFields: CustomField[] = liveCustomFields
+    ?? ((data?.orderForm as any)?.customFields as CustomField[] | undefined)
+    ?? [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1179,13 +1353,36 @@ export default function BookingPage() {
         <StepIndicator current={step} total={5} brandColor={brandColor} />
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-          {step === 1 && <Step1Property form={form} setForm={setForm} settings={formSettings} />}
-          {step === 2 && <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} />}
-          {step === 3 && (
-            <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} />
+          {step === 1 && (
+            <>
+              <Step1Property form={form} setForm={setForm} settings={formSettings} />
+              <CustomFieldsRenderer step={1} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
+            </>
           )}
-          {step === 4 && <Step4Contact form={form} setForm={setForm} settings={formSettings} />}
-          {step === 5 && <Step5Review form={form} packages={packages} services={services ?? []} photographers={reviewPhotographers} />}
+          {step === 2 && (
+            <>
+              <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} />
+              <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
+            </>
+          )}
+          {step === 3 && (
+            <>
+              <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} />
+              <CustomFieldsRenderer step={3} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
+            </>
+          )}
+          {step === 4 && (
+            <>
+              <Step4Contact form={form} setForm={setForm} settings={formSettings} />
+              <CustomFieldsRenderer step={4} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
+            </>
+          )}
+          {step === 5 && (
+            <>
+              <Step5Review form={form} packages={packages} services={services ?? []} photographers={reviewPhotographers} />
+              <CustomFieldsRenderer step={5} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
+            </>
+          )}
 
           {error && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">

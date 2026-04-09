@@ -125,6 +125,9 @@ model OrderForm {
   showLogo        Boolean @default(true)
   showStepNumbers Boolean @default(true)
 
+  // ── Custom Fields ──────────────────────────────────────────────────────────
+  customFields    Json?    // Array of CustomField objects (see booking-form-types.ts)
+
   // ── SEO ───────────────────────────────────────────────────────────────────
   seoTitle        String?
   seoDescription  String?
