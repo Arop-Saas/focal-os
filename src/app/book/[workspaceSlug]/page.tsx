@@ -397,137 +397,215 @@ function Step1Property({
   );
 }
 
-// ─── Step 2: Package / À la carte (Premium Redesign) ──────────────────────────
+// ─── Step 2: Package / À la carte ─────────────────────────────────────────────
 
-// Service category icons for display
-const CATEGORY_ICONS: Record<string, string> = {
-  PHOTOGRAPHY: "📸", VIDEO: "🎬", DRONE: "🚁", VIRTUAL_TOUR_3D: "🏠",
-  FLOOR_PLAN: "📐", VIRTUAL_STAGING: "🪄", TWILIGHT: "🌅", SOCIAL_MEDIA: "📱",
-  RUSH_EDITING: "⚡", OTHER: "🔧",
+const CATEGORY_LABELS: Record<string, string> = {
+  PHOTOGRAPHY: "Photography", VIDEO: "Video", DRONE: "Drone",
+  VIRTUAL_TOUR_3D: "3D Virtual Tour", FLOOR_PLAN: "Floor Plan",
+  VIRTUAL_STAGING: "Virtual Staging", TWILIGHT: "Twilight",
+  SOCIAL_MEDIA: "Social Media", RUSH_EDITING: "Rush Editing", OTHER: "Other",
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services }: { pkg: any; brandColor: string; onSelect: () => void; onClose: () => void; services: any[] }) {
-  // Find add-on services not already in package
+function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, toggleAddOn, selectedAddOns }: {
+  pkg: any; brandColor: string; onSelect: () => void; onClose: () => void; services: any[];
+  toggleAddOn: (id: string) => void; selectedAddOns: string[];
+}) {
+  const [modalTab, setModalTab] = useState<"setup" | "about">("setup");
   const pkgServiceIds = new Set((pkg.items ?? []).map((i: any) => i.serviceId ?? i.service?.id));
-  const suggestedAddOns = services.filter((s: any) => !pkgServiceIds.has(s.id)).slice(0, 6);
+  const suggestedAddOns = services.filter((s: any) => !pkgServiceIds.has(s.id)).slice(0, 8);
+  const [addOnScroll, setAddOnScroll] = useState(0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header with cover image */}
-        <div className="relative h-48 overflow-hidden shrink-0">
-          {pkg.coverImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full" style={{ background: `linear-gradient(135deg, ${brandColor}dd, ${brandColor}88)` }}>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg className="w-16 h-16 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-                </svg>
-              </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[540px] max-h-[90vh] overflow-hidden flex flex-col mx-4" onClick={(e) => e.stopPropagation()}>
+
+        {/* Modal header */}
+        <div className="shrink-0 border-b border-gray-100">
+          <div className="p-5 pb-0">
+            <div className="flex items-start justify-between">
+              <h3 className="text-lg font-bold text-gray-900">{pkg.name}</h3>
+              <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors -mt-1 -mr-1">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-          <div className="absolute bottom-4 left-5 right-5">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                {pkg.isPopular && (
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-white/25 backdrop-blur-md text-white px-2.5 py-1 rounded-full mb-2">
-                    {pkg.badgeLabel || "Most Popular"}
-                  </span>
-                )}
-                <h3 className="text-xl font-bold text-white leading-tight">{pkg.name}</h3>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-2xl font-black text-white">${pkg.price.toLocaleString()}</p>
-              </div>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-white text-sm font-bold px-3 py-1 rounded-md" style={{ backgroundColor: brandColor }}>${pkg.price.toLocaleString()}</span>
+              {pkg.items?.length > 0 && (
+                <span className="text-xs text-gray-500">{pkg.items.length} services</span>
+              )}
+            </div>
+            {pkg.description && (
+              <p className="text-sm text-gray-500 mt-3 leading-relaxed">{pkg.description}</p>
+            )}
+            {/* Tabs */}
+            <div className="flex gap-0 mt-4 border-b border-gray-100 -mx-5 px-5">
+              <button
+                type="button"
+                onClick={() => setModalTab("setup")}
+                className={`pb-3 px-1 mr-6 text-sm font-medium border-b-2 transition-colors ${
+                  modalTab === "setup" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                Package Setup
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab("about")}
+                className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                  modalTab === "about" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                About Package
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {pkg.description && (
-            <p className="text-sm text-gray-600 leading-relaxed">{pkg.description}</p>
-          )}
-
-          {(pkg.photoCount || pkg.turnaroundDays) && (
-            <div className="flex gap-4">
-              {pkg.photoCount && (
-                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
-                  <span className="text-sm">📷</span>
-                  <span className="text-sm font-medium text-gray-700">{pkg.photoCount} photos</span>
+        {/* Modal body */}
+        <div className="flex-1 overflow-y-auto">
+          {modalTab === "setup" && (
+            <div className="p-5">
+              {/* In Package - service list */}
+              {pkg.items?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">In Package</h4>
+                  <div className="space-y-1">
+                    {pkg.items.map((item: any) => (
+                      <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                          <span className="text-base">
+                            {item.service.category === "PHOTOGRAPHY" ? "📸" :
+                             item.service.category === "VIDEO" ? "🎬" :
+                             item.service.category === "DRONE" ? "🚁" :
+                             item.service.category === "VIRTUAL_TOUR_3D" ? "🏠" :
+                             item.service.category === "FLOOR_PLAN" ? "📐" :
+                             item.service.category === "VIRTUAL_STAGING" ? "🪄" :
+                             item.service.category === "TWILIGHT" ? "🌅" :
+                             item.service.category === "SOCIAL_MEDIA" ? "📱" : "📦"}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-sky-700 bg-sky-50">Core</span>
+                          <p className="text-sm font-medium text-gray-900 mt-0.5">{item.service.name}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
-              {pkg.turnaroundDays && (
-                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
-                  <span className="text-sm">⏱</span>
-                  <span className="text-sm font-medium text-gray-700">{pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery</span>
+
+              {/* Suggested Add-ons carousel */}
+              {suggestedAddOns.length > 0 && (
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-gray-900">Suggested Add-ons</h4>
+                    {suggestedAddOns.length > 3 && (
+                      <div className="flex gap-1">
+                        <button type="button" onClick={() => setAddOnScroll(Math.max(0, addOnScroll - 1))}
+                          className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors disabled:opacity-30"
+                          disabled={addOnScroll === 0}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <button type="button" onClick={() => setAddOnScroll(Math.min(suggestedAddOns.length - 3, addOnScroll + 1))}
+                          className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors disabled:opacity-30"
+                          disabled={addOnScroll >= suggestedAddOns.length - 3}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="overflow-hidden">
+                    <div className="flex gap-3 transition-transform duration-300" style={{ transform: `translateX(-${addOnScroll * 170}px)` }}>
+                      {suggestedAddOns.map((svc: any) => {
+                        const isAdded = selectedAddOns.includes(svc.id);
+                        return (
+                          <div key={svc.id} className="w-[160px] shrink-0 rounded-xl border border-gray-200 overflow-hidden bg-white hover:shadow-md transition-shadow">
+                            <div className="h-20 bg-gray-100 flex items-center justify-center relative">
+                              <span className="text-2xl">
+                                {svc.category === "PHOTOGRAPHY" ? "📸" :
+                                 svc.category === "VIDEO" ? "🎬" :
+                                 svc.category === "DRONE" ? "🚁" :
+                                 svc.category === "TWILIGHT" ? "🌅" :
+                                 svc.category === "FLOOR_PLAN" ? "📐" :
+                                 svc.category === "VIRTUAL_STAGING" ? "🪄" : "📦"}
+                              </span>
+                              <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-orange-700 bg-orange-50">Add-on</span>
+                            </div>
+                            <div className="p-3">
+                              <p className="text-xs font-semibold text-gray-900 leading-tight">{svc.name}</p>
+                              <div className="flex items-center gap-1.5 mt-2">
+                                <span className="text-sm font-bold text-gray-900">${svc.basePrice.toLocaleString()}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleAddOn(svc.id)}
+                                  className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold transition-colors"
+                                  style={{ backgroundColor: isAdded ? "#ef4444" : "#22c55e" }}
+                                >
+                                  {isAdded ? "−" : "+"}
+                                </button>
+                              </div>
+                              {svc.description && (
+                                <p className="text-[11px] text-gray-400 mt-1.5 line-clamp-2 leading-relaxed">{svc.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Included services */}
-          {pkg.items?.length > 0 && (
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Included Services</h4>
-              <div className="space-y-2">
-                {pkg.items.map((item: any) => (
-                  <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100">
-                    <span className="text-lg">{CATEGORY_ICONS[item.service.category] ?? "📦"}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{item.service.name}</p>
-                      {item.service.description && (
-                        <p className="text-xs text-gray-500 truncate">{item.service.description}</p>
-                      )}
+          {modalTab === "about" && (
+            <div className="p-5 space-y-4">
+              {pkg.description && (
+                <p className="text-sm text-gray-600 leading-relaxed">{pkg.description}</p>
+              )}
+              {(pkg.photoCount || pkg.turnaroundDays) && (
+                <div className="space-y-2">
+                  {pkg.photoCount && (
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <span>📷</span> <span>{pkg.photoCount} photos included</span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">
-                      Included
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Suggested Add-ons */}
-          {suggestedAddOns.length > 0 && (
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Suggested Add-ons</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {suggestedAddOns.map((svc: any) => (
-                  <div key={svc.id} className="p-3 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-100 hover:border-gray-200 transition-colors">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm">{CATEGORY_ICONS[svc.category] ?? "📦"}</span>
-                      <span className="text-xs font-semibold text-gray-800 truncate">{svc.name}</span>
+                  )}
+                  {pkg.turnaroundDays && (
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <span>⏱</span> <span>{pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery</span>
                     </div>
-                    <p className="text-sm font-bold text-gray-900">+${svc.basePrice.toLocaleString()}</p>
+                  )}
+                </div>
+              )}
+              {pkg.items?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Services included:</h4>
+                  <div className="space-y-1">
+                    {pkg.items.map((item: any) => (
+                      <p key={item.id} className="text-sm text-gray-600">
+                        {item.service.name} — {CATEGORY_LABELS[item.service.category] || item.service.category}
+                      </p>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer CTA */}
-        <div className="shrink-0 p-5 border-t border-gray-100 bg-gray-50/50">
+        <div className="shrink-0 p-4 border-t border-gray-100">
           <button
             type="button"
             onClick={() => { onSelect(); onClose(); }}
             style={{ backgroundColor: brandColor }}
-            className="w-full py-3 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity shadow-lg"
+            className="w-full py-3 text-sm font-bold text-white rounded-lg hover:opacity-90 transition-opacity"
           >
-            Select {pkg.name} — ${pkg.price.toLocaleString()}
+            Add to Order
           </button>
         </div>
       </div>
@@ -553,9 +631,10 @@ function Step2Package({
   const [tab, setTab] = useState<"packages" | "services">("packages");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [detailPkg, setDetailPkg] = useState<any | null>(null);
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
 
   const selectPackage = (pkgId: string) => {
-    setForm({ ...form, packageId: pkgId, selectedServiceIds: [] });
+    setForm({ ...form, packageId: pkgId, selectedServiceIds: [...selectedAddOns] });
   };
 
   const toggleService = (serviceId: string) => {
@@ -566,281 +645,250 @@ function Step2Package({
     setForm({ ...form, packageId: "", selectedServiceIds: next });
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const alaCarteTotal = services.filter((s: any) => form.selectedServiceIds.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0);
-
-  // Group services by category for à la carte view
-  const servicesByCategory = services.reduce((acc: Record<string, any[]>, svc: any) => {
-    const cat = svc.category || "OTHER";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(svc);
-    return acc;
-  }, {});
-
-  const categoryLabels: Record<string, string> = {
-    PHOTOGRAPHY: "Photography", VIDEO: "Video", DRONE: "Aerial / Drone",
-    VIRTUAL_TOUR_3D: "3D Virtual Tours", FLOOR_PLAN: "Floor Plans",
-    VIRTUAL_STAGING: "Virtual Staging", TWILIGHT: "Twilight",
-    SOCIAL_MEDIA: "Social Media", RUSH_EDITING: "Rush Editing", OTHER: "Other",
+  const toggleAddOn = (serviceId: string) => {
+    setSelectedAddOns((prev) => {
+      const next = prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId];
+      if (form.packageId) setForm({ ...form, selectedServiceIds: next });
+      return next;
+    });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const alaCarteTotal = services.filter((s: any) => form.selectedServiceIds.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectedPkg = packages.find((p: any) => p.id === form.packageId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const addOnTotal = services.filter((s: any) => selectedAddOns.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0);
+  const orderTotal = selectedPkg ? selectedPkg.price + addOnTotal : alaCarteTotal;
+
+  // Category filter tabs for services
+  const allCategories = Array.from(new Set(services.map((s: any) => s.category || "OTHER")));
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const filteredServices = activeCategory ? services.filter((s: any) => (s.category || "OTHER") === activeCategory) : services;
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* Header */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Choose Your Services</h2>
-        <p className="text-sm text-gray-500 mt-1">Select a package or build your own from individual services.</p>
+        <h2 className="text-lg font-semibold text-gray-900">Services</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Please choose your items below.</p>
       </div>
 
-      {/* Segmented tabs */}
-      <div className="relative bg-gray-100 rounded-xl p-1 flex">
+      {/* Cart bar */}
+      {(selectedPkg || form.selectedServiceIds.length > 0) && (
+        <div className="flex items-center justify-between rounded-lg p-3" style={{ backgroundColor: brandColor }}>
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+            </svg>
+            <span className="text-white text-sm font-medium">
+              {selectedPkg ? selectedPkg.name : `${form.selectedServiceIds.length} service${form.selectedServiceIds.length !== 1 ? "s" : ""}`}
+              {selectedAddOns.length > 0 && selectedPkg ? ` + ${selectedAddOns.length} add-on${selectedAddOns.length !== 1 ? "s" : ""}` : ""}
+            </span>
+          </div>
+          <span className="text-white font-bold text-sm">Total: ${orderTotal.toLocaleString()}</span>
+        </div>
+      )}
+
+      {/* Category filter tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
         <button
           type="button"
-          onClick={() => setTab("packages")}
-          className={`flex-1 relative z-10 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-            tab === "packages" ? "text-gray-900 shadow-sm bg-white" : "text-gray-500 hover:text-gray-700"
+          onClick={() => { setTab("packages"); setActiveCategory(null); }}
+          className={`shrink-0 px-4 py-2 text-xs font-semibold rounded-full border transition-colors ${
+            tab === "packages"
+              ? "text-white border-transparent"
+              : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
           }`}
+          style={tab === "packages" ? { backgroundColor: brandColor } : undefined}
         >
           Packages
-          {packages.length > 0 && (
-            <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${tab === "packages" ? "bg-gray-100 text-gray-600" : "bg-gray-200/60 text-gray-400"}`}>
-              {packages.length}
-            </span>
-          )}
         </button>
-        <button
-          type="button"
-          onClick={() => setTab("services")}
-          className={`flex-1 relative z-10 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-            tab === "services" ? "text-gray-900 shadow-sm bg-white" : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          À La Carte
-          {form.selectedServiceIds.length > 0 && (
-            <span className="ml-1.5 text-[10px] text-white px-1.5 py-0.5 rounded-full" style={{ backgroundColor: brandColor }}>
-              {form.selectedServiceIds.length}
-            </span>
-          )}
-        </button>
+        {allCategories.map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => { setTab("services"); setActiveCategory(cat === activeCategory ? null : cat); }}
+            className={`shrink-0 px-4 py-2 text-xs font-semibold rounded-full border transition-colors ${
+              tab === "services" && activeCategory === cat
+                ? "text-white border-transparent"
+                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+            }`}
+            style={tab === "services" && activeCategory === cat ? { backgroundColor: brandColor } : undefined}
+          >
+            {CATEGORY_LABELS[cat] || cat}
+          </button>
+        ))}
+        {allCategories.length > 0 && (
+          <button
+            type="button"
+            onClick={() => { setTab("services"); setActiveCategory(null); }}
+            className={`shrink-0 px-4 py-2 text-xs font-semibold rounded-full border transition-colors ${
+              tab === "services" && !activeCategory
+                ? "text-white border-transparent"
+                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+            }`}
+            style={tab === "services" && !activeCategory ? { backgroundColor: brandColor } : undefined}
+          >
+            All Services
+          </button>
+        )}
       </div>
 
-      {/* ═══ Packages Tab ═══ */}
+      {/* ═══ Packages ═══ */}
       {tab === "packages" && (
-        <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {packages.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-3xl mb-2">📦</div>
-              <p className="text-sm">No packages available right now.</p>
-              <button type="button" onClick={() => setTab("services")} className="mt-2 text-sm font-medium underline underline-offset-2" style={{ color: brandColor }}>
-                Browse individual services instead
-              </button>
-            </div>
+            <div className="col-span-full text-center py-10 text-gray-400 text-sm">No packages available.</div>
           ) : (
-            <div className="space-y-4">
-              {packages.map((pkg: any) => {
-                const selected = form.packageId === pkg.id;
-                const hasImage = !!pkg.coverImage;
-                return (
-                  <div
-                    key={pkg.id}
-                    className={`group relative rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
-                      selected ? "ring-2 ring-offset-2" : "hover:shadow-lg hover:-translate-y-0.5"
-                    }`}
-                    style={
-                      selected
-                        ? { borderColor: brandColor, ringColor: brandColor }
-                        : { borderColor: "#e5e7eb" }
-                    }
-                    onClick={() => selectPackage(pkg.id)}
-                  >
-                    {/* Cover image or gradient header */}
-                    {hasImage ? (
-                      <div className="relative h-36 overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                        {pkg.isPopular && (
-                          <span
-                            className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1 rounded-full"
-                            style={{ backgroundColor: pkg.badgeColor || brandColor }}
-                          >
-                            {pkg.badgeLabel || "Most Popular"}
-                          </span>
-                        )}
-                        {selected && (
-                          <div className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: brandColor }}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>
-                          </div>
-                        )}
-                      </div>
+            packages.map((pkg: any) => {
+              const selected = form.packageId === pkg.id;
+              return (
+                <div
+                  key={pkg.id}
+                  className={`relative rounded-xl overflow-hidden border bg-white transition-all cursor-pointer group ${
+                    selected ? "ring-2 ring-offset-1" : "hover:shadow-lg"
+                  }`}
+                  style={selected ? { borderColor: brandColor, ringColor: brandColor } : { borderColor: "#e5e7eb" }}
+                >
+                  {/* Cover image */}
+                  <div className="relative h-40 bg-gray-100 overflow-hidden" onClick={() => selectPackage(pkg.id)}>
+                    {pkg.coverImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
-                      <>
-                        {pkg.isPopular && (
-                          <div className="px-5 pt-4">
-                            <span
-                              className="inline-block text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1 rounded-full"
-                              style={{ backgroundColor: pkg.badgeColor || brandColor }}
-                            >
-                              {pkg.badgeLabel || "Most Popular"}
-                            </span>
-                          </div>
-                        )}
-                      </>
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(145deg, ${brandColor}22, ${brandColor}08)` }}>
+                        <svg className="w-12 h-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                          <path strokeLinecap="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                        </svg>
+                      </div>
+                    )}
+                    {/* Badge */}
+                    {pkg.isPopular && (
+                      <span className="absolute top-3 left-3 text-[10px] font-bold text-white px-2.5 py-1 rounded-md shadow-sm" style={{ backgroundColor: pkg.badgeColor || brandColor }}>
+                        {pkg.badgeLabel || "Most Popular"}
+                      </span>
+                    )}
+                    {/* Selected check */}
+                    {selected && (
+                      <div className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: brandColor }}>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card body */}
+                  <div className="p-4">
+                    <h3 className="font-bold text-gray-900">{pkg.name}</h3>
+
+                    {/* Service dots */}
+                    {pkg.items?.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                        {pkg.items.map((item: any) => (
+                          <span key={item.id} className="text-xs text-gray-500 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: brandColor }} />
+                            {item.service.name}
+                          </span>
+                        ))}
+                      </div>
                     )}
 
-                    {/* Card body */}
-                    <div className="p-5 bg-white">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-bold text-gray-900 leading-tight">{pkg.name}</h3>
-                          {pkg.description && (
-                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{pkg.description}</p>
-                          )}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-2xl font-black text-gray-900">${pkg.price.toLocaleString()}</p>
-                        </div>
-                      </div>
+                    {/* View Details link */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDetailPkg(pkg); }}
+                      className="mt-3 text-xs font-semibold transition-colors"
+                      style={{ color: brandColor }}
+                    >
+                      View Details
+                    </button>
 
-                      {/* Meta badges */}
-                      {(pkg.photoCount || pkg.turnaroundDays || pkg.items?.length) && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {pkg.photoCount && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
-                              📷 {pkg.photoCount} photos
-                            </span>
-                          )}
-                          {pkg.turnaroundDays && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
-                              ⏱ {pkg.turnaroundDays}d delivery
-                            </span>
-                          )}
-                          {pkg.items?.length > 0 && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
-                              📦 {pkg.items.length} services
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Service tags */}
-                      {pkg.items?.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-3">
-                          {pkg.items.slice(0, 5).map((item: any) => (
-                            <span key={item.id} className="text-[11px] font-medium bg-gray-50 border border-gray-200 text-gray-600 px-2 py-0.5 rounded-md">
-                              {item.service.name}
-                            </span>
-                          ))}
-                          {pkg.items.length > 5 && (
-                            <span className="text-[11px] font-medium text-gray-400 px-1 py-0.5">
-                              +{pkg.items.length - 5} more
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* View details link */}
+                    {/* Price + Add button */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                      <span className="text-lg font-bold text-gray-900">${pkg.price.toLocaleString()}</span>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); setDetailPkg(pkg); }}
-                        className="mt-3 text-xs font-semibold hover:underline underline-offset-2 transition-colors"
-                        style={{ color: brandColor }}
+                        onClick={() => selectPackage(pkg.id)}
+                        className={`px-4 py-1.5 text-xs font-semibold rounded-md border transition-colors ${
+                          selected
+                            ? "text-white border-transparent"
+                            : "text-gray-700 border-gray-300 hover:border-gray-400 bg-white"
+                        }`}
+                        style={selected ? { backgroundColor: brandColor } : undefined}
                       >
-                        View Details →
+                        {selected ? "Selected" : "Add"}
                       </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
-                      {/* Selection indicator (no image variant) */}
-                      {!hasImage && selected && (
-                        <div className="absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center text-white shadow" style={{ backgroundColor: brandColor }}>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>
-                        </div>
-                      )}
+      {/* ═══ Services (A La Carte) ═══ */}
+      {tab === "services" && (
+        <div className="space-y-2">
+          {filteredServices.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 text-sm">No services in this category.</div>
+          ) : (
+            <>
+              {filteredServices.map((svc: any) => {
+                const selected = form.selectedServiceIds.includes(svc.id);
+                return (
+                  <div
+                    key={svc.id}
+                    className={`flex items-center gap-4 p-4 rounded-xl border bg-white transition-all ${
+                      selected ? "ring-1 ring-offset-0" : "hover:shadow-sm"
+                    }`}
+                    style={selected ? { borderColor: brandColor, ringColor: `${brandColor}44` } : { borderColor: "#f3f4f6" }}
+                  >
+                    {/* Service icon/image placeholder */}
+                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                      <span className="text-lg">
+                        {svc.category === "PHOTOGRAPHY" ? "📸" :
+                         svc.category === "VIDEO" ? "🎬" :
+                         svc.category === "DRONE" ? "🚁" :
+                         svc.category === "VIRTUAL_TOUR_3D" ? "🏠" :
+                         svc.category === "FLOOR_PLAN" ? "📐" :
+                         svc.category === "VIRTUAL_STAGING" ? "🪄" :
+                         svc.category === "TWILIGHT" ? "🌅" :
+                         svc.category === "SOCIAL_MEDIA" ? "📱" : "📦"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{svc.name}</p>
+                      {svc.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{svc.description}</p>}
+                      {svc.durationMins && <p className="text-[11px] text-gray-400 mt-0.5">~{svc.durationMins} min</p>}
+                    </div>
+                    <div className="shrink-0 flex items-center gap-3">
+                      <span className="text-sm font-bold text-gray-900">${svc.basePrice.toLocaleString()}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleService(svc.id)}
+                        className={`w-7 h-7 rounded-md flex items-center justify-center text-sm font-bold transition-colors ${
+                          selected ? "text-white" : "text-white"
+                        }`}
+                        style={{ backgroundColor: selected ? "#ef4444" : "#22c55e" }}
+                      >
+                        {selected ? "−" : "+"}
+                      </button>
                     </div>
                   </div>
                 );
               })}
-            </div>
-          )}
-        </>
-      )}
 
-      {/* ═══ À La Carte Tab ═══ */}
-      {tab === "services" && (
-        <>
-          {services.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-3xl mb-2">🛠</div>
-              <p className="text-sm">No individual services available at this time.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {Object.entries(servicesByCategory).map(([category, catServices]) => (
-                <div key={category}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-base">{CATEGORY_ICONS[category] ?? "📦"}</span>
-                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">{categoryLabels[category] || category}</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {catServices.map((svc: any) => {
-                      const selected = form.selectedServiceIds.includes(svc.id);
-                      return (
-                        <button
-                          key={svc.id}
-                          type="button"
-                          onClick={() => toggleService(svc.id)}
-                          className={`w-full text-left p-4 rounded-xl border-2 transition-all bg-white group ${
-                            !selected ? "border-gray-100 hover:border-gray-200 hover:shadow-sm" : ""
-                          }`}
-                          style={selected ? { borderColor: brandColor, backgroundColor: `${brandColor}05` } : undefined}
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-gray-900 text-sm">{svc.name}</span>
-                              </div>
-                              {svc.description && (
-                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{svc.description}</p>
-                              )}
-                              {svc.durationMins && (
-                                <p className="text-[11px] text-gray-400 mt-0.5">~{svc.durationMins} min on-site</p>
-                              )}
-                            </div>
-                            <div className="shrink-0 flex items-center gap-3">
-                              <span className="text-base font-bold text-gray-900">${svc.basePrice.toLocaleString()}</span>
-                              <div
-                                className="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all"
-                                style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
-                              >
-                                {selected && (
-                                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {/* Floating total bar */}
-              {form.selectedServiceIds.length > 0 && (
-                <div
-                  className="sticky bottom-0 mt-4 p-4 rounded-2xl border shadow-lg flex items-center justify-between"
-                  style={{ backgroundColor: `${brandColor}08`, borderColor: `${brandColor}20` }}
-                >
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{form.selectedServiceIds.length} service{form.selectedServiceIds.length !== 1 ? "s" : ""}</p>
-                    <p className="text-xs text-gray-500">Custom bundle</p>
-                  </div>
-                  <p className="text-xl font-black text-gray-900">${alaCarteTotal.toLocaleString()}</p>
+              {/* Running total */}
+              {form.selectedServiceIds.length > 0 && !form.packageId && (
+                <div className="mt-3 p-4 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex justify-between items-center">
+                  <span className="text-sm text-gray-600">{form.selectedServiceIds.length} service{form.selectedServiceIds.length !== 1 ? "s" : ""} selected</span>
+                  <span className="text-lg font-bold text-gray-900">${alaCarteTotal.toLocaleString()}</span>
                 </div>
               )}
-            </div>
+            </>
           )}
-        </>
+        </div>
       )}
 
       {/* Detail Modal */}
@@ -849,6 +897,8 @@ function Step2Package({
           pkg={detailPkg}
           brandColor={brandColor}
           services={services}
+          selectedAddOns={selectedAddOns}
+          toggleAddOn={toggleAddOn}
           onSelect={() => selectPackage(detailPkg.id)}
           onClose={() => setDetailPkg(null)}
         />
