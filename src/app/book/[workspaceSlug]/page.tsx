@@ -1397,17 +1397,21 @@ function CustomFieldsRenderer({
 
 function Step5Review({
   form,
+  setForm,
   packages,
   services,
   photographers,
+  brandColor,
 }: {
   form: FormData;
+  setForm: (f: FormData) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   packages: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   services: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   photographers: any[];
+  brandColor: string;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pkg = packages.find((p: any) => p.id === form.packageId);
@@ -1423,6 +1427,33 @@ function Step5Review({
           "EEEE, MMMM d, yyyy 'at' h:mm aa"
         )
       : "—";
+
+  // Determine add-on services: services NOT included in the selected package and not already selected
+  const pkgServiceIds = new Set(
+    pkg?.items?.map((item: any) => item.serviceId) ?? []
+  );
+  const alreadySelectedIds = new Set(form.selectedServiceIds);
+  const addOnServices = services.filter(
+    (s: any) => !pkgServiceIds.has(s.id) && !alreadySelectedIds.has(s.id) && s.isActive !== false
+  );
+
+  const toggleAddOn = (serviceId: string) => {
+    const current = form.selectedServiceIds;
+    const next = current.includes(serviceId)
+      ? current.filter((id) => id !== serviceId)
+      : [...current, serviceId];
+    setForm({ ...form, selectedServiceIds: next });
+  };
+
+  // Calculate total
+  const pkgTotal = pkg?.price ?? 0;
+  const addOnTotal = form.selectedServiceIds
+    .filter((id) => !pkgServiceIds.has(id))
+    .reduce((sum, id) => {
+      const svc = services.find((s: any) => s.id === id);
+      return sum + (svc?.basePrice ?? 0);
+    }, 0);
+  const grandTotal = pkgTotal + alaCarteTotal + addOnTotal;
 
   const rows = [
     { label: "Property", value: `${form.propertyAddress}, ${form.propertyCity}, ${form.propertyState}` },
@@ -1461,6 +1492,82 @@ function Step5Review({
           </div>
         ))}
       </div>
+
+      {/* Add-on services suggestion */}
+      {addOnServices.length > 0 && (
+        <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+          <div>
+            <h3 className="font-semibold text-gray-900 text-sm">Enhance Your Shoot</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Add extra services to get the most out of your session.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {addOnServices.map((svc: any) => {
+              const isAdded = form.selectedServiceIds.includes(svc.id);
+              return (
+                <button
+                  key={svc.id}
+                  type="button"
+                  onClick={() => toggleAddOn(svc.id)}
+                  className={`flex items-center gap-3 p-3 rounded-lg border text-left text-sm transition-all ${
+                    isAdded
+                      ? "border-green-300 bg-green-50"
+                      : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {svc.coverImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={svc.coverImage} alt={svc.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-lg shrink-0">
+                      {svc.emoji || "📷"}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 truncate">{svc.name}</div>
+                    <div className="text-gray-500 text-xs">${svc.basePrice.toLocaleString()}</div>
+                  </div>
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      isAdded ? "text-white" : "border-2 border-gray-300"
+                    }`}
+                    style={isAdded ? { backgroundColor: brandColor } : undefined}
+                  >
+                    {isAdded ? "✓" : "+"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {form.selectedServiceIds.filter((id) => !pkgServiceIds.has(id)).length > 0 && (
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-sm">
+              <span className="text-gray-500">Add-ons total</span>
+              <span className="font-semibold text-gray-900">+${addOnTotal.toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Total */}
+      {grandTotal > 0 && (
+        <div className="flex justify-between items-center p-4 rounded-xl border border-gray-200 bg-gray-50">
+          <span className="font-semibold text-gray-900">Total</span>
+          <span className="text-xl font-bold text-gray-900">${grandTotal.toLocaleString()}</span>
+        </div>
+      )}
+
+      {/* Additional notes */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium text-gray-700">Additional Notes</label>
+        <textarea
+          value={form.clientNotes}
+          onChange={(e) => setForm({ ...form, clientNotes: e.target.value })}
+          rows={3}
+          placeholder="Any special requests or instructions for your shoot..."
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:border-transparent transition-shadow resize-none"
+          style={{ ["--tw-ring-color" as string]: brandColor } as React.CSSProperties}
+        />
+      </div>
+
       {/* Map preview on review step */}
       {form.propertyLat && form.propertyLng && (
         <MapboxMap
@@ -1475,11 +1582,6 @@ function Step5Review({
       {form.accessNotes && (
         <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-800">
           <span className="font-medium">Access notes:</span> {form.accessNotes}
-        </div>
-      )}
-      {form.clientNotes && (
-        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">
-          <span className="font-medium">Your notes:</span> {form.clientNotes}
         </div>
       )}
       <p className="text-xs text-gray-400 text-center">
@@ -1638,6 +1740,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [form, setForm] = useState<FormData>(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [showAddOnModal, setShowAddOnModal] = useState(false);
 
   // ── Live designer state (overrides from postMessage) ─────────────────────
   const [liveFieldSettings, setLiveFieldSettings] = useState<BookingFormSettings["fields"] | null>(null);
@@ -1765,9 +1868,33 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
 
   const handleNext = () => {
     if (!canAdvance()) return;
+
+    // After step 2: if a package is selected and there are services not in it, show add-on popup
+    if (step === 2 && form.packageId && data) {
+      const pkg = data.packages?.find((p: any) => p.id === form.packageId);
+      const pkgServiceIds = new Set(pkg?.items?.map((item: any) => item.serviceId) ?? []);
+      const alreadySelected = new Set(form.selectedServiceIds);
+      const available = (data.services ?? []).filter(
+        (s: any) => !pkgServiceIds.has(s.id) && !alreadySelected.has(s.id)
+      );
+      if (available.length > 0) {
+        setShowAddOnModal(true);
+        return;
+      }
+    }
+
     setStep((s) => {
       const next = (s + 1) as Step;
       // Skip step 4 (contact info) if signed in — go straight to review
+      if (next === 4 && isSignedIn) return 5 as Step;
+      return next;
+    });
+  };
+
+  const handleSkipAddOns = () => {
+    setShowAddOnModal(false);
+    setStep((s) => {
+      const next = (s + 1) as Step;
       if (next === 4 && isSignedIn) return 5 as Step;
       return next;
     });
@@ -1864,8 +1991,96 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
     ?? (rawSettings as any)?.gridColumns
     ?? 3;
 
+  // Add-on modal: services not in the selected package
+  const selectedPkg = packages.find((p: any) => p.id === form.packageId);
+  const modalPkgServiceIds = new Set(selectedPkg?.items?.map((item: any) => item.serviceId) ?? []);
+  const modalAlreadySelected = new Set(form.selectedServiceIds);
+  const modalAddOnServices = (services ?? []).filter(
+    (s: any) => !modalPkgServiceIds.has(s.id) && !modalAlreadySelected.has(s.id)
+  );
+
+  const toggleModalAddOn = (serviceId: string) => {
+    const current = form.selectedServiceIds;
+    const next = current.includes(serviceId)
+      ? current.filter((id: string) => id !== serviceId)
+      : [...current, serviceId];
+    setForm({ ...form, selectedServiceIds: next });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Add-on services popup modal */}
+      {showAddOnModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">Enhance Your Shoot</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Would you like to add any of these services to your {selectedPkg?.name ?? "package"}?
+              </p>
+            </div>
+            <div className="p-4 space-y-2">
+              {modalAddOnServices.map((svc: any) => {
+                const isAdded = form.selectedServiceIds.includes(svc.id);
+                return (
+                  <button
+                    key={svc.id}
+                    type="button"
+                    onClick={() => toggleModalAddOn(svc.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left text-sm transition-all ${
+                      isAdded
+                        ? "border-green-300 bg-green-50"
+                        : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {svc.coverImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={svc.coverImage} alt={svc.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-xl shrink-0">
+                        {svc.emoji || "📷"}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900">{svc.name}</div>
+                      {svc.description && (
+                        <div className="text-gray-500 text-xs mt-0.5 line-clamp-1">{svc.description}</div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-semibold text-gray-900">${svc.basePrice.toLocaleString()}</div>
+                      <div
+                        className={`text-xs font-medium mt-0.5 ${isAdded ? "text-green-600" : ""}`}
+                        style={!isAdded ? { color: brandColor } : undefined}
+                      >
+                        {isAdded ? "✓ Added" : "+ Add"}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="p-4 border-t border-gray-100 flex gap-3">
+              <button
+                type="button"
+                onClick={handleSkipAddOns}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                No thanks
+              </button>
+              <button
+                type="button"
+                onClick={handleSkipAddOns}
+                style={{ backgroundColor: brandColor }}
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Continue →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Brand accent bar + Header */}
       <div className="h-1 sticky top-0 z-20" style={{ backgroundColor: brandColor }} />
       <header className="bg-white border-b border-gray-100 py-4 px-6 sticky top-1 z-10 shadow-sm">
@@ -1945,7 +2160,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 5 && (
             <>
-              <Step5Review form={form} packages={packages} services={services ?? []} photographers={reviewPhotographers} />
+              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} />
               <CustomFieldsRenderer step={5} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
