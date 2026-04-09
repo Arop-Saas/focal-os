@@ -27,6 +27,19 @@ export function DashboardShell({
     setMobileOpen(false);
   }, [pathname]);
 
+  // Full-page mode for the order form designer (hides sidebar + top bars)
+  const isFormDesigner = /^\/order-form\/.+/.test(pathname);
+
+  if (isFormDesigner) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-gray-50">
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {children}
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* ── Desktop sidebar (always visible at md+) ── */}
