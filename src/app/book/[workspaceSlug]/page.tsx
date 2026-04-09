@@ -435,10 +435,10 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
   const [addOnScroll, setAddOnScroll] = useState(0);
 
   const svcIcon = (cat: string) =>
-    cat === "PHOTOGRAPHY" ? "📸" : cat === "VIDEO" ? "🎬" : cat === "DRONE" ? "🚁" :
-    cat === "VIRTUAL_TOUR_3D" ? "🏠" : cat === "FLOOR_PLAN" ? "📐" :
-    cat === "VIRTUAL_STAGING" ? "🪄" : cat === "TWILIGHT" ? "🌅" :
-    cat === "SOCIAL_MEDIA" ? "📱" : "📦";
+    cat === "PHOTOGRAPHY" ? "P" : cat === "VIDEO" ? "V" : cat === "DRONE" ? "D" :
+    cat === "VIRTUAL_TOUR_3D" ? "3D" : cat === "FLOOR_PLAN" ? "FP" :
+    cat === "VIRTUAL_STAGING" ? "VS" : cat === "TWILIGHT" ? "TW" :
+    cat === "SOCIAL_MEDIA" ? "SM" : "S";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
@@ -541,7 +541,7 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
               {pkg.description && <p className="text-sm text-gray-600 leading-relaxed">{pkg.description}</p>}
               {(pkg.photoCount || pkg.turnaroundDays) && (
                 <div className="space-y-2">
-                  {pkg.photoCount && <div className="flex items-center gap-2 text-sm text-gray-700"><span>📷</span> <span>{pkg.photoCount} photos included</span></div>}
+                  {pkg.photoCount && <div className="flex items-center gap-2 text-sm text-gray-700"><span>{pkg.photoCount} photos included</span></div>}
                   {pkg.turnaroundDays && <div className="flex items-center gap-2 text-sm text-gray-700"><span>⏱</span> <span>{pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery</span></div>}
                 </div>
               )}
@@ -727,10 +727,10 @@ function Step2Package({
   const selectedPkg = packages.find((p: any) => p.id === form.packageId) ?? null;
 
   const svcIcon = (cat: string) =>
-    cat === "PHOTOGRAPHY" ? "📸" : cat === "VIDEO" ? "🎬" : cat === "DRONE" ? "🚁" :
-    cat === "VIRTUAL_TOUR_3D" ? "🏠" : cat === "FLOOR_PLAN" ? "📐" :
-    cat === "VIRTUAL_STAGING" ? "🪄" : cat === "TWILIGHT" ? "🌅" :
-    cat === "SOCIAL_MEDIA" ? "📱" : "📦";
+    cat === "PHOTOGRAPHY" ? "P" : cat === "VIDEO" ? "V" : cat === "DRONE" ? "D" :
+    cat === "VIRTUAL_TOUR_3D" ? "3D" : cat === "FLOOR_PLAN" ? "FP" :
+    cat === "VIRTUAL_STAGING" ? "VS" : cat === "TWILIGHT" ? "TW" :
+    cat === "SOCIAL_MEDIA" ? "SM" : "S";
 
   const gridClass =
     columns === 5 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" :
@@ -1428,32 +1428,21 @@ function Step5Review({
         )
       : "—";
 
-  // Determine add-on services: services NOT included in the selected package and not already selected
-  const pkgServiceIds = new Set(
-    pkg?.items?.map((item: any) => item.serviceId) ?? []
-  );
-  const alreadySelectedIds = new Set(form.selectedServiceIds);
-  const addOnServices = services.filter(
-    (s: any) => !pkgServiceIds.has(s.id) && !alreadySelectedIds.has(s.id) && s.isActive !== false
-  );
-
-  const toggleAddOn = (serviceId: string) => {
-    const current = form.selectedServiceIds;
-    const next = current.includes(serviceId)
-      ? current.filter((id) => id !== serviceId)
-      : [...current, serviceId];
-    setForm({ ...form, selectedServiceIds: next });
-  };
-
   // Calculate total
-  const pkgTotal = pkg?.price ?? 0;
+  const pkgServiceIds = new Set(pkg?.items?.map((item: any) => item.serviceId) ?? []);
   const addOnTotal = form.selectedServiceIds
     .filter((id) => !pkgServiceIds.has(id))
     .reduce((sum, id) => {
       const svc = services.find((s: any) => s.id === id);
       return sum + (svc?.basePrice ?? 0);
     }, 0);
-  const grandTotal = pkgTotal + alaCarteTotal + addOnTotal;
+  const grandTotal = (pkg?.price ?? 0) + alaCarteTotal + addOnTotal;
+
+  // Build add-on display for review
+  const addOnNames = form.selectedServiceIds
+    .filter((id) => !pkgServiceIds.has(id))
+    .map((id) => services.find((s: any) => s.id === id))
+    .filter(Boolean);
 
   const rows = [
     { label: "Property", value: `${form.propertyAddress}, ${form.propertyCity}, ${form.propertyState}` },
@@ -1468,11 +1457,15 @@ function Step5Review({
           ? `${selectedServices.map((s: any) => s.name).join(", ")} — $${alaCarteTotal.toLocaleString()}`
           : "None selected",
     },
+    ...(addOnNames.length > 0
+      ? [{ label: "Add-ons", value: `${addOnNames.map((s: any) => s.name).join(", ")} — $${addOnTotal.toLocaleString()}` }]
+      : []),
     { label: "Appointment", value: scheduledDisplay },
     ...(photographer ? [{ label: "Photographer", value: photographer.name }] : []),
     { label: "Name", value: `${form.firstName} ${form.lastName}` },
     { label: "Email", value: form.email },
     { label: "Phone", value: form.phone || "—" },
+    ...(grandTotal > 0 ? [{ label: "Total", value: `$${grandTotal.toLocaleString()}` }] : []),
   ];
 
   return (
@@ -1488,72 +1481,10 @@ function Step5Review({
             className={`flex gap-4 px-4 py-3 text-sm ${i % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
           >
             <span className="w-36 shrink-0 text-gray-500">{row.label}</span>
-            <span className="text-gray-900 font-medium">{row.value}</span>
+            <span className={`text-gray-900 font-medium ${row.label === "Total" ? "text-base font-bold" : ""}`}>{row.value}</span>
           </div>
         ))}
       </div>
-
-      {/* Add-on services suggestion */}
-      {addOnServices.length > 0 && (
-        <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-          <div>
-            <h3 className="font-semibold text-gray-900 text-sm">Enhance Your Shoot</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Add extra services to get the most out of your session.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {addOnServices.map((svc: any) => {
-              const isAdded = form.selectedServiceIds.includes(svc.id);
-              return (
-                <button
-                  key={svc.id}
-                  type="button"
-                  onClick={() => toggleAddOn(svc.id)}
-                  className={`flex items-center gap-3 p-3 rounded-lg border text-left text-sm transition-all ${
-                    isAdded
-                      ? "border-green-300 bg-green-50"
-                      : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {svc.coverImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={svc.coverImage} alt={svc.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-lg shrink-0">
-                      {svc.emoji || "📷"}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 truncate">{svc.name}</div>
-                    <div className="text-gray-500 text-xs">${svc.basePrice.toLocaleString()}</div>
-                  </div>
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      isAdded ? "text-white" : "border-2 border-gray-300"
-                    }`}
-                    style={isAdded ? { backgroundColor: brandColor } : undefined}
-                  >
-                    {isAdded ? "✓" : "+"}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          {form.selectedServiceIds.filter((id) => !pkgServiceIds.has(id)).length > 0 && (
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-sm">
-              <span className="text-gray-500">Add-ons total</span>
-              <span className="font-semibold text-gray-900">+${addOnTotal.toLocaleString()}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Total */}
-      {grandTotal > 0 && (
-        <div className="flex justify-between items-center p-4 rounded-xl border border-gray-200 bg-gray-50">
-          <span className="font-semibold text-gray-900">Total</span>
-          <span className="text-xl font-bold text-gray-900">${grandTotal.toLocaleString()}</span>
-        </div>
-      )}
 
       {/* Additional notes */}
       <div className="space-y-1.5">
@@ -1585,7 +1516,7 @@ function Step5Review({
         </div>
       )}
       <p className="text-xs text-gray-400 text-center">
-        By clicking Book, you agree to our standard cancellation policy. You'll receive a confirmation email shortly.
+        By clicking Book, you agree to our standard cancellation policy. You will receive a confirmation email shortly.
       </p>
     </div>
   );
@@ -1613,7 +1544,6 @@ function OrderFormSelector({ workspaceSlug }: { workspaceSlug: string }) {
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 text-center px-4">
-        <div className="text-5xl">🔍</div>
         <h1 className="text-2xl font-bold text-gray-900">Booking page not found</h1>
         <p className="text-gray-500 max-w-sm">This booking link doesn&apos;t exist or has been disabled.</p>
       </div>
@@ -1637,7 +1567,6 @@ function OrderFormSelector({ workspaceSlug }: { workspaceSlug: string }) {
   if (orderForms.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 text-center px-4">
-        <div className="text-5xl">📋</div>
         <h1 className="text-2xl font-bold text-gray-900">No order forms available</h1>
         <p className="text-gray-500 max-w-sm">This company hasn&apos;t published any order forms yet. Please check back later.</p>
       </div>
@@ -1946,7 +1875,6 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 text-center px-4">
-        <div className="text-5xl">🔍</div>
         <h1 className="text-2xl font-bold text-gray-900">Booking page not found</h1>
         <p className="text-gray-500 max-w-sm">This booking link doesn't exist or has been disabled. Please check the URL or contact the company directly.</p>
       </div>
@@ -2038,7 +1966,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
                       <img src={svc.coverImage} alt={svc.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-xl shrink-0">
-                        {svc.emoji || "📷"}
+                        {svc.name?.[0]?.toUpperCase() ?? "S"}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -2208,7 +2136,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
                     Booking...
                   </>
                 ) : (
-                  "📅 Book Now"
+                  "Book Now"
                 )}
               </button>
             )}
