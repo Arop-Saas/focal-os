@@ -4,6 +4,11 @@ import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
+// Increase Next.js body size limit (default is ~4.5MB on Vercel)
+export const fetchCache = "force-no-store";
+
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -46,9 +51,8 @@ export async function POST(req: NextRequest) {
 
     const { data: { publicUrl } } = adminClient.storage.from("galleries").getPublicUrl(storageKey);
 
-    // Save to form
-    await prisma.orderForm.update({ where: { id: formId }, data: { coverImage: publicUrl } });
-
+    // Don't save to DB here — the designer saves via updateGeneral when user clicks "Save Changes"
+    // This avoids failures if the column hasn't been migrated yet
     return NextResponse.json({ coverImage: publicUrl });
   } catch (err) {
     console.error("Cover upload error:", err);

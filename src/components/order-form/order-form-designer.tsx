@@ -13,6 +13,44 @@ import {
 import { DEFAULT_BOOKING_FORM_SETTINGS, DEFAULT_PORTAL_SETTINGS, type BookingFormSettings, type CustomField, type PortalSettings } from "@/lib/booking-form-types";
 import { CustomFieldBuilder } from "./custom-field-builder";
 
+// ── Client-side image compression ───────────────────────────────────────────
+// Resizes large images to max 1600px and compresses to JPEG ≤ 1.5MB
+async function compressImage(file: File, maxWidth = 1600, maxHeight = 1200, quality = 0.85): Promise<File> {
+  // Skip if already small enough
+  if (file.size <= 1.5 * 1024 * 1024) return file;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      // Scale down if needed
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          const compressed = new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+          resolve(compressed);
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 type FieldKey = keyof BookingFormSettings["fields"];
 type PreviewSize = "mobile" | "tablet" | "desktop";
 type SidebarSection =
@@ -369,8 +407,9 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     if (!file) return;
     setHeroUploading(true);
     try {
+      const compressed = await compressImage(file, 1920, 1200);
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", compressed);
       const res = await fetch("/api/workspace/portal-hero-upload", { method: "POST", body: fd });
       const json = await res.json();
       if (json.heroImageUrl) {
@@ -389,13 +428,15 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     if (!file) return;
     setCoverUploading(true);
     try {
+      const compressed = await compressImage(file, 1600, 1200);
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", compressed);
       fd.append("formId", formId);
       const res = await fetch("/api/order-form/cover-upload", { method: "POST", body: fd });
       const json = await res.json();
+      if (!res.ok) { alert("Upload failed: " + (json.error ?? "Unknown error")); return; }
       if (json.coverImage) { setCoverImage(json.coverImage); setSavedGeneral(false); }
-    } catch (err) { console.error("Cover upload failed:", err); }
+    } catch (err) { console.error("Cover upload failed:", err); alert("Cover upload failed. Please try again."); }
     finally { setCoverUploading(false); }
   }
 
