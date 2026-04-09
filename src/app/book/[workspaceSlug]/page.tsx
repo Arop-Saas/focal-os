@@ -1743,7 +1743,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
 
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(initialForm);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string[] | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [showAddOnModal, setShowAddOnModal] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
@@ -1815,7 +1815,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       );
     },
     onError: (err) => {
-      setError(err.message ?? "Something went wrong. Please try again.");
+      setError([err.message ?? "Something went wrong. Please try again."]);
     },
   });
 
@@ -1823,51 +1823,47 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const canAdvance = (): boolean => {
     setError(null);
     const f = formSettings.fields;
+    const errors: string[] = [];
+
     if (step === 1) {
-      // Always-required fields
-      if (!form.propertyAddress.trim()) return !!setError("Property address is required.");
-      if (!form.propertyCity.trim()) return !!setError("City is required.");
-      if (!form.propertyState) return !!setError("State / Province is required.");
-      // Configurable required fields
-      if (f.propertyType.visible && f.propertyType.required && !form.propertyType) return !!setError("Property type is required.");
-      if (f.sqft.visible && f.sqft.required && !form.squareFootage.trim()) return !!setError("Square footage is required.");
-      if (f.beds.visible && f.beds.required && !form.bedrooms.trim()) return !!setError("Number of bedrooms is required.");
-      if (f.baths.visible && f.baths.required && !form.bathrooms.trim()) return !!setError("Number of bathrooms is required.");
-      if (f.mlsNumber.visible && f.mlsNumber.required && !form.mlsNumber.trim()) return !!setError("MLS number is required.");
-      if (f.accessNotes.visible && f.accessNotes.required && !form.accessNotes.trim()) return !!setError("Access notes are required.");
-      return true;
+      if (!form.propertyAddress.trim()) errors.push("Property address");
+      if (!form.propertyCity.trim()) errors.push("City");
+      if (!form.propertyState) errors.push("State / Province");
+      if (f.propertyType.visible && f.propertyType.required && !form.propertyType) errors.push("Property type");
+      if (f.sqft.visible && f.sqft.required && !form.squareFootage.trim()) errors.push("Square footage");
+      if (f.beds.visible && f.beds.required && !form.bedrooms.trim()) errors.push("Bedrooms");
+      if (f.baths.visible && f.baths.required && !form.bathrooms.trim()) errors.push("Bathrooms");
+      if (f.mlsNumber.visible && f.mlsNumber.required && !form.mlsNumber.trim()) errors.push("MLS number");
+      if (f.accessNotes.visible && f.accessNotes.required && !form.accessNotes.trim()) errors.push("Access notes");
     }
     if (step === 2) {
-      if (!form.packageId && form.selectedServiceIds.length === 0) {
-        return !!setError("Please select a package or at least one service to continue.");
-      }
-      return true;
+      if (!form.packageId && form.selectedServiceIds.length === 0) errors.push("Please select a package or at least one service");
     }
     if (step === 3) {
-      if (!form.scheduledDate) return !!setError("Please select a date.");
-      if (!form.scheduledTime) return !!setError("Please select a time slot.");
-      return true;
+      if (!form.scheduledDate) errors.push("Date");
+      if (!form.scheduledTime) errors.push("Time slot");
     }
     if (step === 4) {
-      // Always-required fields
-      if (!form.firstName.trim()) return !!setError("First name is required.");
-      if (!form.lastName.trim()) return !!setError("Last name is required.");
-      if (!form.email.trim()) return !!setError("Email is required.");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return !!setError("Enter a valid email.");
-      // Configurable required fields
-      if (f.phone.visible && f.phone.required && !form.phone.trim()) return !!setError("Phone number is required.");
-      if (f.company.visible && f.company.required && !form.company.trim()) return !!setError("Company / Brokerage is required.");
-      if (f.clientNotes.visible && f.clientNotes.required && !form.clientNotes.trim()) return !!setError("Notes are required.");
-      // Custom fields validation
+      if (!form.firstName.trim()) errors.push("First name");
+      if (!form.lastName.trim()) errors.push("Last name");
+      if (!form.email.trim()) errors.push("Email");
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.push("Valid email address");
+      if (f.phone.visible && f.phone.required && !form.phone.trim()) errors.push("Phone number");
+      if (f.company.visible && f.company.required && !form.company.trim()) errors.push("Company / Brokerage");
+      if (f.clientNotes.visible && f.clientNotes.required && !form.clientNotes.trim()) errors.push("Notes");
       for (const field of customFields) {
         if (field.required) {
           const val = customFieldValues[field.id];
           if (!val || (typeof val === "string" && !val.trim()) || (Array.isArray(val) && val.length === 0)) {
-            return !!setError(`${field.label} is required.`);
+            errors.push(field.label);
           }
         }
       }
-      return true;
+    }
+
+    if (errors.length > 0) {
+      setError(errors);
+      return false;
     }
     return true;
   };
@@ -2123,9 +2119,12 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
-            {error && (
+            {error && error.length > 0 && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {error}
+                <span className="font-medium">Please fill in the following:</span>
+                <ul className="mt-1 ml-4 list-disc">
+                  {error.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
               </div>
             )}
             <div className="mt-6 flex items-center justify-between gap-4">
@@ -2174,9 +2173,12 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
             </>
           )}
 
-          {error && !(step === 1 && !form.propertyAddress.trim()) && (
+          {error && error.length > 0 && !(step === 1 && !form.propertyAddress.trim()) && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
+              <span className="font-medium">Please fill in the following:</span>
+              <ul className="mt-1 ml-4 list-disc">
+                {error.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
             </div>
           )}
 
