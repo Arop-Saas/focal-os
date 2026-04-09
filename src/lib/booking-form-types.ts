@@ -57,6 +57,52 @@ export const CUSTOM_FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   date:        "Date",
 };
 
+// ─── Portal Settings ───────────────────────────────────────────────────────
+
+export interface PortalSettings {
+  /** Hero / background image URL (uploaded to Supabase) */
+  heroImageUrl?: string;
+  /** Welcome heading shown on the portal */
+  welcomeTitle?: string;
+  /** Subtitle / description below the heading */
+  welcomeText?: string;
+  /** Contact phone displayed on portal */
+  contactPhone?: string;
+  /** Contact email displayed on portal */
+  contactEmail?: string;
+  /** Layout style: split (left form / right hero), centered, or fullHero */
+  layout?: "split" | "centered" | "fullHero";
+  /** Show the "I have an account" sign-in option */
+  showLogin?: boolean;
+  /** Show the "I don't have an account" registration option */
+  showRegister?: boolean;
+  /** Show order form cards for direct ordering */
+  showOrderForms?: boolean;
+  /** Which order form IDs to display (empty = show all public) */
+  visibleOrderFormIds?: string[];
+  /** Feature bullets shown on the right panel */
+  featureBullets?: string[];
+}
+
+export const DEFAULT_PORTAL_SETTINGS: PortalSettings = {
+  heroImageUrl: "",
+  welcomeTitle: "",
+  welcomeText: "",
+  contactPhone: "",
+  contactEmail: "",
+  layout: "split",
+  showLogin: true,
+  showRegister: true,
+  showOrderForms: true,
+  visibleOrderFormIds: [],
+  featureBullets: [
+    "Book new shoots online",
+    "Track your order status",
+    "Download delivered photos",
+    "View and pay invoices",
+  ],
+};
+
 export const DEFAULT_BOOKING_FORM_SETTINGS: BookingFormSettings = {
   welcomeMessage: "",
   showMapPreview: true,

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, workspaceProcedure, adminProcedure, ownerProcedure } from "../trpc";
+import { router, publicProcedure, protectedProcedure, workspaceProcedure, adminProcedure, ownerProcedure } from "../trpc";
 import { slugify } from "@/lib/utils";
 import { sendWelcomeEmail } from "@/lib/resend";
-import { type BookingFormSettings, DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
+import { type BookingFormSettings, type PortalSettings, DEFAULT_BOOKING_FORM_SETTINGS, DEFAULT_PORTAL_SETTINGS } from "@/lib/booking-form-types";
 
 export const workspaceRouter = router({
   // Get current workspace
@@ -382,8 +382,68 @@ export const workspaceRouter = router({
       });
       return { ok: true };
     }),
+  // ─── Portal Settings ────────────────────────────────────────────────────────
+
+  getPortalSettings: workspaceProcedure.query(async ({ ctx }) => {
+    const ws = await ctx.prisma.workspace.findUnique({
+      where: { id: ctx.workspace.id },
+      select: { portalSettings: true, slug: true, logoUrl: true, name: true, brandColor: true },
+    });
+    return {
+      settings: (ws?.portalSettings ?? null) as PortalSettings | null,
+      slug: ws?.slug ?? "",
+      logoUrl: ws?.logoUrl ?? null,
+      name: ws?.name ?? "",
+      brandColor: ws?.brandColor ?? "#1B4F9E",
+    };
+  }),
+
+  savePortalSettings: ownerProcedure
+    .input(z.object({
+      heroImageUrl:        z.string().max(2000).optional(),
+      welcomeTitle:        z.string().max(200).optional(),
+      welcomeText:         z.string().max(500).optional(),
+      contactPhone:        z.string().max(30).optional(),
+      contactEmail:        z.string().max(200).optional(),
+      layout:              z.enum(["split", "centered", "fullHero"]).optional(),
+      showLogin:           z.boolean().optional(),
+      showRegister:        z.boolean().optional(),
+      showOrderForms:      z.boolean().optional(),
+      visibleOrderFormIds: z.array(z.string()).optional(),
+      featureBullets:      z.array(z.string().max(100)).max(8).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.workspace.update({
+        where: { id: ctx.workspace.id },
+        data: { portalSettings: input },
+      });
+      return { ok: true };
+    }),
+
+  /** Public endpoint — returns portal settings for the portal landing page */
+  getPublicPortalSettings: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const ws = await ctx.prisma.workspace.findUnique({
+        where: { slug: input.slug },
+        select: {
+          id: true, name: true, slug: true, logoUrl: true, brandColor: true,
+          phone: true, email: true, portalSettings: true,
+          orderForms: {
+            where: { isPublic: true },
+            select: { id: true, title: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          },
+        },
+      });
+      if (!ws) return null;
+      return {
+        ...ws,
+        portalSettings: (ws.portalSettings ?? null) as PortalSettings | null,
+      };
+    }),
 });
 
 // Re-export from shared types file so existing imports still work
-export type { BookingFormSettings } from "@/lib/booking-form-types";
-export { DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
+export type { BookingFormSettings, PortalSettings } from "@/lib/booking-form-types";
+export { DEFAULT_BOOKING_FORM_SETTINGS, DEFAULT_PORTAL_SETTINGS } from "@/lib/booking-form-types";

@@ -8,9 +8,9 @@ import {
   Globe, Lock, Clock, CreditCard, ClipboardList,
   Palette, Type, Search, ChevronDown, Smartphone, Tablet, Monitor,
   Settings2, Eye, MapPin, ShoppingBag, CalendarClock, UserCircle,
-  CheckSquare, Zap,
+  CheckSquare, Zap, LayoutDashboard, Upload, X, Plus, Trash2, Image as ImageIcon,
 } from "lucide-react";
-import { DEFAULT_BOOKING_FORM_SETTINGS, type BookingFormSettings, type CustomField } from "@/lib/booking-form-types";
+import { DEFAULT_BOOKING_FORM_SETTINGS, DEFAULT_PORTAL_SETTINGS, type BookingFormSettings, type CustomField, type PortalSettings } from "@/lib/booking-form-types";
 import { CustomFieldBuilder } from "./custom-field-builder";
 
 type FieldKey = keyof BookingFormSettings["fields"];
@@ -19,6 +19,7 @@ type SidebarSection =
   | "general"
   | "appearance"
   | "seo"
+  | "portal"
   | "step-1"
   | "step-2"
   | "step-3"
@@ -113,6 +114,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const updateAppearance = api.orderForm.updateAppearance.useMutation();
   const updateSeo          = api.orderForm.updateSeo.useMutation();
   const updateCustomFields = api.orderForm.updateCustomFields.useMutation();
+  const savePortalSettings = api.workspace.savePortalSettings.useMutation();
+  const { data: portalData } = api.workspace.getPortalSettings.useQuery();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<SidebarSection>("general");
@@ -165,6 +168,20 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   // Custom fields
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
+  // Portal settings
+  const [portalHeroImage, setPortalHeroImage]       = useState("");
+  const [portalWelcomeTitle, setPortalWelcomeTitle] = useState("");
+  const [portalWelcomeText, setPortalWelcomeText]   = useState("");
+  const [portalContactPhone, setPortalContactPhone] = useState("");
+  const [portalContactEmail, setPortalContactEmail] = useState("");
+  const [portalLayout, setPortalLayout]             = useState<PortalSettings["layout"]>("split");
+  const [portalShowLogin, setPortalShowLogin]       = useState(true);
+  const [portalShowRegister, setPortalShowRegister] = useState(true);
+  const [portalShowOrderForms, setPortalShowOrderForms] = useState(true);
+  const [portalBullets, setPortalBullets]           = useState<string[]>(DEFAULT_PORTAL_SETTINGS.featureBullets!);
+  const [savedPortal, setSavedPortal]               = useState(false);
+  const [heroUploading, setHeroUploading]           = useState(false);
+
   // ── Populate ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!form) return;
@@ -194,6 +211,22 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     }
   }, [form]);
 
+  // ── Populate portal settings ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!portalData?.settings) return;
+    const ps = portalData.settings;
+    setPortalHeroImage(ps.heroImageUrl ?? "");
+    setPortalWelcomeTitle(ps.welcomeTitle ?? "");
+    setPortalWelcomeText(ps.welcomeText ?? "");
+    setPortalContactPhone(ps.contactPhone ?? portalData.settings.contactPhone ?? "");
+    setPortalContactEmail(ps.contactEmail ?? portalData.settings.contactEmail ?? "");
+    setPortalLayout(ps.layout ?? "split");
+    setPortalShowLogin(ps.showLogin ?? true);
+    setPortalShowRegister(ps.showRegister ?? true);
+    setPortalShowOrderForms(ps.showOrderForms ?? true);
+    setPortalBullets(ps.featureBullets ?? DEFAULT_PORTAL_SETTINGS.featureBullets!);
+  }, [portalData]);
+
   function setField(key: FieldKey, prop: "visible" | "required", value: boolean) {
     setFields((prev) => ({
       ...prev,
@@ -213,7 +246,14 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   }, []);
 
   function handleSectionChange(section: SidebarSection) {
+    const wasPortal = activeSection === "portal";
+    const isPortal = section === "portal";
     setActiveSection(section);
+    // Switch iframe between portal and booking URLs when toggling
+    if (wasPortal !== isPortal && iframeRef.current) {
+      const target = isPortal ? `${typeof window !== "undefined" ? window.location.origin : ""}/portal/${workspaceSlug}` : `${typeof window !== "undefined" ? window.location.origin : ""}/book/${workspaceSlug}?form=${formId}`;
+      iframeRef.current.src = target;
+    }
     const stepNum = STEP_MAP[section];
     if (stepNum) sendStepToPreview(stepNum);
   }
@@ -255,6 +295,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://www.scalist.io";
   const bookingUrl = `${origin}/book/${workspaceSlug}?form=${formId}`;
+  const portalUrl = `${origin}/portal/${workspaceSlug}`;
+  const previewUrl = activeSection === "portal" ? portalUrl : bookingUrl;
 
   // ── Save handlers ─────────────────────────────────────────────────────────
 
@@ -294,6 +336,46 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setTimeout(() => setSavedCustom(false), 3000);
   }
 
+  // ── Portal save + hero upload ──────────────────────────────────────────────
+  async function savePortal() {
+    await savePortalSettings.mutateAsync({
+      heroImageUrl: portalHeroImage || undefined,
+      welcomeTitle: portalWelcomeTitle || undefined,
+      welcomeText: portalWelcomeText || undefined,
+      contactPhone: portalContactPhone || undefined,
+      contactEmail: portalContactEmail || undefined,
+      layout: portalLayout,
+      showLogin: portalShowLogin,
+      showRegister: portalShowRegister,
+      showOrderForms: portalShowOrderForms,
+      featureBullets: portalBullets.filter(Boolean),
+    });
+    setSavedPortal(true);
+    // Reload the portal preview if showing it
+    if (activeSection === "portal") refreshPreview();
+    setTimeout(() => setSavedPortal(false), 3000);
+  }
+
+  async function handleHeroUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setHeroUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/workspace/portal-hero-upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json.heroImageUrl) {
+        setPortalHeroImage(json.heroImageUrl);
+        setSavedPortal(false);
+      }
+    } catch (err) {
+      console.error("Hero upload failed:", err);
+    } finally {
+      setHeroUploading(false);
+    }
+  }
+
   // Helper for custom fields onChange — mark dirty + trigger live update
   function handleCustomFieldsChange(updated: CustomField[]) {
     setCustomFields(updated);
@@ -328,6 +410,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           </NavGroup>
 
           <NavGroup label="Steps">
+            <NavBtn icon={LayoutDashboard} label="Client Portal" active={activeSection === "portal"} onClick={() => handleSectionChange("portal")} />
             <NavBtn icon={MapPin}        label="Address"     active={activeSection === "step-1"} onClick={() => handleSectionChange("step-1")} number={1} />
             <NavBtn icon={ShoppingBag}   label="Services"    active={activeSection === "step-2"} onClick={() => handleSectionChange("step-2")} number={2} />
             <NavBtn icon={CalendarClock} label="Scheduling"  active={activeSection === "step-3"} onClick={() => handleSectionChange("step-3")} number={3} />
@@ -415,6 +498,103 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               <TextareaField label="Meta Description" value={seoDesc} onChange={(v) => { setSeoDesc(v); setSavedSeo(false); }} placeholder="Professional real estate photography…" optional rows={3} maxLength={300} counter />
               <InputField label="OG Image URL" value={seoImage} onChange={(v) => { setSeoImage(v); setSavedSeo(false); }} placeholder="https://…/og.jpg" optional />
               <SaveBar><SavePill loading={updateSeo.isPending} saved={savedSeo} onClick={saveSeo} /></SaveBar>
+            </Panel>
+          )}
+
+          {activeSection === "portal" && (
+            <Panel title="Client Portal" desc="Customize your client-facing portal landing page">
+              {/* Hero image upload */}
+              <div className="mt-0">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Hero Image</label>
+                {portalHeroImage ? (
+                  <div className="mt-1.5 relative group rounded-xl overflow-hidden border border-gray-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={portalHeroImage} alt="Portal hero" className="w-full h-36 object-cover" />
+                    <button
+                      onClick={() => { setPortalHeroImage(""); setSavedPortal(false); }}
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="mt-1.5 flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+                    {heroUploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    ) : (
+                      <>
+                        <ImageIcon className="w-6 h-6 text-gray-400 mb-1" />
+                        <span className="text-xs text-gray-500">Click to upload (max 5 MB)</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleHeroUpload} className="hidden" />
+                  </label>
+                )}
+              </div>
+
+              {/* Text fields */}
+              <InputField label="Welcome Title" value={portalWelcomeTitle} onChange={(v) => { setPortalWelcomeTitle(v); setSavedPortal(false); }} placeholder="e.g. Welcome to Our Portal" optional maxLength={200} />
+              <TextareaField label="Welcome Text" value={portalWelcomeText} onChange={(v) => { setPortalWelcomeText(v); setSavedPortal(false); }} placeholder="Brief description for your clients…" optional rows={3} maxLength={500} />
+              <InputField label="Contact Phone" value={portalContactPhone} onChange={(v) => { setPortalContactPhone(v); setSavedPortal(false); }} placeholder="(555) 123-4567" optional />
+              <InputField label="Contact Email" value={portalContactEmail} onChange={(v) => { setPortalContactEmail(v); setSavedPortal(false); }} placeholder="hello@company.com" optional />
+
+              {/* Layout selector */}
+              <div className="mt-4">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 block">Layout</label>
+                {([
+                  { val: "split",    label: "Split",     desc: "Form left, hero image right" },
+                  { val: "centered", label: "Centered",  desc: "Centered card over hero" },
+                  { val: "fullHero", label: "Full Hero",  desc: "Full-width hero with overlay" },
+                ] as const).map(({ val, label, desc }) => (
+                  <RadioCard key={val} selected={portalLayout === val} onClick={() => { setPortalLayout(val); setSavedPortal(false); }}
+                    label={label} desc={desc}
+                  />
+                ))}
+              </div>
+
+              {/* Visibility toggles */}
+              <Divider label="Sections" />
+              <ToggleRow label="Sign In" desc="Show 'I have an account' option" value={portalShowLogin} onChange={(v) => { setPortalShowLogin(v); setSavedPortal(false); }} />
+              <ToggleRow label="Register" desc="Show 'Create an account' option" value={portalShowRegister} onChange={(v) => { setPortalShowRegister(v); setSavedPortal(false); }} />
+              <ToggleRow label="Order Forms" desc="Show order form cards for direct booking" value={portalShowOrderForms} onChange={(v) => { setPortalShowOrderForms(v); setSavedPortal(false); }} />
+
+              {/* Feature bullets */}
+              <Divider label="Feature Bullets" />
+              <p className="text-[11px] text-gray-500 mb-2">Shown on the right panel (split layout)</p>
+              {portalBullets.map((bullet, i) => (
+                <div key={i} className="flex items-center gap-1.5 mb-1.5">
+                  <input
+                    value={bullet}
+                    onChange={(e) => {
+                      const updated = [...portalBullets];
+                      updated[i] = e.target.value;
+                      setPortalBullets(updated);
+                      setSavedPortal(false);
+                    }}
+                    placeholder="Feature text…"
+                    className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+                  />
+                  <button
+                    onClick={() => {
+                      setPortalBullets(portalBullets.filter((_, j) => j !== i));
+                      setSavedPortal(false);
+                    }}
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {portalBullets.length < 8 && (
+                <button
+                  onClick={() => { setPortalBullets([...portalBullets, ""]); setSavedPortal(false); }}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium mt-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add bullet
+                </button>
+              )}
+
+              <SaveBar><SavePill loading={savePortalSettings.isPending} saved={savedPortal} onClick={savePortal} /></SaveBar>
             </Panel>
           )}
 
@@ -675,7 +855,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           >
             <iframe
               ref={iframeRef}
-              src={bookingUrl}
+              src={previewUrl}
               className="w-full h-full bg-white"
               style={{
                 borderRadius: previewSize === "mobile" ? "28px" : previewSize === "tablet" ? "12px" : "12px",

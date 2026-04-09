@@ -64,6 +64,7 @@ model Workspace {
   invoiceDueDays        Int      @default(30)
   lockDownloads         Boolean  @default(false)
   bookingFormSettings   Json?    // Serialized BookingFormSettings object
+  portalSettings        Json?    // Serialized PortalSettings object
 
   // Relations
   members          WorkspaceMember[]
