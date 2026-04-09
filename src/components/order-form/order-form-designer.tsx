@@ -408,6 +408,12 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           {activeSection === "step-1" && (
             <Panel title="Step 1 — Address" desc="Built-in property fields and custom fields">
               <FieldTable fields={PROPERTY_FIELDS} values={fields} onToggle={setField} />
+              <ToggleRow
+                label="Map Preview"
+                desc="Show a Mapbox map pin after the address is entered"
+                value={fields.showMapPreview !== false}
+                onChange={(v) => { setFields({ ...fields, showMapPreview: v } as any); setSavedFields(false); }}
+              />
               <SaveBar><SavePill loading={updateFields.isPending} saved={savedFields} onClick={saveFields} /></SaveBar>
               <Divider label="Custom Fields" />
               <CustomFieldBuilder step={1} fields={customFields} onChange={handleCustomFieldsChange} />
@@ -464,6 +470,24 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
                     <div>
                       <p className="text-xs font-semibold text-gray-700">Badges &amp; labels</p>
                       <p className="text-[11px] text-gray-500">Mark packages as <span className="font-medium">Popular</span> and set custom badge text/color</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <Settings2 className="w-3 h-3 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Grid layout toggle</p>
+                      <p className="text-[11px] text-gray-500">Clients can switch between 2 or 3 items per row</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <ClipboardList className="w-3 h-3 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Side cart</p>
+                      <p className="text-[11px] text-gray-500">Order summary sidebar shows selected items, add-ons, and running total</p>
                     </div>
                   </div>
                 </div>
