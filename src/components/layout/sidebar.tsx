@@ -53,12 +53,12 @@ const navGroups = [
     ],
   },
   {
-    label: "Order Form",
+    label: "Forms/Services",
     items: [
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Listings", href: "/gallery", icon: Image },
       { label: "Availability", href: "/availability", icon: Clock },
-      { label: "Services", href: "/order-form", icon: ClipboardList },
+      { label: "Forms/Services", href: "/order-form", icon: ClipboardList },
       { label: "Integrations", href: "/integrations", icon: Puzzle },
     ],
   },
