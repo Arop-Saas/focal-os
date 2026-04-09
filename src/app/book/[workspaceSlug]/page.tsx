@@ -324,102 +324,157 @@ function Step1Property({
   setForm: (f: FormData) => void;
   settings: BookingFormSettings;
 }) {
+  const [manualEntry, setManualEntry] = useState(false);
   const set = (key: keyof FormData) => (v: string) => setForm({ ...form, [key]: v });
   const f = settings.fields;
+
+  // Show the rest of the form once an address has been selected or manual entry is toggled
+  const addressFilled = !!(form.propertyAddress.trim() && form.propertyCity.trim());
+  const showDetails = addressFilled || manualEntry;
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Property Details</h2>
-        <p className="text-sm text-gray-500 mt-1">Tell us about the property we'll be photographing.</p>
+        <h2 className="text-xl font-semibold text-gray-900">Property Address</h2>
+        <p className="text-sm text-gray-500 mt-1">Where is the property located?</p>
       </div>
-      <Field label="Property Address" required>
-        <AddressAutocomplete
-          value={form.propertyAddress}
-          onChange={set("propertyAddress")}
-          onSelect={(result) =>
-            setForm({
-              ...form,
-              propertyAddress: result.streetAddress || form.propertyAddress,
-              propertyCity: result.city || form.propertyCity,
-              propertyState: result.state || form.propertyState,
-              propertyZip: result.zip || form.propertyZip,
-              propertyLat: result.lat ?? null,
-              propertyLng: result.lng ?? null,
-            })
-          }
-          placeholder="123 Main St"
-          required
-        />
-      </Field>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="City" required>
-          <Input value={form.propertyCity} onChange={set("propertyCity")} placeholder="e.g. Toronto" required />
-        </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="State / Province" required>
-            <Select
-              value={form.propertyState}
-              onChange={set("propertyState")}
-              options={STATES_PROVINCES}
-              placeholder="Select…"
-            />
-          </Field>
-          <Field label="ZIP / Postal Code">
-            <Input value={form.propertyZip} onChange={set("propertyZip")} placeholder="78701 or A1A 1A1" />
-          </Field>
-        </div>
-      </div>
-      {/* Map preview after address is selected (respects showMapPreview setting) */}
-      {settings.showMapPreview !== false && form.propertyLat && form.propertyLng && (
-        <MapboxMap
-          center={{ lat: form.propertyLat, lng: form.propertyLng }}
-          markers={[{ lat: form.propertyLat, lng: form.propertyLng, color: "#3B82F6" }]}
-          height={200}
-          zoom={15}
-          interactive={false}
-          showControls={false}
-        />
-      )}
-      {f.propertyType.visible && (
-        <Field label="Property Type" required={f.propertyType.required}>
-          <Select value={form.propertyType} onChange={set("propertyType")} options={PROPERTY_TYPES} />
-        </Field>
-      )}
-      {(f.sqft.visible || f.beds.visible || f.baths.visible) && (
-        <div className="grid grid-cols-3 gap-3">
-          {f.sqft.visible && (
-            <Field label="Sq Ft" required={f.sqft.required}>
-              <Input value={form.squareFootage} onChange={set("squareFootage")} placeholder="2,400" type="number" required={f.sqft.required} />
-            </Field>
-          )}
-          {f.beds.visible && (
-            <Field label="Beds" required={f.beds.required}>
-              <Input value={form.bedrooms} onChange={set("bedrooms")} placeholder="3" type="number" required={f.beds.required} />
-            </Field>
-          )}
-          {f.baths.visible && (
-            <Field label="Baths" required={f.baths.required}>
-              <Input value={form.bathrooms} onChange={set("bathrooms")} placeholder="2" type="number" required={f.baths.required} />
-            </Field>
-          )}
-        </div>
-      )}
-      {f.mlsNumber.visible && (
-        <Field label="MLS #" required={f.mlsNumber.required}>
-          <Input value={form.mlsNumber} onChange={set("mlsNumber")} placeholder="Optional" required={f.mlsNumber.required} />
-        </Field>
-      )}
-      {f.accessNotes.visible && (
-        <Field label="Access Notes" hint="Lock box codes, gate codes, or special instructions for the photographer." required={f.accessNotes.required}>
-          <textarea
-            value={form.accessNotes}
-            onChange={(e) => set("accessNotes")(e.target.value)}
-            placeholder="e.g., Lock box on front door, code 1234. Dog-friendly yard."
-            rows={3}
-            required={f.accessNotes.required}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+
+      {!manualEntry ? (
+        <>
+          <AddressAutocomplete
+            value={form.propertyAddress}
+            onChange={set("propertyAddress")}
+            onSelect={(result) =>
+              setForm({
+                ...form,
+                propertyAddress: result.streetAddress || form.propertyAddress,
+                propertyCity: result.city || form.propertyCity,
+                propertyState: result.state || form.propertyState,
+                propertyZip: result.zip || form.propertyZip,
+                propertyLat: result.lat ?? null,
+                propertyLng: result.lng ?? null,
+              })
+            }
+            placeholder="Start typing an address..."
+            required
           />
-        </Field>
+          <button
+            type="button"
+            onClick={() => setManualEntry(true)}
+            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Enter address manually
+          </button>
+        </>
+      ) : (
+        <>
+          <Field label="Street Address" required>
+            <Input value={form.propertyAddress} onChange={set("propertyAddress")} placeholder="123 Main St" required />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="City" required>
+              <Input value={form.propertyCity} onChange={set("propertyCity")} placeholder="e.g. Toronto" required />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="State / Province" required>
+                <Select
+                  value={form.propertyState}
+                  onChange={set("propertyState")}
+                  options={STATES_PROVINCES}
+                  placeholder="Select..."
+                />
+              </Field>
+              <Field label="ZIP / Postal Code">
+                <Input value={form.propertyZip} onChange={set("propertyZip")} placeholder="78701 or A1A 1A1" />
+              </Field>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setManualEntry(false)}
+            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Search for address instead
+          </button>
+        </>
+      )}
+
+      {/* Everything below reveals after address is filled */}
+      {showDetails && (
+        <div className="space-y-4 pt-2">
+          {/* Map preview */}
+          {settings.showMapPreview !== false && form.propertyLat && form.propertyLng && (
+            <MapboxMap
+              center={{ lat: form.propertyLat, lng: form.propertyLng }}
+              markers={[{ lat: form.propertyLat, lng: form.propertyLng, color: "#3B82F6" }]}
+              height={200}
+              zoom={15}
+              interactive={false}
+              showControls={false}
+            />
+          )}
+
+          {/* Auto-filled address summary (when using autocomplete) */}
+          {!manualEntry && form.propertyCity && (
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg text-sm">
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">{form.propertyAddress}</div>
+                <div className="text-gray-500">{form.propertyCity}, {form.propertyState} {form.propertyZip}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm({ ...form, propertyAddress: "", propertyCity: "", propertyState: "", propertyZip: "", propertyLat: null, propertyLng: null });
+                }}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Change
+              </button>
+            </div>
+          )}
+
+          {f.propertyType.visible && (
+            <Field label="Property Type" required={f.propertyType.required}>
+              <Select value={form.propertyType} onChange={set("propertyType")} options={PROPERTY_TYPES} />
+            </Field>
+          )}
+          {(f.sqft.visible || f.beds.visible || f.baths.visible) && (
+            <div className="grid grid-cols-3 gap-3">
+              {f.sqft.visible && (
+                <Field label="Sq Ft" required={f.sqft.required}>
+                  <Input value={form.squareFootage} onChange={set("squareFootage")} placeholder="2,400" type="number" required={f.sqft.required} />
+                </Field>
+              )}
+              {f.beds.visible && (
+                <Field label="Beds" required={f.beds.required}>
+                  <Input value={form.bedrooms} onChange={set("bedrooms")} placeholder="3" type="number" required={f.beds.required} />
+                </Field>
+              )}
+              {f.baths.visible && (
+                <Field label="Baths" required={f.baths.required}>
+                  <Input value={form.bathrooms} onChange={set("bathrooms")} placeholder="2" type="number" required={f.baths.required} />
+                </Field>
+              )}
+            </div>
+          )}
+          {f.mlsNumber.visible && (
+            <Field label="MLS #" required={f.mlsNumber.required}>
+              <Input value={form.mlsNumber} onChange={set("mlsNumber")} placeholder="Optional" required={f.mlsNumber.required} />
+            </Field>
+          )}
+          {f.accessNotes.visible && (
+            <Field label="Access Notes" hint="Lock box codes, gate codes, or special instructions for the photographer." required={f.accessNotes.required}>
+              <textarea
+                value={form.accessNotes}
+                onChange={(e) => set("accessNotes")(e.target.value)}
+                placeholder="e.g., Lock box on front door, code 1234. Dog-friendly yard."
+                rows={3}
+                required={f.accessNotes.required}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </Field>
+          )}
+        </div>
       )}
     </div>
   );
