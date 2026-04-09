@@ -411,6 +411,7 @@ export const workspaceRouter = router({
       showOrderForms:      z.boolean().optional(),
       visibleOrderFormIds: z.array(z.string()).optional(),
       featureBullets:      z.array(z.string().max(100)).max(8).optional(),
+      portalCardStyle:     z.enum(["list", "imageGrid"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.workspace.update({
@@ -431,7 +432,7 @@ export const workspaceRouter = router({
           phone: true, email: true, portalSettings: true,
           orderForms: {
             where: { isPublic: true },
-            select: { id: true, title: true },
+            select: { id: true, title: true, description: true, coverImage: true },
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           },
         },

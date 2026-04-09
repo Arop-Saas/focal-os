@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       portalSettings: true,
       orderForms: {
         where: { isPublic: true },
-        select: { id: true, title: true },
+        select: { id: true, title: true, description: true, coverImage: true },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       },
     },

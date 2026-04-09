@@ -123,6 +123,9 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
 
   // General
   const [title, setTitle]             = useState("");
+  const [description, setDescription] = useState("");
+  const [coverImage, setCoverImage]   = useState("");
+  const [coverUploading, setCoverUploading] = useState(false);
   const [welcomeMsg, setWelcomeMsg]   = useState("");
   const [isPublic, setIsPublic]       = useState(true);
 
@@ -179,6 +182,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const [portalShowRegister, setPortalShowRegister] = useState(true);
   const [portalShowOrderForms, setPortalShowOrderForms] = useState(true);
   const [portalBullets, setPortalBullets]           = useState<string[]>(DEFAULT_PORTAL_SETTINGS.featureBullets!);
+  const [portalCardStyle, setPortalCardStyle]       = useState<"list" | "imageGrid">("list");
   const [savedPortal, setSavedPortal]               = useState(false);
   const [heroUploading, setHeroUploading]           = useState(false);
 
@@ -186,6 +190,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   useEffect(() => {
     if (!form) return;
     setTitle(form.title);
+    setDescription((form as any).description ?? "");
+    setCoverImage((form as any).coverImage ?? "");
     setWelcomeMsg(form.welcomeMessage ?? "");
     setIsPublic(form.isPublic);
     setConfirmMode((form.confirmationMode as any) ?? "IMMEDIATE");
@@ -225,6 +231,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setPortalShowRegister(ps.showRegister ?? true);
     setPortalShowOrderForms(ps.showOrderForms ?? true);
     setPortalBullets(ps.featureBullets ?? DEFAULT_PORTAL_SETTINGS.featureBullets!);
+    setPortalCardStyle(ps.portalCardStyle ?? "list");
   }, [portalData]);
 
   function setField(key: FieldKey, prop: "visible" | "required", value: boolean) {
@@ -301,7 +308,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   // ── Save handlers ─────────────────────────────────────────────────────────
 
   async function saveGeneral() {
-    await updateGeneral.mutateAsync({ id: formId, title, welcomeMessage: welcomeMsg, isPublic });
+    await updateGeneral.mutateAsync({ id: formId, title, description: description || null, coverImage: coverImage || null, welcomeMessage: welcomeMsg, isPublic });
     setSavedGeneral(true); refreshPreview();
     setTimeout(() => setSavedGeneral(false), 3000);
   }
@@ -349,6 +356,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
       showRegister: portalShowRegister,
       showOrderForms: portalShowOrderForms,
       featureBullets: portalBullets.filter(Boolean),
+      portalCardStyle,
     });
     setSavedPortal(true);
     // Reload the portal preview if showing it
@@ -374,6 +382,21 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     } finally {
       setHeroUploading(false);
     }
+  }
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("formId", formId);
+      const res = await fetch("/api/order-form/cover-upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json.coverImage) { setCoverImage(json.coverImage); setSavedGeneral(false); }
+    } catch (err) { console.error("Cover upload failed:", err); }
+    finally { setCoverUploading(false); }
   }
 
   // Helper for custom fields onChange — mark dirty + trigger live update
@@ -442,6 +465,38 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           {activeSection === "general" && (
             <Panel title="General Settings" desc="Name, visibility, and welcome text">
               <InputField label="Form Title" value={title} onChange={(v) => { setTitle(v); setSavedGeneral(false); }} placeholder="e.g. Standard Booking" />
+              <TextareaField label="Description" value={description} onChange={(v) => { setDescription(v); setSavedGeneral(false); }} placeholder="Short description shown on portal cards…" optional rows={2} maxLength={300} counter />
+
+              {/* Cover image upload */}
+              <div className="mt-4">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Cover Image</label>
+                <p className="text-[11px] text-gray-400 mt-0.5 mb-1.5">Shown on the portal card when image grid style is enabled</p>
+                {coverImage ? (
+                  <div className="relative group rounded-xl overflow-hidden border border-gray-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={coverImage} alt="Cover" className="w-full h-32 object-cover" />
+                    <button
+                      onClick={() => { setCoverImage(""); setSavedGeneral(false); }}
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+                    {coverUploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 text-gray-400 mb-1" />
+                        <span className="text-xs text-gray-500">Click to upload (max 5 MB)</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleCoverUpload} className="hidden" />
+                  </label>
+                )}
+              </div>
+
               <TextareaField label="Welcome Message" value={welcomeMsg} onChange={(v) => { setWelcomeMsg(v); setSavedGeneral(false); }} placeholder="Shown at the top of your booking page…" optional rows={3} />
               <ToggleRow label="Public" desc="Visible on your booking page" value={isPublic} onChange={(v) => { setIsPublic(v); setSavedGeneral(false); }} />
               <SaveBar><SavePill loading={updateGeneral.isPending} saved={savedGeneral} onClick={saveGeneral} /></SaveBar>
@@ -557,6 +612,30 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               <ToggleRow label="Sign In" desc="Show 'I have an account' option" value={portalShowLogin} onChange={(v) => { setPortalShowLogin(v); setSavedPortal(false); }} />
               <ToggleRow label="Register" desc="Show 'Create an account' option" value={portalShowRegister} onChange={(v) => { setPortalShowRegister(v); setSavedPortal(false); }} />
               <ToggleRow label="Order Forms" desc="Show order form cards for direct booking" value={portalShowOrderForms} onChange={(v) => { setPortalShowOrderForms(v); setSavedPortal(false); }} />
+
+              {/* Card style selector */}
+              {portalShowOrderForms && (
+                <div className="mt-3">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 block">Card Style</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { val: "list" as const, label: "List", desc: "Simple text rows" },
+                      { val: "imageGrid" as const, label: "Image Grid", desc: "Cards with cover photos" },
+                    ]).map(({ val, label, desc }) => (
+                      <button key={val} onClick={() => { setPortalCardStyle(val); setSavedPortal(false); }}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          portalCardStyle === val
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <p className={`text-xs font-semibold ${portalCardStyle === val ? "text-blue-700" : "text-gray-700"}`}>{label}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">{desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Feature bullets */}
               <Divider label="Feature Bullets" />

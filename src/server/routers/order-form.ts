@@ -59,6 +59,8 @@ export const orderFormRouter = router({
     .input(z.object({
       id:             z.string(),
       title:          z.string().min(1).max(100).optional(),
+      description:    z.string().max(300).optional().nullable(),
+      coverImage:     z.string().max(2000).optional().nullable(),
       welcomeMessage: z.string().max(500).optional(),
       isPublic:       z.boolean().optional(),
     }))

@@ -101,6 +101,8 @@ model OrderForm {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   title           String
+  description     String?                      // Short description shown on portal cards
+  coverImage      String?                      // Cover image URL for portal cards
   isPublic        Boolean @default(true)
   welcomeMessage  String?
 

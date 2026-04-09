@@ -82,6 +82,8 @@ export interface PortalSettings {
   visibleOrderFormIds?: string[];
   /** Feature bullets shown on the right panel */
   featureBullets?: string[];
+  /** How order form cards appear on portal: "list" (default) or "imageGrid" */
+  portalCardStyle?: "list" | "imageGrid";
 }
 
 export const DEFAULT_PORTAL_SETTINGS: PortalSettings = {
@@ -101,6 +103,7 @@ export const DEFAULT_PORTAL_SETTINGS: PortalSettings = {
     "Download delivered photos",
     "View and pay invoices",
   ],
+  portalCardStyle: "list",
 };
 
 export const DEFAULT_BOOKING_FORM_SETTINGS: BookingFormSettings = {

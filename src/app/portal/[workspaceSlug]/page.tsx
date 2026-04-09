@@ -21,7 +21,7 @@ interface WorkspacePortalData {
   phone: string | null;
   email: string | null;
   portalSettings: PortalSettings | null;
-  orderForms: { id: string; title: string }[];
+  orderForms: { id: string; title: string; description: string | null; coverImage: string | null }[];
 }
 
 function PortalLanding() {
@@ -88,6 +88,7 @@ function PortalLanding() {
   const showLogin = ps.showLogin !== false;
   const showRegister = ps.showRegister !== false;
   const showOrderForms = ps.showOrderForms !== false;
+  const cardStyle = ps.portalCardStyle ?? "list";
   const layout = ps.layout ?? "split";
   const orderForms = ws?.orderForms ?? [];
 
@@ -219,8 +220,8 @@ function PortalLanding() {
               </button>
             )}
 
-            {/* Order form cards */}
-            {showOrderForms && orderForms.length > 0 && orderForms.map((of) => (
+            {/* Order form cards — list style */}
+            {showOrderForms && cardStyle === "list" && orderForms.length > 0 && orderForms.map((of) => (
               <a key={of.id} href={`/book/${workspaceSlug}?form=${of.id}`}
                 className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50/50 transition-colors text-left group"
               >
@@ -229,11 +230,38 @@ function PortalLanding() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{of.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Place a new order</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{of.description || "Place a new order"}</p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-gray-300 ml-auto group-hover:text-blue-400 transition-colors" />
               </a>
             ))}
+
+            {/* Order form cards — image grid style */}
+            {showOrderForms && cardStyle === "imageGrid" && orderForms.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 w-full">
+                {orderForms.map((of) => (
+                  <a key={of.id} href={`/book/${workspaceSlug}?form=${of.id}`}
+                    className="rounded-xl border border-gray-200 overflow-hidden hover:border-blue-400 hover:shadow-md transition-all group"
+                  >
+                    {of.coverImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={of.coverImage} alt={of.title} className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="w-full h-28 flex items-center justify-center" style={{ backgroundColor: `${brandColor}10` }}>
+                        <ClipboardList className="w-8 h-8" style={{ color: `${brandColor}40` }} />
+                      </div>
+                    )}
+                    <div className="p-3">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{of.title}</p>
+                      {of.description && <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{of.description}</p>}
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium mt-2 transition-colors" style={{ color: brandColor }}>
+                        Order now <ArrowRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
 
             {/* Fallback: single "Place an order" link when no specific forms */}
             {showOrderForms && orderForms.length === 0 && (
