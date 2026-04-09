@@ -572,60 +572,70 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
   const svcTotal = serviceItems.reduce((sum: number, s: any) => sum + s.basePrice, 0);
   const total = selectedPkg ? pkgPrice + addOnTotal : svcTotal;
   const hasItems = !!selectedPkg || serviceItems.length > 0;
+  const itemCount = (selectedPkg ? 1 : 0) + addOnItems.length + (!selectedPkg ? serviceItems.length : 0);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden sticky top-28">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden sticky top-28">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-900">Order details</h3>
+        {itemCount > 0 && (
+          <span className="text-[10px] font-bold text-white rounded-full w-5 h-5 flex items-center justify-center" style={{ backgroundColor: brandColor }}>
+            {itemCount}
+          </span>
+        )}
       </div>
 
       {/* Items */}
-      <div className="p-4 space-y-3 max-h-[50vh] overflow-y-auto">
+      <div className="px-5 py-3 space-y-0 max-h-[50vh] overflow-y-auto">
         {!hasItems && (
-          <p className="text-xs text-gray-400 text-center py-4">Your cart is empty. Select a package or services to get started.</p>
+          <div className="text-center py-8">
+            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-2">
+              <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
+            </div>
+            <p className="text-xs text-gray-400">Select a package or services</p>
+          </div>
         )}
 
         {selectedPkg && (
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 py-3 border-b border-gray-50 last:border-0">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">{selectedPkg.name}</p>
-              <p className="text-xs text-gray-400">Package</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">{selectedPkg.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Package</p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-sm font-bold text-gray-900">${pkgPrice.toLocaleString()}</span>
-              <button type="button" onClick={onRemovePkg} className="w-5 h-5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              <button type="button" onClick={onRemovePkg} className="w-5 h-5 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Remove">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
           </div>
         )}
 
         {addOnItems.map((svc: any) => (
-          <div key={svc.id} className="flex items-start justify-between gap-2">
+          <div key={svc.id} className="flex items-center justify-between gap-2 py-3 border-b border-gray-50 last:border-0">
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-700">{svc.name}</p>
-              <p className="text-xs text-orange-500 font-medium">Add-on</p>
+              <p className="text-sm text-gray-700 truncate">{svc.name}</p>
+              <p className="text-[11px] font-medium mt-0.5" style={{ color: brandColor }}>Add-on</p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-sm text-gray-700">${svc.basePrice.toLocaleString()}</span>
-              <button type="button" onClick={() => onRemoveAddOn(svc.id)} className="w-5 h-5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-sm text-gray-600">${svc.basePrice.toLocaleString()}</span>
+              <button type="button" onClick={() => onRemoveAddOn(svc.id)} className="w-5 h-5 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Remove">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
           </div>
         ))}
 
         {!selectedPkg && serviceItems.map((svc: any) => (
-          <div key={svc.id} className="flex items-start justify-between gap-2">
+          <div key={svc.id} className="flex items-center justify-between gap-2 py-3 border-b border-gray-50 last:border-0">
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-700">{svc.name}</p>
-              <p className="text-xs text-gray-400">Service</p>
+              <p className="text-sm text-gray-700 truncate">{svc.name}</p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-sm text-gray-700">${svc.basePrice.toLocaleString()}</span>
-              <button type="button" onClick={() => onRemoveService(svc.id)} className="w-5 h-5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-sm text-gray-600">${svc.basePrice.toLocaleString()}</span>
+              <button type="button" onClick={() => onRemoveService(svc.id)} className="w-5 h-5 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Remove">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
           </div>
@@ -633,10 +643,10 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
       </div>
 
       {/* Total */}
-      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+      <div className="px-5 py-4 border-t border-gray-100" style={{ backgroundColor: `${brandColor}08` }}>
         <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-600">Total:</span>
-          <span className="text-lg font-bold text-gray-900">${total.toLocaleString()}</span>
+          <span className="text-sm text-gray-500">Total</span>
+          <span className="text-xl font-bold text-gray-900">${total.toLocaleString()}</span>
         </div>
       </div>
     </div>
@@ -649,6 +659,7 @@ function Step2Package({
   packages,
   services,
   brandColor,
+  gridColumns = 3,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -657,12 +668,13 @@ function Step2Package({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   services: any[];
   brandColor: string;
+  gridColumns?: number;
 }) {
   const [tab, setTab] = useState<"packages" | "services">("packages");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [detailPkg, setDetailPkg] = useState<any | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
-  const [columns, setColumns] = useState(3);
+  const columns = gridColumns;
 
   const selectPackage = (pkgId: string) => {
     setForm({ ...form, packageId: pkgId, selectedServiceIds: [...selectedAddOns] });
@@ -710,27 +722,19 @@ function Step2Package({
     cat === "VIRTUAL_STAGING" ? "🪄" : cat === "TWILIGHT" ? "🌅" :
     cat === "SOCIAL_MEDIA" ? "📱" : "📦";
 
-  const gridClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+  const gridClass =
+    columns === 5 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" :
+    columns === 4 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" :
+    "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
 
   return (
     <div className="flex gap-6 items-start">
       {/* Left: Main content */}
       <div className="flex-1 min-w-0 space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Services</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Please choose your items below.</p>
-          </div>
-          {/* Column toggle */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-            <button type="button" onClick={() => setColumns(2)} className={`p-1.5 rounded-md transition-colors ${columns === 2 ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600"}`} title="2 per row">
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="14" rx="1" /><rect x="9" y="1" width="6" height="14" rx="1" /></svg>
-            </button>
-            <button type="button" onClick={() => setColumns(3)} className={`p-1.5 rounded-md transition-colors ${columns === 3 ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600"}`} title="3 per row">
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"><rect x="0.5" y="1" width="4" height="14" rx="1" /><rect x="6" y="1" width="4" height="14" rx="1" /><rect x="11.5" y="1" width="4" height="14" rx="1" /></svg>
-            </button>
-          </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Services</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Please choose your items below.</p>
         </div>
 
         {/* Tabs: Packages / Services */}
@@ -854,7 +858,7 @@ function Step2Package({
       </div>
 
       {/* Right: Order Cart sidebar */}
-      <div className="w-[260px] shrink-0 hidden md:block">
+      <div className="w-[280px] shrink-0 hidden lg:block">
         <OrderCart
           selectedPkg={selectedPkg}
           selectedAddOns={selectedAddOns}
@@ -1486,6 +1490,7 @@ export default function BookingPage() {
   // ── Live designer state (overrides from postMessage) ─────────────────────
   const [liveFieldSettings, setLiveFieldSettings] = useState<BookingFormSettings["fields"] | null>(null);
   const [liveCustomFields, setLiveCustomFields] = useState<CustomField[] | null>(null);
+  const [liveGridColumns, setLiveGridColumns] = useState<number | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
 
   // ── Listen for designer postMessages ─────────────────────────────────────
@@ -1498,6 +1503,7 @@ export default function BookingPage() {
       if (e.data?.type === "DESIGNER_LIVE_UPDATE") {
         if (e.data.fieldSettings) setLiveFieldSettings(e.data.fieldSettings);
         if (e.data.customFields) setLiveCustomFields(e.data.customFields);
+        if (e.data.gridColumns != null) setLiveGridColumns(e.data.gridColumns);
       }
     }
     window.addEventListener("message", handleMessage);
@@ -1633,6 +1639,11 @@ export default function BookingPage() {
     ?? ((data?.orderForm as any)?.customFields as CustomField[] | undefined)
     ?? [];
 
+  // Grid columns: live override > saved in fieldSettings > default 3
+  const gridColumns = liveGridColumns
+    ?? (rawSettings as any)?.gridColumns
+    ?? 3;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Brand accent bar + Header */}
@@ -1658,13 +1669,13 @@ export default function BookingPage() {
       </header>
 
       {/* Content */}
-      <main className={`mx-auto px-4 py-8 transition-all ${step === 2 ? "max-w-5xl" : "max-w-2xl"}`}>
+      <main className={`mx-auto px-4 py-8 transition-all ${step === 2 ? "max-w-6xl" : "max-w-2xl"}`}>
         <StepIndicator current={step} total={5} brandColor={brandColor} />
 
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>

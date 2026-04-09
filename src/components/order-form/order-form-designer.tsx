@@ -159,6 +159,9 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const [savedSeo, setSavedSeo]               = useState(false);
   const [savedCustom, setSavedCustom]         = useState(false);
 
+  // Grid columns (Step 2)
+  const [gridColumns, setGridColumns] = useState(3);
+
   // Custom fields
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
@@ -185,6 +188,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setSeoDesc((form as any).seoDescription ?? "");
     setSeoImage((form as any).seoImage ?? "");
     setCustomFields(((form as any).customFields as CustomField[]) ?? []);
+    setGridColumns((form.fieldSettings as any)?.gridColumns ?? DEFAULT_BOOKING_FORM_SETTINGS.gridColumns ?? 3);
     if (form.fieldSettings) {
       setFields({ ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...(form.fieldSettings as BookingFormSettings["fields"]) });
     }
@@ -228,7 +232,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   if (!form) return null;
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://www.scalist.io";
-  const bookingUrl = `${origin}/book/${workspaceSlug}`;
+  const bookingUrl = `${origin}/book/${workspaceSlug}?form=${formId}`;
 
   // ── Save handlers ─────────────────────────────────────────────────────────
 
@@ -238,7 +242,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setTimeout(() => setSavedGeneral(false), 3000);
   }
   async function saveFields() {
-    await updateFields.mutateAsync({ id: formId, fieldSettings: fields });
+    await updateFields.mutateAsync({ id: formId, fieldSettings: { ...fields, gridColumns } as any });
     setSavedFields(true); refreshPreview();
     setTimeout(() => setSavedFields(false), 3000);
   }
@@ -275,9 +279,10 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
         type: "DESIGNER_LIVE_UPDATE",
         fieldSettings: fields,
         customFields,
+        gridColumns,
       }, "*");
     }
-  }, [fields, customFields]);
+  }, [fields, customFields, gridColumns]);
 
   useEffect(() => { sendLiveUpdate(); }, [sendLiveUpdate]);
 
@@ -441,6 +446,31 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
                 </div>
               </div>
 
+              {/* Grid columns setting */}
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Layout Settings</p>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-gray-700">Items per row</label>
+                    <span className="text-xs font-bold text-gray-900 bg-white px-2 py-0.5 rounded border border-gray-200">{gridColumns}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={3}
+                    max={5}
+                    step={1}
+                    value={gridColumns}
+                    onChange={(e) => { setGridColumns(Number(e.target.value)); setSavedFields(false); }}
+                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-gray-400">3</span>
+                    <span className="text-[10px] text-gray-400">4</span>
+                    <span className="text-[10px] text-gray-400">5</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Display tips */}
               <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Display Features</p>
@@ -473,15 +503,6 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <Settings2 className="w-3 h-3 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-700">Grid layout toggle</p>
-                      <p className="text-[11px] text-gray-500">Clients can switch between 2 or 3 items per row</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
                     <div className="w-5 h-5 rounded-md bg-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
                       <ClipboardList className="w-3 h-3 text-indigo-600" />
                     </div>
@@ -492,6 +513,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
                   </div>
                 </div>
               </div>
+
+              <SaveBar><SavePill loading={updateFields.isPending} saved={savedFields} onClick={saveFields} /></SaveBar>
 
               <Divider label="Custom Fields" />
               <CustomFieldBuilder step={2} fields={customFields} onChange={handleCustomFieldsChange} />

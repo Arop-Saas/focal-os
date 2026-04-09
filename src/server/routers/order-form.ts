@@ -13,6 +13,7 @@ const fieldSettingsSchema = z.object({
   phone:        z.object({ visible: z.boolean(), required: z.boolean() }),
   company:      z.object({ visible: z.boolean(), required: z.boolean() }),
   clientNotes:  z.object({ visible: z.boolean(), required: z.boolean() }),
+  gridColumns:  z.number().int().min(3).max(5).optional(),
 }).optional();
 
 export const orderFormRouter = router({
