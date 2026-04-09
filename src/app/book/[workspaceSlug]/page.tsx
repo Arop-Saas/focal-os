@@ -2148,7 +2148,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
             </>
           )}
 
-          {error && (
+          {error && !(step === 1 && !form.propertyAddress.trim()) && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {error}
             </div>
@@ -2168,7 +2168,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
               <div />
             )}
 
-            {step < 5 ? (
+            {step < 5 && !(step === 1 && !form.propertyAddress.trim()) ? (
               <button
                 type="button"
                 onClick={handleNext}
