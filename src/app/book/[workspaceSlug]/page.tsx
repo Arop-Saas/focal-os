@@ -834,10 +834,15 @@ function Step2Package({
                   <div key={svc.id} className={`rounded-xl border bg-white overflow-hidden transition-all ${selected ? "" : "hover:shadow-sm"}`}
                     style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 1px ${brandColor}44` } : { borderColor: "#f3f4f6" }}
                   >
-                    {/* Icon header */}
-                    <div className="h-20 bg-gray-50 flex items-center justify-center">
-                      <span className="text-2xl">{svcIcon(svc.category)}</span>
-                    </div>
+                    {/* Cover image or icon header */}
+                    {svc.coverImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={svc.coverImage} alt={svc.name} className="w-full h-20 object-cover" />
+                    ) : (
+                      <div className="h-20 bg-gray-50 flex items-center justify-center">
+                        <span className="text-2xl">{svcIcon(svc.category)}</span>
+                      </div>
+                    )}
                     <div className="p-3">
                       <p className="text-sm font-semibold text-gray-900">{svc.name}</p>
                       {svc.description && <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{svc.description}</p>}

@@ -7,6 +7,7 @@ import {
   Plus, X, ToggleRight, ToggleLeft, Star, Pencil, Clock, Camera,
   Video, Plane, Boxes, FileText, Layers, Sunset, Share2, Zap,
   HelpCircle, Timer, CheckCircle2, ChevronDown, Tag, Building2,
+  Upload, Loader2, Image as ImageIcon,
 } from "lucide-react";
 import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ type Service = {
   turnaroundHours?: number | null;
   isActive: boolean;
   description?: string | null;
+  coverImage?: string | null;
 };
 
 type Package = {
@@ -53,6 +55,7 @@ type Package = {
   name: string;
   price: number;
   description?: string | null;
+  coverImage?: string | null;
   isActive: boolean;
   isPopular: boolean;
   badgeLabel?: string | null;
@@ -63,6 +66,33 @@ type Package = {
   items: Array<{ serviceId: string; quantity: number; service: Service }>;
   _count: { jobs: number };
 };
+
+// ── Client-side image compression ───────────────────────────────────────
+async function compressImage(file: File, maxWidth = 1200, maxHeight = 900, quality = 0.85): Promise<File> {
+  if (file.size <= 1.5 * 1024 * 1024) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; }
+        resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
 
 /* ─── Small reusable badge ──────────────────────────────────────────── */
 function PackageBadge({ pkg }: { pkg: Pick<Package, "badgeLabel" | "badgeColor" | "isPopular"> }) {
@@ -101,11 +131,15 @@ export function PackagesView() {
   const [serviceDuration, setServiceDuration] = useState("60");
   const [serviceTurnaroundHours, setServiceTurnaroundHours] = useState("");
   const [serviceDescription, setServiceDescription] = useState("");
+  const [serviceCoverImage, setServiceCoverImage] = useState("");
+  const [serviceImageUploading, setServiceImageUploading] = useState(false);
 
   /* ── Package form ── */
   const [packageName, setPackageName] = useState("");
   const [packagePrice, setPackagePrice] = useState("");
   const [packageDescription, setPackageDescription] = useState("");
+  const [packageCoverImage, setPackageCoverImage] = useState("");
+  const [packageImageUploading, setPackageImageUploading] = useState(false);
   const [packageIsPopular, setPackageIsPopular] = useState(false);
   const [packageBadgeLabel, setPackageBadgeLabel] = useState("");
   const [packageBadgeColor, setPackageBadgeColor] = useState("#f59e0b");
@@ -126,7 +160,7 @@ export function PackagesView() {
   const resetServiceForm = () => {
     setServiceName(""); setServicePrice(""); setServiceCategory("PHOTOGRAPHY");
     setServiceDuration("60"); setServiceTurnaroundHours(""); setServiceDescription("");
-    setEditingService(null); setShowServiceModal(false);
+    setServiceCoverImage(""); setEditingService(null); setShowServiceModal(false);
   };
 
   const handleOpenEditService = (service: Service) => {
@@ -137,6 +171,7 @@ export function PackagesView() {
     setServiceDuration(String(service.durationMins));
     setServiceTurnaroundHours(service.turnaroundHours ? String(service.turnaroundHours) : "");
     setServiceDescription(service.description ?? "");
+    setServiceCoverImage(service.coverImage ?? "");
     setShowServiceModal(true);
   };
 
@@ -154,6 +189,7 @@ export function PackagesView() {
           durationMins: parseInt(serviceDuration),
           turnaroundHours: serviceTurnaroundHours ? parseInt(serviceTurnaroundHours) : null,
           description: serviceDescription || undefined,
+          coverImage: serviceCoverImage || null,
         });
       } else {
         await createServiceMutation.mutateAsync({
@@ -163,6 +199,7 @@ export function PackagesView() {
           durationMins: parseInt(serviceDuration),
           turnaroundHours: serviceTurnaroundHours ? parseInt(serviceTurnaroundHours) : undefined,
           description: serviceDescription || undefined,
+          coverImage: serviceCoverImage || null,
           isActive: true,
         });
       }
@@ -191,6 +228,7 @@ export function PackagesView() {
         name: packageName,
         price: parseFloat(packagePrice),
         description: packageDescription || undefined,
+        coverImage: packageCoverImage || null,
         isActive: true,
         isPopular: packageIsPopular,
         badgeLabel: packageBadgeLabel || undefined,
@@ -200,7 +238,7 @@ export function PackagesView() {
         items: packageServices,
       });
       setShowPackageModal(false);
-      setPackageName(""); setPackagePrice(""); setPackageDescription("");
+      setPackageName(""); setPackagePrice(""); setPackageDescription(""); setPackageCoverImage("");
       setPackageIsPopular(false); setPackageBadgeLabel(""); setPackageBadgeColor("#f59e0b");
       setPackagePhotoCount(""); setPackageTurnaroundHours(""); setPackageServices([]);
       await refetchPackages();
@@ -208,6 +246,31 @@ export function PackagesView() {
       setIsSubmitting(false);
     }
   };
+
+  /* ── Image upload handler (shared for service & package) ── */
+  async function handleProductImageUpload(
+    file: File,
+    setUploading: (v: boolean) => void,
+    setImage: (url: string) => void,
+  ) {
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      const fd = new FormData();
+      fd.append("file", compressed);
+      fd.append("type", "service");
+      fd.append("productId", "new"); // "new" skips ownership check; URL saved via tRPC
+      const res = await fetch("/api/product/image-upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) { alert("Upload failed: " + (json.error ?? "Unknown error")); return; }
+      if (json.coverImage) setImage(json.coverImage);
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      alert("Image upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   /* ── Live service card preview ── */
   const cat = CATEGORY_META[serviceCategory] ?? CATEGORY_META.OTHER;
@@ -344,8 +407,13 @@ export function PackagesView() {
                 const Icon = meta.icon;
                 return (
                   <div key={service.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
-                    {/* Color accent top bar */}
-                    <div className={cn("h-1.5 w-full", meta.bg)} />
+                    {/* Cover image or color accent */}
+                    {service.coverImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={service.coverImage} alt={service.name} className="w-full h-32 object-cover" />
+                    ) : (
+                      <div className={cn("h-1.5 w-full", meta.bg)} />
+                    )}
                     <div className="p-4 space-y-3">
                       {/* Header row */}
                       <div className="flex items-start justify-between gap-2">
@@ -433,8 +501,13 @@ export function PackagesView() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(packages as Package[]).map((pkg) => (
                 <div key={pkg.id} className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-blue-200 transition-all group">
-                  {/* Gradient accent */}
-                  <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+                  {/* Cover image or gradient accent */}
+                  {pkg.coverImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={pkg.coverImage} alt={pkg.name} className="w-full h-36 object-cover" />
+                  ) : (
+                    <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+                  )}
                   <div className="p-4 space-y-3">
                     {/* Name + badge row */}
                     <div className="flex items-start justify-between gap-2">
@@ -612,6 +685,34 @@ export function PackagesView() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
                     />
                   </div>
+
+                  {/* Cover Image */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image <span className="text-gray-400 font-normal">(optional)</span></label>
+                    {serviceCoverImage ? (
+                      <div className="relative group rounded-lg overflow-hidden border border-gray-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={serviceCoverImage} alt="Cover" className="w-full h-28 object-cover" />
+                        <button type="button" onClick={() => setServiceCoverImage("")}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+                        {serviceImageUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 text-gray-400 mb-0.5" />
+                            <span className="text-[11px] text-gray-500">Upload image</span>
+                          </>
+                        )}
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProductImageUpload(f, setServiceImageUploading, setServiceCoverImage); }} />
+                      </label>
+                    )}
+                  </div>
                 </form>
 
                 {/* Right: live preview */}
@@ -689,6 +790,34 @@ export function PackagesView() {
                       disabled={isSubmitting}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
                     />
+                  </div>
+
+                  {/* Cover Image */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image <span className="text-gray-400 font-normal">(optional)</span></label>
+                    {packageCoverImage ? (
+                      <div className="relative group rounded-lg overflow-hidden border border-gray-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={packageCoverImage} alt="Cover" className="w-full h-28 object-cover" />
+                        <button type="button" onClick={() => setPackageCoverImage("")}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+                        {packageImageUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 text-gray-400 mb-0.5" />
+                            <span className="text-[11px] text-gray-500">Upload image</span>
+                          </>
+                        )}
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProductImageUpload(f, setPackageImageUploading, setPackageCoverImage); }} />
+                      </label>
+                    )}
                   </div>
 
                   {/* Turnaround */}

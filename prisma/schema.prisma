@@ -451,6 +451,7 @@ model Service {
   workspaceId   String
   name          String
   description   String?
+  coverImage    String?
   category      ServiceCategory
   basePrice     Float    @default(0)
   durationMins  Int      @default(60)
