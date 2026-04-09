@@ -228,15 +228,17 @@ function Field({
   required,
   children,
   hint,
+  error,
 }: {
   label: string;
   required?: boolean;
   children: React.ReactNode;
   hint?: string;
+  error?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">
+      <label className={`text-sm font-medium ${error ? "text-red-600" : "text-gray-700"}`}>
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -253,6 +255,7 @@ function Input({
   type = "text",
   required,
   className = "",
+  error,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -260,6 +263,7 @@ function Input({
   type?: string;
   required?: boolean;
   className?: string;
+  error?: boolean;
 }) {
   return (
     <input
@@ -268,7 +272,9 @@ function Input({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       required={required}
-      className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`}
+      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+        error ? "border-red-400 focus:ring-red-400" : "border-gray-200 focus:ring-blue-500"
+      } ${className}`}
     />
   );
 }
@@ -278,11 +284,13 @@ function Select({
   onChange,
   options,
   placeholder,
+  error,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string; group?: string }[];
   placeholder?: string;
+  error?: boolean;
 }) {
   // Group options if any have a `group` field
   const hasGroups = options.some((o) => o.group);
@@ -294,12 +302,14 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 bg-white ${
+        error ? "border-red-400 focus:ring-red-400" : "border-gray-200 focus:ring-blue-500"
+      }`}
     >
       {placeholder && <option value="">{placeholder}</option>}
       {hasGroups
         ? groups.map((g) => (
-            <optgroup key={g} label={g === "US" ? "🇺🇸 United States" : g === "CA" ? "🇨🇦 Canada" : g}>
+            <optgroup key={g} label={g === "US" ? "United States" : g === "CA" ? "Canada" : g}>
               {options.filter((o) => o.group === g).map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
@@ -319,14 +329,17 @@ function Step1Property({
   form,
   setForm,
   settings,
+  showErrors = false,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   settings: BookingFormSettings;
+  showErrors?: boolean;
 }) {
   const [manualEntry, setManualEntry] = useState(false);
   const set = (key: keyof FormData) => (v: string) => setForm({ ...form, [key]: v });
   const f = settings.fields;
+  const err = (val: string) => showErrors && !val.trim();
 
   // Show the rest of the form once an address has been selected or manual entry is toggled
   const addressFilled = !!(form.propertyAddress.trim() && form.propertyCity.trim());
@@ -368,20 +381,21 @@ function Step1Property({
         </>
       ) : (
         <>
-          <Field label="Street Address" required>
-            <Input value={form.propertyAddress} onChange={set("propertyAddress")} placeholder="123 Main St" required />
+          <Field label="Street Address" required error={err(form.propertyAddress)}>
+            <Input value={form.propertyAddress} onChange={set("propertyAddress")} placeholder="123 Main St" required error={err(form.propertyAddress)} />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="City" required>
-              <Input value={form.propertyCity} onChange={set("propertyCity")} placeholder="e.g. Toronto" required />
+            <Field label="City" required error={err(form.propertyCity)}>
+              <Input value={form.propertyCity} onChange={set("propertyCity")} placeholder="e.g. Toronto" required error={err(form.propertyCity)} />
             </Field>
             <div className="grid grid-cols-2 gap-2">
-              <Field label="State / Province" required>
+              <Field label="State / Province" required error={err(form.propertyState)}>
                 <Select
                   value={form.propertyState}
                   onChange={set("propertyState")}
                   options={STATES_PROVINCES}
                   placeholder="Select..."
+                  error={err(form.propertyState)}
                 />
               </Field>
               <Field label="ZIP / Postal Code">
@@ -434,43 +448,45 @@ function Step1Property({
           )}
 
           {f.propertyType.visible && (
-            <Field label="Property Type" required={f.propertyType.required}>
-              <Select value={form.propertyType} onChange={set("propertyType")} options={PROPERTY_TYPES} />
+            <Field label="Property Type" required={f.propertyType.required} error={f.propertyType.required && err(form.propertyType)}>
+              <Select value={form.propertyType} onChange={set("propertyType")} options={PROPERTY_TYPES} error={f.propertyType.required && err(form.propertyType)} />
             </Field>
           )}
           {(f.sqft.visible || f.beds.visible || f.baths.visible) && (
             <div className="grid grid-cols-3 gap-3">
               {f.sqft.visible && (
-                <Field label="Sq Ft" required={f.sqft.required}>
-                  <Input value={form.squareFootage} onChange={set("squareFootage")} placeholder="2,400" type="number" required={f.sqft.required} />
+                <Field label="Sq Ft" required={f.sqft.required} error={f.sqft.required && err(form.squareFootage)}>
+                  <Input value={form.squareFootage} onChange={set("squareFootage")} placeholder="2,400" type="number" required={f.sqft.required} error={f.sqft.required && err(form.squareFootage)} />
                 </Field>
               )}
               {f.beds.visible && (
-                <Field label="Beds" required={f.beds.required}>
-                  <Input value={form.bedrooms} onChange={set("bedrooms")} placeholder="3" type="number" required={f.beds.required} />
+                <Field label="Beds" required={f.beds.required} error={f.beds.required && err(form.bedrooms)}>
+                  <Input value={form.bedrooms} onChange={set("bedrooms")} placeholder="3" type="number" required={f.beds.required} error={f.beds.required && err(form.bedrooms)} />
                 </Field>
               )}
               {f.baths.visible && (
-                <Field label="Baths" required={f.baths.required}>
-                  <Input value={form.bathrooms} onChange={set("bathrooms")} placeholder="2" type="number" required={f.baths.required} />
+                <Field label="Baths" required={f.baths.required} error={f.baths.required && err(form.bathrooms)}>
+                  <Input value={form.bathrooms} onChange={set("bathrooms")} placeholder="2" type="number" required={f.baths.required} error={f.baths.required && err(form.bathrooms)} />
                 </Field>
               )}
             </div>
           )}
           {f.mlsNumber.visible && (
-            <Field label="MLS #" required={f.mlsNumber.required}>
-              <Input value={form.mlsNumber} onChange={set("mlsNumber")} placeholder="Optional" required={f.mlsNumber.required} />
+            <Field label="MLS #" required={f.mlsNumber.required} error={f.mlsNumber.required && err(form.mlsNumber)}>
+              <Input value={form.mlsNumber} onChange={set("mlsNumber")} placeholder="Optional" required={f.mlsNumber.required} error={f.mlsNumber.required && err(form.mlsNumber)} />
             </Field>
           )}
           {f.accessNotes.visible && (
-            <Field label="Access Notes" hint="Lock box codes, gate codes, or special instructions for the photographer." required={f.accessNotes.required}>
+            <Field label="Access Notes" hint="Lock box codes, gate codes, or special instructions for the photographer." required={f.accessNotes.required} error={f.accessNotes.required && err(form.accessNotes)}>
               <textarea
                 value={form.accessNotes}
                 onChange={(e) => set("accessNotes")(e.target.value)}
                 placeholder="e.g., Lock box on front door, code 1234. Dog-friendly yard."
                 rows={3}
                 required={f.accessNotes.required}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 resize-none ${
+                  f.accessNotes.required && err(form.accessNotes) ? "border-red-400 focus:ring-red-400" : "border-gray-200 focus:ring-blue-500"
+                }`}
               />
             </Field>
           )}
@@ -1240,50 +1256,55 @@ function Step4Contact({
   form,
   setForm,
   settings,
+  showErrors = false,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   settings: BookingFormSettings;
+  showErrors?: boolean;
 }) {
   const set = (key: keyof FormData) => (v: string) => setForm({ ...form, [key]: v });
   const f = settings.fields;
+  const err = (val: string) => showErrors && !val.trim();
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Your Contact Info</h2>
-        <p className="text-sm text-gray-500 mt-1">We'll send the confirmation and updates here.</p>
+        <p className="text-sm text-gray-500 mt-1">We will send the confirmation and updates here.</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="First Name" required>
-          <Input value={form.firstName} onChange={set("firstName")} placeholder="Jane" required />
+        <Field label="First Name" required error={err(form.firstName)}>
+          <Input value={form.firstName} onChange={set("firstName")} placeholder="Jane" required error={err(form.firstName)} />
         </Field>
-        <Field label="Last Name" required>
-          <Input value={form.lastName} onChange={set("lastName")} placeholder="Smith" required />
+        <Field label="Last Name" required error={err(form.lastName)}>
+          <Input value={form.lastName} onChange={set("lastName")} placeholder="Smith" required error={err(form.lastName)} />
         </Field>
       </div>
 
-      <Field label="Email" required>
-        <Input value={form.email} onChange={set("email")} placeholder="jane@realty.com" type="email" required />
+      <Field label="Email" required error={err(form.email)}>
+        <Input value={form.email} onChange={set("email")} placeholder="jane@realty.com" type="email" required error={err(form.email)} />
       </Field>
       {f.phone.visible && (
-        <Field label="Phone" required={f.phone.required}>
-          <Input value={form.phone} onChange={set("phone")} placeholder="(512) 555-0100" type="tel" required={f.phone.required} />
+        <Field label="Phone" required={f.phone.required} error={f.phone.required && err(form.phone)}>
+          <Input value={form.phone} onChange={set("phone")} placeholder="(512) 555-0100" type="tel" required={f.phone.required} error={f.phone.required && err(form.phone)} />
         </Field>
       )}
       {f.company.visible && (
-        <Field label="Company / Brokerage" required={f.company.required}>
-          <Input value={form.company} onChange={set("company")} placeholder="Austin Premier Realty" required={f.company.required} />
+        <Field label="Company / Brokerage" required={f.company.required} error={f.company.required && err(form.company)}>
+          <Input value={form.company} onChange={set("company")} placeholder="Austin Premier Realty" required={f.company.required} error={f.company.required && err(form.company)} />
         </Field>
       )}
       {f.clientNotes.visible && (
-        <Field label="Notes for us" hint="Anything specific you'd like us to know about the shoot." required={f.clientNotes.required}>
+        <Field label="Notes for us" hint="Anything specific you'd like us to know about the shoot." required={f.clientNotes.required} error={f.clientNotes.required && err(form.clientNotes)}>
           <textarea
             value={form.clientNotes}
             onChange={(e) => set("clientNotes")(e.target.value)}
             placeholder="e.g., Please focus on the backyard pool. The kitchen was just renovated."
             rows={3}
             required={f.clientNotes.required}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 resize-none ${
+              f.clientNotes.required && err(form.clientNotes) ? "border-red-400 focus:ring-red-400" : "border-gray-200 focus:ring-blue-500"
+            }`}
           />
         </Field>
       )}
@@ -1725,6 +1746,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [error, setError] = useState<string | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [showAddOnModal, setShowAddOnModal] = useState(false);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   // ── Live designer state (overrides from postMessage) ─────────────────────
   const [liveFieldSettings, setLiveFieldSettings] = useState<BookingFormSettings["fields"] | null>(null);
@@ -1851,7 +1873,11 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   };
 
   const handleNext = () => {
-    if (!canAdvance()) return;
+    if (!canAdvance()) {
+      setShowFieldErrors(true);
+      return;
+    }
+    setShowFieldErrors(false);
 
     // After step 2: if a package is selected and there are services not in it, show add-on popup
     if (step === 2 && form.packageId && data) {
@@ -2125,7 +2151,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 ${step === 2 ? "hidden" : ""}`}>
           {step === 1 && (
             <>
-              <Step1Property form={form} setForm={setForm} settings={formSettings} />
+              <Step1Property form={form} setForm={setForm} settings={formSettings} showErrors={showFieldErrors} />
               <CustomFieldsRenderer step={1} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
@@ -2137,7 +2163,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 4 && (
             <>
-              <Step4Contact form={form} setForm={setForm} settings={formSettings} />
+              <Step4Contact form={form} setForm={setForm} settings={formSettings} showErrors={showFieldErrors} />
               <CustomFieldsRenderer step={4} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
