@@ -1,11 +1,10 @@
 "use client";
 
 import { api } from "@/lib/trpc/client";
-import { OrderFormEditor } from "./order-form-editor";
+import { OrderFormDesigner } from "./order-form-designer";
 import { Loader2 } from "lucide-react";
 
 export function OrderFormEditorWrapper({ formId }: { formId: string }) {
-  // Reuse getBookingFormSettings which already returns the workspace slug
   const { data, isLoading } = api.workspace.getBookingFormSettings.useQuery();
 
   if (isLoading) {
@@ -16,5 +15,5 @@ export function OrderFormEditorWrapper({ formId }: { formId: string }) {
     );
   }
 
-  return <OrderFormEditor formId={formId} workspaceSlug={data?.slug ?? ""} />;
+  return <OrderFormDesigner formId={formId} workspaceSlug={data?.slug ?? ""} />;
 }

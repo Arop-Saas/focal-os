@@ -116,6 +116,20 @@ model OrderForm {
   paymentMode    String @default("NONE")  // NONE | FULL | PARTIAL
   depositPercent Int?                     // e.g. 25 = 25% deposit
 
+  // ── Designer / Appearance ─────────────────────────────────────────────────
+  accentColor     String  @default("#2563eb")  // Primary button & link color
+  backgroundColor String  @default("#ffffff")  // Form background
+  logoUrl         String?                      // Custom logo URL for this form
+  fontFamily      String  @default("Inter")    // Font: Inter, System, Serif, Mono
+  buttonStyle     String  @default("rounded")  // rounded | pill | square
+  showLogo        Boolean @default(true)
+  showStepNumbers Boolean @default(true)
+
+  // ── SEO ───────────────────────────────────────────────────────────────────
+  seoTitle        String?
+  seoDescription  String?
+  seoImage        String?                      // Open Graph image URL
+
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

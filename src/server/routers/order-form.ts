@@ -106,6 +106,38 @@ export const orderFormRouter = router({
       return ctx.prisma.orderForm.update({ where: { id }, data });
     }),
 
+  // ─── Update appearance (designer) ──────────────────────────────────────────────
+  updateAppearance: ownerProcedure
+    .input(z.object({
+      id:              z.string(),
+      accentColor:     z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      logoUrl:         z.string().url().optional().nullable(),
+      fontFamily:      z.enum(["Inter", "System", "Serif", "Mono"]).optional(),
+      buttonStyle:     z.enum(["rounded", "pill", "square"]).optional(),
+      showLogo:        z.boolean().optional(),
+      showStepNumbers: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      await assertOwns(ctx, id);
+      return ctx.prisma.orderForm.update({ where: { id }, data });
+    }),
+
+  // ─── Update SEO settings ──────────────────────────────────────────────────────
+  updateSeo: ownerProcedure
+    .input(z.object({
+      id:             z.string(),
+      seoTitle:       z.string().max(120).optional().nullable(),
+      seoDescription: z.string().max(300).optional().nullable(),
+      seoImage:       z.string().url().optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      await assertOwns(ctx, id);
+      return ctx.prisma.orderForm.update({ where: { id }, data });
+    }),
+
   // ─── Delete ───────────────────────────────────────────────────────────────────
   delete: ownerProcedure
     .input(z.object({ id: z.string() }))
