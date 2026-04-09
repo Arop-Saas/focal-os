@@ -1810,8 +1810,9 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const selectedPkg = data?.packages?.find((p: any) => p.id === form.packageId);
       const pkgName = selectedPkg?.name ?? "";
+      const confirmed = (result as any).confirmed !== false;
       router.push(
-        `/book/${workspaceSlug}/success?job=${result.jobNumber}&name=${encodeURIComponent(result.clientName)}&date=${encodeURIComponent(result.scheduledAt)}&pkg=${encodeURIComponent(pkgName)}`
+        `/book/${workspaceSlug}/success?job=${result.jobNumber}&name=${encodeURIComponent(result.clientName)}&date=${encodeURIComponent(result.scheduledAt)}&pkg=${encodeURIComponent(pkgName)}&confirmed=${confirmed}`
       );
     },
     onError: (err) => {
@@ -1938,6 +1939,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       staffProfileId: form.photographerId || undefined,
       scheduledAt: new Date(`${form.scheduledDate}T${form.scheduledTime}`).toISOString(),
       clientNotes: form.clientNotes || undefined,
+      formId: formId || undefined,
     });
   };
 

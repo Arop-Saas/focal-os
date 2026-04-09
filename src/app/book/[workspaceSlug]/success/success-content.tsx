@@ -12,6 +12,7 @@ interface Props {
   clientName: string;
   dateStr: string;
   packageName: string;
+  confirmed: boolean;
 }
 
 export function BookingSuccessContent({
@@ -24,6 +25,7 @@ export function BookingSuccessContent({
   clientName,
   dateStr,
   packageName,
+  confirmed,
 }: Props) {
   let formattedDate = dateStr;
   try {
@@ -73,11 +75,13 @@ export function BookingSuccessContent({
           </div>
 
           <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">
-            You&apos;re booked!
+            {confirmed ? "You're booked!" : "Booking Request Submitted"}
           </h1>
           <p className="text-gray-500 text-sm text-center mb-6">
             {firstName ? `Thanks, ${firstName}! ` : "Thanks! "}
-            {workspaceName} will be in touch to confirm your appointment.
+            {confirmed
+              ? "Your appointment has been confirmed."
+              : `${workspaceName} will review and confirm your appointment shortly.`}
           </p>
 
           {/* Details card */}
@@ -102,12 +106,18 @@ export function BookingSuccessContent({
             )}
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Status</span>
-              <span
-                className="font-semibold text-xs px-2.5 py-1 rounded-full"
-                style={{ backgroundColor: brandColor + "18", color: brandColor }}
-              >
-                Pending confirmation
-              </span>
+              {confirmed ? (
+                <span className="font-semibold text-xs px-2.5 py-1 rounded-full bg-green-50 text-green-700">
+                  Confirmed
+                </span>
+              ) : (
+                <span
+                  className="font-semibold text-xs px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: brandColor + "18", color: brandColor }}
+                >
+                  Pending confirmation
+                </span>
+              )}
             </div>
           </div>
 
@@ -116,12 +126,19 @@ export function BookingSuccessContent({
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
               What happens next
             </p>
-            {[
-              `${workspaceName} will review and confirm your booking shortly.`,
-              "You'll receive a confirmation email with all the details.",
-              "Our photographer will arrive at the scheduled time.",
-              "Edited photos are typically delivered within 24–48 hours.",
-            ].map((item, i) => (
+            {(confirmed
+              ? [
+                  "You'll receive a confirmation email with all the details.",
+                  "Our photographer will arrive at the scheduled time.",
+                  "Edited photos are typically delivered within 24-48 hours.",
+                ]
+              : [
+                  `${workspaceName} will review and confirm your booking shortly.`,
+                  "You'll receive a confirmation email once approved.",
+                  "Our photographer will arrive at the scheduled time.",
+                  "Edited photos are typically delivered within 24-48 hours.",
+                ]
+            ).map((item, i) => (
               <div key={i} className="flex items-start gap-3 text-sm text-gray-600">
                 <span
                   className="w-5 h-5 shrink-0 rounded-full text-white text-[10px] font-bold flex items-center justify-center mt-0.5"

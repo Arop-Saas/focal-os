@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 interface Props {
   params: { workspaceSlug: string };
-  searchParams: { job?: string; name?: string; date?: string; pkg?: string };
+  searchParams: { job?: string; name?: string; date?: string; pkg?: string; confirmed?: string };
 }
 
 export default async function BookingSuccessPage({ params, searchParams }: Props) {
@@ -27,6 +27,7 @@ export default async function BookingSuccessPage({ params, searchParams }: Props
         clientName={searchParams.name ?? ""}
         dateStr={searchParams.date ?? ""}
         packageName={searchParams.pkg ?? ""}
+        confirmed={searchParams.confirmed === "true"}
       />
     </Suspense>
   );

@@ -275,6 +275,7 @@ export const bookingRouter = router({
         staffProfileId: z.string().optional(), // assigned photographer
         scheduledAt: z.string(), // ISO datetime string
         clientNotes: z.string().optional(),
+        formId: z.string().optional(), // order form ID to check confirmation mode
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -285,6 +286,16 @@ export const bookingRouter = router({
 
       if (!workspace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Booking page not found." });
+      }
+
+      // Check confirmation mode from order form (default: IMMEDIATE = auto-confirm)
+      let confirmationMode = "IMMEDIATE";
+      if (input.formId) {
+        const orderForm = await ctx.prisma.orderForm.findFirst({
+          where: { id: input.formId, workspaceId: workspace.id },
+          select: { confirmationMode: true },
+        });
+        if (orderForm) confirmationMode = orderForm.confirmationMode;
       }
 
       // Validate package belongs to this workspace if provided
@@ -366,7 +377,7 @@ export const bookingRouter = router({
             propertyLng: input.propertyLng,
             scheduledAt,
             clientNotes: input.clientNotes,
-            status: "PENDING",
+            status: confirmationMode === "IMMEDIATE" ? "CONFIRMED" : "PENDING",
             subtotal,
             totalAmount: subtotal,
           },
@@ -419,25 +430,58 @@ export const bookingRouter = router({
         return { job, client };
       });
 
-      // Fire booking confirmation email (fire-and-forget)
-      notifyJobBooked({
-        workspaceId: workspace.id,
-        jobId: result.job.id,
-        clientEmail: input.email,
-        clientName: `${input.firstName} ${input.lastName}`,
-        jobNumber: result.job.jobNumber,
-        propertyAddress: input.propertyAddress,
-        scheduledAt,
-        packageName: pkg?.name ?? (alaCarteServices.length > 0 ? alaCarteServices.map((s) => s.name).join(", ") : ""),
-      }).catch(console.error);
+      const clientName = `${input.firstName} ${input.lastName}`;
+      const pkgName = pkg?.name ?? (alaCarteServices.length > 0 ? alaCarteServices.map((s) => s.name).join(", ") : "");
+
+      if (confirmationMode === "IMMEDIATE") {
+        // Auto-confirm: send confirmation email to client + in-app notification
+        notifyJobBooked({
+          workspaceId: workspace.id,
+          jobId: result.job.id,
+          clientEmail: input.email,
+          clientName,
+          jobNumber: result.job.jobNumber,
+          propertyAddress: input.propertyAddress,
+          scheduledAt,
+          packageName: pkgName,
+        }).catch(console.error);
+      } else {
+        // Manual confirmation: notify workspace owner to review, send pending notice to client
+        // In-app notification for workspace owner
+        ctx.prisma.notification.create({
+          data: {
+            workspaceId: workspace.id,
+            jobId: result.job.id,
+            type: "JOB_BOOKED",
+            channel: "IN_APP",
+            status: "DELIVERED",
+            title: `New booking request — ${result.job.jobNumber}`,
+            body: `${clientName} is requesting a booking at ${input.propertyAddress}. Review and confirm.`,
+            sentAt: new Date(),
+          },
+        }).catch(console.error);
+
+        // Also send the standard notification so emails still go out
+        notifyJobBooked({
+          workspaceId: workspace.id,
+          jobId: result.job.id,
+          clientEmail: input.email,
+          clientName,
+          jobNumber: result.job.jobNumber,
+          propertyAddress: input.propertyAddress,
+          scheduledAt,
+          packageName: pkgName,
+        }).catch(console.error);
+      }
 
       return {
         jobId: result.job.id,
         jobNumber: result.job.jobNumber,
-        clientName: `${input.firstName} ${input.lastName}`,
+        clientName,
         propertyAddress: input.propertyAddress,
         scheduledAt: input.scheduledAt,
         packageName: pkg?.name ?? null,
+        confirmed: confirmationMode === "IMMEDIATE",
       };
     }),
 });
