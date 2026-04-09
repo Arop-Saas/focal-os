@@ -8,7 +8,6 @@ import {
   Briefcase,
   Users,
   UserCheck,
-  Package,
   Receipt,
   Image,
   CalendarDays,
@@ -56,7 +55,6 @@ const navGroups = [
   {
     label: "Business",
     items: [
-      { label: "Products", href: "/packages", icon: Package },
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Listings", href: "/gallery", icon: Image },
       { label: "Availability", href: "/availability", icon: Clock },
