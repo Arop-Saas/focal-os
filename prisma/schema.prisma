@@ -488,6 +488,7 @@ model Package {
   isPopular     Boolean  @default(false)
   badgeLabel    String?
   badgeColor    String?
+  coverImage    String?
   photoCount    Int?
   turnaroundDays Int?
   turnaroundHours Int?

@@ -50,6 +50,7 @@ export const bookingRouter = router({
             timeSlotInterval: true,
             paymentMode: true,
             depositPercent: true,
+            customFields: true,
           },
         });
       }

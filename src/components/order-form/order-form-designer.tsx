@@ -419,13 +419,56 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
 
           {activeSection === "step-2" && (
             <Panel title="Step 2 — Services" desc="Packages, add-ons, and custom fields">
+              {/* Product management link */}
               <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4">
-                <p className="text-sm text-blue-800 font-medium">Products are managed separately</p>
-                <p className="text-xs text-blue-600 mt-1">Active packages and services appear automatically.</p>
-                <button onClick={() => router.push("/products")} className="mt-3 text-xs font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2">
-                  Go to Products &rarr;
-                </button>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-900 font-semibold">Products &amp; Packages</p>
+                    <p className="text-xs text-blue-600 mt-0.5">Manage your packages, services, and pricing from the Products page. Active items appear automatically on the booking form.</p>
+                    <button onClick={() => router.push("/products")} className="mt-2 text-xs font-bold text-blue-700 hover:text-blue-900 underline underline-offset-2 transition-colors">
+                      Go to Products &rarr;
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* Display tips */}
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Display Features</p>
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <CheckSquare className="w-3 h-3 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Cover images on cards</p>
+                      <p className="text-[11px] text-gray-500">Add a <span className="font-medium">Cover Image</span> URL to any package for a premium card layout</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <Eye className="w-3 h-3 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Detail modal with add-ons</p>
+                      <p className="text-[11px] text-gray-500">Clients can click &quot;View Details&quot; to see included services and suggested add-ons</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <Zap className="w-3 h-3 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Badges &amp; labels</p>
+                      <p className="text-[11px] text-gray-500">Mark packages as <span className="font-medium">Popular</span> and set custom badge text/color</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <Divider label="Custom Fields" />
               <CustomFieldBuilder step={2} fields={customFields} onChange={handleCustomFieldsChange} />
               {customFields.some((f) => f.step === 2) && (

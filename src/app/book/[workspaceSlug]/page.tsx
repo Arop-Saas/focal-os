@@ -397,7 +397,143 @@ function Step1Property({
   );
 }
 
-// ─── Step 2: Package / À la carte ─────────────────────────────────────────────
+// ─── Step 2: Package / À la carte (Premium Redesign) ──────────────────────────
+
+// Service category icons for display
+const CATEGORY_ICONS: Record<string, string> = {
+  PHOTOGRAPHY: "📸", VIDEO: "🎬", DRONE: "🚁", VIRTUAL_TOUR_3D: "🏠",
+  FLOOR_PLAN: "📐", VIRTUAL_STAGING: "🪄", TWILIGHT: "🌅", SOCIAL_MEDIA: "📱",
+  RUSH_EDITING: "⚡", OTHER: "🔧",
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services }: { pkg: any; brandColor: string; onSelect: () => void; onClose: () => void; services: any[] }) {
+  // Find add-on services not already in package
+  const pkgServiceIds = new Set((pkg.items ?? []).map((i: any) => i.serviceId ?? i.service?.id));
+  const suggestedAddOns = services.filter((s: any) => !pkgServiceIds.has(s.id)).slice(0, 6);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header with cover image */}
+        <div className="relative h-48 overflow-hidden shrink-0">
+          {pkg.coverImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full" style={{ background: `linear-gradient(135deg, ${brandColor}dd, ${brandColor}88)` }}>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg className="w-16 h-16 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                </svg>
+              </div>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          <div className="absolute bottom-4 left-5 right-5">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                {pkg.isPopular && (
+                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-white/25 backdrop-blur-md text-white px-2.5 py-1 rounded-full mb-2">
+                    {pkg.badgeLabel || "Most Popular"}
+                  </span>
+                )}
+                <h3 className="text-xl font-bold text-white leading-tight">{pkg.name}</h3>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-2xl font-black text-white">${pkg.price.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {pkg.description && (
+            <p className="text-sm text-gray-600 leading-relaxed">{pkg.description}</p>
+          )}
+
+          {(pkg.photoCount || pkg.turnaroundDays) && (
+            <div className="flex gap-4">
+              {pkg.photoCount && (
+                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
+                  <span className="text-sm">📷</span>
+                  <span className="text-sm font-medium text-gray-700">{pkg.photoCount} photos</span>
+                </div>
+              )}
+              {pkg.turnaroundDays && (
+                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
+                  <span className="text-sm">⏱</span>
+                  <span className="text-sm font-medium text-gray-700">{pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Included services */}
+          {pkg.items?.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Included Services</h4>
+              <div className="space-y-2">
+                {pkg.items.map((item: any) => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100">
+                    <span className="text-lg">{CATEGORY_ICONS[item.service.category] ?? "📦"}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{item.service.name}</p>
+                      {item.service.description && (
+                        <p className="text-xs text-gray-500 truncate">{item.service.description}</p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                      Included
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Suggested Add-ons */}
+          {suggestedAddOns.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Suggested Add-ons</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {suggestedAddOns.map((svc: any) => (
+                  <div key={svc.id} className="p-3 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-100 hover:border-gray-200 transition-colors">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm">{CATEGORY_ICONS[svc.category] ?? "📦"}</span>
+                      <span className="text-xs font-semibold text-gray-800 truncate">{svc.name}</span>
+                    </div>
+                    <p className="text-sm font-bold text-gray-900">+${svc.basePrice.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer CTA */}
+        <div className="shrink-0 p-5 border-t border-gray-100 bg-gray-50/50">
+          <button
+            type="button"
+            onClick={() => { onSelect(); onClose(); }}
+            style={{ backgroundColor: brandColor }}
+            className="w-full py-3 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity shadow-lg"
+          >
+            Select {pkg.name} — ${pkg.price.toLocaleString()}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Step2Package({
   form,
@@ -415,6 +551,8 @@ function Step2Package({
   brandColor: string;
 }) {
   const [tab, setTab] = useState<"packages" | "services">("packages");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [detailPkg, setDetailPkg] = useState<any | null>(null);
 
   const selectPackage = (pkgId: string) => {
     setForm({ ...form, packageId: pkgId, selectedServiceIds: [] });
@@ -428,114 +566,196 @@ function Step2Package({
     setForm({ ...form, packageId: "", selectedServiceIds: next });
   };
 
-  // Compute à la carte total
-  const alaCarteTotal = services
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((s: any) => form.selectedServiceIds.includes(s.id))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .reduce((sum: number, s: any) => sum + s.basePrice, 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const alaCarteTotal = services.filter((s: any) => form.selectedServiceIds.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0);
+
+  // Group services by category for à la carte view
+  const servicesByCategory = services.reduce((acc: Record<string, any[]>, svc: any) => {
+    const cat = svc.category || "OTHER";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(svc);
+    return acc;
+  }, {});
+
+  const categoryLabels: Record<string, string> = {
+    PHOTOGRAPHY: "Photography", VIDEO: "Video", DRONE: "Aerial / Drone",
+    VIRTUAL_TOUR_3D: "3D Virtual Tours", FLOOR_PLAN: "Floor Plans",
+    VIRTUAL_STAGING: "Virtual Staging", TWILIGHT: "Twilight",
+    SOCIAL_MEDIA: "Social Media", RUSH_EDITING: "Rush Editing", OTHER: "Other",
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Choose Your Services</h2>
-        <p className="text-sm text-gray-500 mt-1">Select a package or pick individual services à la carte.</p>
+        <p className="text-sm text-gray-500 mt-1">Select a package or build your own from individual services.</p>
       </div>
 
-      {/* Tab toggle */}
-      <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+      {/* Segmented tabs */}
+      <div className="relative bg-gray-100 rounded-xl p-1 flex">
         <button
           type="button"
           onClick={() => setTab("packages")}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
-            tab === "packages" ? "text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+          className={`flex-1 relative z-10 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+            tab === "packages" ? "text-gray-900 shadow-sm bg-white" : "text-gray-500 hover:text-gray-700"
           }`}
-          style={tab === "packages" ? { backgroundColor: brandColor } : undefined}
         >
           Packages
+          {packages.length > 0 && (
+            <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${tab === "packages" ? "bg-gray-100 text-gray-600" : "bg-gray-200/60 text-gray-400"}`}>
+              {packages.length}
+            </span>
+          )}
         </button>
         <button
           type="button"
           onClick={() => setTab("services")}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
-            tab === "services" ? "text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+          className={`flex-1 relative z-10 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+            tab === "services" ? "text-gray-900 shadow-sm bg-white" : "text-gray-500 hover:text-gray-700"
           }`}
-          style={tab === "services" ? { backgroundColor: brandColor } : undefined}
         >
-          Services
+          À La Carte
           {form.selectedServiceIds.length > 0 && (
-            <span className="ml-1.5 text-xs bg-white bg-opacity-30 px-1.5 py-0.5 rounded-full">
+            <span className="ml-1.5 text-[10px] text-white px-1.5 py-0.5 rounded-full" style={{ backgroundColor: brandColor }}>
               {form.selectedServiceIds.length}
             </span>
           )}
         </button>
       </div>
 
-      {/* Packages tab */}
+      {/* ═══ Packages Tab ═══ */}
       {tab === "packages" && (
         <>
           {packages.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 text-sm">No packages available. Switch to Services to pick individual services.</div>
+            <div className="text-center py-12 text-gray-400">
+              <div className="text-3xl mb-2">📦</div>
+              <p className="text-sm">No packages available right now.</p>
+              <button type="button" onClick={() => setTab("services")} className="mt-2 text-sm font-medium underline underline-offset-2" style={{ color: brandColor }}>
+                Browse individual services instead
+              </button>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <div className="space-y-4">
               {packages.map((pkg: any) => {
                 const selected = form.packageId === pkg.id;
+                const hasImage = !!pkg.coverImage;
                 return (
-                  <button
+                  <div
                     key={pkg.id}
-                    type="button"
-                    onClick={() => selectPackage(pkg.id)}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all bg-white ${
-                      !selected ? "border-gray-200 hover:border-gray-300" : ""
+                    className={`group relative rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
+                      selected ? "ring-2 ring-offset-2" : "hover:shadow-lg hover:-translate-y-0.5"
                     }`}
-                    style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 3px ${brandColor}22` } : undefined}
+                    style={
+                      selected
+                        ? { borderColor: brandColor, ringColor: brandColor }
+                        : { borderColor: "#e5e7eb" }
+                    }
+                    onClick={() => selectPackage(pkg.id)}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-900">{pkg.name}</span>
-                          {pkg.isPopular && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                              Most Popular
+                    {/* Cover image or gradient header */}
+                    {hasImage ? (
+                      <div className="relative h-36 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        {pkg.isPopular && (
+                          <span
+                            className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1 rounded-full"
+                            style={{ backgroundColor: pkg.badgeColor || brandColor }}
+                          >
+                            {pkg.badgeLabel || "Most Popular"}
+                          </span>
+                        )}
+                        {selected && (
+                          <div className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: brandColor }}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {pkg.isPopular && (
+                          <div className="px-5 pt-4">
+                            <span
+                              className="inline-block text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1 rounded-full"
+                              style={{ backgroundColor: pkg.badgeColor || brandColor }}
+                            >
+                              {pkg.badgeLabel || "Most Popular"}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Card body */}
+                    <div className="p-5 bg-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-bold text-gray-900 leading-tight">{pkg.name}</h3>
+                          {pkg.description && (
+                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{pkg.description}</p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-2xl font-black text-gray-900">${pkg.price.toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      {/* Meta badges */}
+                      {(pkg.photoCount || pkg.turnaroundDays || pkg.items?.length) && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {pkg.photoCount && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+                              📷 {pkg.photoCount} photos
+                            </span>
+                          )}
+                          {pkg.turnaroundDays && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+                              ⏱ {pkg.turnaroundDays}d delivery
+                            </span>
+                          )}
+                          {pkg.items?.length > 0 && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+                              📦 {pkg.items.length} services
                             </span>
                           )}
                         </div>
-                        {pkg.description && (
-                          <p className="text-sm text-gray-500 mt-1">{pkg.description}</p>
-                        )}
-                        {(pkg.photoCount || pkg.turnaroundDays) && (
-                          <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
-                            {pkg.photoCount && <span>📷 {pkg.photoCount} photos</span>}
-                            {pkg.turnaroundDays && <span>⏱ {pkg.turnaroundDays} day{pkg.turnaroundDays !== 1 ? "s" : ""} delivery</span>}
-                          </div>
-                        )}
-                        {pkg.items?.length > 0 && (
-                          <ul className="mt-2 flex flex-wrap gap-1">
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {pkg.items.map((item: any) => (
-                              <li key={item.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                {item.service.name}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-xl font-bold text-gray-900">${pkg.price.toLocaleString()}</div>
-                        <div
-                          className="w-5 h-5 mt-2 ml-auto rounded-full border-2 flex items-center justify-center"
-                          style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
-                        >
-                          {selected && (
-                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                              <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-                            </svg>
+                      )}
+
+                      {/* Service tags */}
+                      {pkg.items?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                          {pkg.items.slice(0, 5).map((item: any) => (
+                            <span key={item.id} className="text-[11px] font-medium bg-gray-50 border border-gray-200 text-gray-600 px-2 py-0.5 rounded-md">
+                              {item.service.name}
+                            </span>
+                          ))}
+                          {pkg.items.length > 5 && (
+                            <span className="text-[11px] font-medium text-gray-400 px-1 py-0.5">
+                              +{pkg.items.length - 5} more
+                            </span>
                           )}
                         </div>
-                      </div>
+                      )}
+
+                      {/* View details link */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setDetailPkg(pkg); }}
+                        className="mt-3 text-xs font-semibold hover:underline underline-offset-2 transition-colors"
+                        style={{ color: brandColor }}
+                      >
+                        View Details →
+                      </button>
+
+                      {/* Selection indicator (no image variant) */}
+                      {!hasImage && selected && (
+                        <div className="absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center text-white shadow" style={{ backgroundColor: brandColor }}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -543,64 +763,95 @@ function Step2Package({
         </>
       )}
 
-      {/* À la carte tab */}
+      {/* ═══ À La Carte Tab ═══ */}
       {tab === "services" && (
         <>
           {services.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 text-sm">No individual services available at this time.</div>
+            <div className="text-center py-12 text-gray-400">
+              <div className="text-3xl mb-2">🛠</div>
+              <p className="text-sm">No individual services available at this time.</p>
+            </div>
           ) : (
-            <div className="space-y-2">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {services.map((svc: any) => {
-                const selected = form.selectedServiceIds.includes(svc.id);
-                return (
-                  <button
-                    key={svc.id}
-                    type="button"
-                    onClick={() => toggleService(svc.id)}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all bg-white ${
-                      !selected ? "border-gray-200 hover:border-gray-300" : ""
-                    }`}
-                    style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 3px ${brandColor}22` } : undefined}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <span className="font-semibold text-gray-900">{svc.name}</span>
-                        {svc.description && (
-                          <p className="text-sm text-gray-500 mt-0.5">{svc.description}</p>
-                        )}
-                        {svc.durationMins && (
-                          <p className="text-xs text-gray-400 mt-0.5">⏱ ~{svc.durationMins} min</p>
-                        )}
-                      </div>
-                      <div className="shrink-0 flex items-center gap-3">
-                        <span className="text-lg font-bold text-gray-900">${svc.basePrice.toLocaleString()}</span>
-                        <div
-                          className="w-5 h-5 rounded border-2 flex items-center justify-center"
-                          style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
+            <div className="space-y-6">
+              {Object.entries(servicesByCategory).map(([category, catServices]) => (
+                <div key={category}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-base">{CATEGORY_ICONS[category] ?? "📦"}</span>
+                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">{categoryLabels[category] || category}</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {catServices.map((svc: any) => {
+                      const selected = form.selectedServiceIds.includes(svc.id);
+                      return (
+                        <button
+                          key={svc.id}
+                          type="button"
+                          onClick={() => toggleService(svc.id)}
+                          className={`w-full text-left p-4 rounded-xl border-2 transition-all bg-white group ${
+                            !selected ? "border-gray-100 hover:border-gray-200 hover:shadow-sm" : ""
+                          }`}
+                          style={selected ? { borderColor: brandColor, backgroundColor: `${brandColor}05` } : undefined}
                         >
-                          {selected && (
-                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                              <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-gray-900 text-sm">{svc.name}</span>
+                              </div>
+                              {svc.description && (
+                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{svc.description}</p>
+                              )}
+                              {svc.durationMins && (
+                                <p className="text-[11px] text-gray-400 mt-0.5">~{svc.durationMins} min on-site</p>
+                              )}
+                            </div>
+                            <div className="shrink-0 flex items-center gap-3">
+                              <span className="text-base font-bold text-gray-900">${svc.basePrice.toLocaleString()}</span>
+                              <div
+                                className="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all"
+                                style={selected ? { borderColor: brandColor, backgroundColor: brandColor } : { borderColor: "#d1d5db" }}
+                              >
+                                {selected && (
+                                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
 
-              {/* Running total */}
+              {/* Floating total bar */}
               {form.selectedServiceIds.length > 0 && (
-                <div className="mt-3 p-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex justify-between items-center text-sm">
-                  <span className="text-gray-600">{form.selectedServiceIds.length} service{form.selectedServiceIds.length !== 1 ? "s" : ""} selected</span>
-                  <span className="font-bold text-gray-900">Total: ${alaCarteTotal.toLocaleString()}</span>
+                <div
+                  className="sticky bottom-0 mt-4 p-4 rounded-2xl border shadow-lg flex items-center justify-between"
+                  style={{ backgroundColor: `${brandColor}08`, borderColor: `${brandColor}20` }}
+                >
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{form.selectedServiceIds.length} service{form.selectedServiceIds.length !== 1 ? "s" : ""}</p>
+                    <p className="text-xs text-gray-500">Custom bundle</p>
+                  </div>
+                  <p className="text-xl font-black text-gray-900">${alaCarteTotal.toLocaleString()}</p>
                 </div>
               )}
             </div>
           )}
         </>
+      )}
+
+      {/* Detail Modal */}
+      {detailPkg && (
+        <PackageDetailModal
+          pkg={detailPkg}
+          brandColor={brandColor}
+          services={services}
+          onSelect={() => selectPackage(detailPkg.id)}
+          onClose={() => setDetailPkg(null)}
+        />
       )}
     </div>
   );
