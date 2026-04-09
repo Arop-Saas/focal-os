@@ -166,14 +166,24 @@ const STATES_PROVINCES: { value: string; label: string; group: string }[] = [
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ current, total, brandColor }: { current: Step; total: number; brandColor: string }) {
-  const labels = ["Property", "Package", "Date & Time", "Your Info", "Review"];
+function StepIndicator({ current, total, brandColor, skipContact }: { current: Step; total: number; brandColor: string; skipContact?: boolean }) {
+  const allLabels = ["Property", "Package", "Date & Time", "Your Info", "Review"];
+  // Map internal step numbers to display — skip "Your Info" when signed in
+  const entries = skipContact
+    ? allLabels.filter((_, i) => i !== 3).map((label, displayIdx) => {
+        // Map display index back to internal step: 0→1, 1→2, 2→3, 3→5
+        const internalStep = (displayIdx < 3 ? displayIdx + 1 : 5) as Step;
+        return { label, internalStep, displayNum: displayIdx + 1 };
+      })
+    : allLabels.map((label, i) => ({ label, internalStep: (i + 1) as Step, displayNum: i + 1 }));
+
+  const displayTotal = entries.length;
+
   return (
     <div className="flex items-center gap-2 mb-8">
-      {labels.map((label, i) => {
-        const stepNum = (i + 1) as Step;
-        const done = stepNum < current;
-        const active = stepNum === current;
+      {entries.map((entry, i) => {
+        const done = entry.internalStep < current;
+        const active = entry.internalStep === current;
         return (
           <div key={i} className="flex items-center gap-2 flex-1">
             <div className="flex flex-col items-center gap-1">
@@ -189,16 +199,16 @@ function StepIndicator({ current, total, brandColor }: { current: Step; total: n
                     : undefined
                 }
               >
-                {done ? "✓" : stepNum}
+                {done ? "✓" : entry.displayNum}
               </div>
               <span
                 className="text-xs hidden sm:block"
                 style={active ? { color: brandColor, fontWeight: 500 } : { color: "#9ca3af" }}
               >
-                {label}
+                {entry.label}
               </span>
             </div>
-            {i < total - 1 && (
+            {i < displayTotal - 1 && (
               <div
                 className="flex-1 h-0.5 mb-4"
                 style={{ backgroundColor: done ? brandColor : "#e5e7eb" }}
@@ -1627,12 +1637,35 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(initialForm);
   const [error, setError] = useState<string | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
 
   // ── Live designer state (overrides from postMessage) ─────────────────────
   const [liveFieldSettings, setLiveFieldSettings] = useState<BookingFormSettings["fields"] | null>(null);
   const [liveCustomFields, setLiveCustomFields] = useState<CustomField[] | null>(null);
   const [liveGridColumns, setLiveGridColumns] = useState<number | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
+
+  // ── Check if customer is signed in via portal session ───────────────────
+  const { data: clientData } = trpc.booking.getCurrentClient.useQuery(
+    { slug: workspaceSlug },
+    { enabled: !!workspaceSlug }
+  );
+
+  // Auto-fill contact info when signed-in client data loads
+  useEffect(() => {
+    if (clientData?.client) {
+      const c = clientData.client;
+      setForm((prev) => ({
+        ...prev,
+        firstName: prev.firstName || c.firstName,
+        lastName: prev.lastName || c.lastName,
+        email: prev.email || c.email,
+        phone: prev.phone || c.phone || "",
+        company: prev.company || c.company || "",
+      }));
+      setIsSignedIn(true);
+    }
+  }, [clientData]);
 
   // ── Listen for designer postMessages ─────────────────────────────────────
   useEffect(() => {
@@ -1731,7 +1764,13 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   };
 
   const handleNext = () => {
-    if (canAdvance()) setStep((s) => (s + 1) as Step);
+    if (!canAdvance()) return;
+    setStep((s) => {
+      const next = (s + 1) as Step;
+      // Skip step 4 (contact info) if signed in — go straight to review
+      if (next === 4 && isSignedIn) return 5 as Step;
+      return next;
+    });
   };
 
   const handleSubmit = () => {
@@ -1851,7 +1890,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
 
       {/* Content */}
       <main className={`mx-auto px-4 py-8 transition-all ${step === 2 ? "max-w-6xl" : "max-w-2xl"}`}>
-        <StepIndicator current={step} total={5} brandColor={brandColor} />
+        <StepIndicator current={step} total={isSignedIn ? 4 : 5} brandColor={brandColor} skipContact={isSignedIn} />
 
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
@@ -1868,7 +1907,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
             <div className="mt-6 flex items-center justify-between gap-4">
               <button
                 type="button"
-                onClick={() => setStep((s) => (s - 1) as Step)}
+                onClick={() => setStep((s) => { const prev = (s - 1) as Step; return prev === 4 && isSignedIn ? 3 as Step : prev; })}
                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
               >
                 ← Back
@@ -1922,7 +1961,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
             {step > 1 ? (
               <button
                 type="button"
-                onClick={() => setStep((s) => (s - 1) as Step)}
+                onClick={() => setStep((s) => { const prev = (s - 1) as Step; return prev === 4 && isSignedIn ? 3 as Step : prev; })}
                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
               >
                 ← Back

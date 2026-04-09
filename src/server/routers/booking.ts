@@ -3,11 +3,39 @@ import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { generateJobNumber } from "@/lib/utils";
 import { notifyJobBooked } from "@/lib/notify";
+import { verifyPortalToken, PORTAL_COOKIE } from "@/lib/portal-auth";
 
 // ─── Public Booking Router ────────────────────────────────────────────────────
 // No auth required — used by the client-facing booking form at /book/[slug]
 
 export const bookingRouter = router({
+  // Get currently signed-in portal client (from cookie)
+  getCurrentClient: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const cookieHeader = ctx.req?.headers.get("cookie") ?? "";
+      const match = cookieHeader.match(new RegExp(`${PORTAL_COOKIE}=([^;]+)`));
+      const token = match?.[1];
+      if (!token) return { client: null };
+
+      const session = verifyPortalToken(token);
+      if (!session || session.workspaceSlug !== input.slug) return { client: null };
+
+      const client = await ctx.prisma.client.findUnique({
+        where: { id: session.clientId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          company: true,
+        },
+      });
+
+      return { client };
+    }),
+
   // List available order forms for the selection page
   listOrderForms: publicProcedure
     .input(z.object({ slug: z.string() }))
