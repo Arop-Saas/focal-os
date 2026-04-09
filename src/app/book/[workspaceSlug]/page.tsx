@@ -1627,8 +1627,25 @@ export default function BookingPage() {
   const brandColor = workspace.brandColor ?? "#1B4F9E";
   // Prefer per-form field settings (when ?form= is set), fall back to workspace-level settings
   const rawSettings = data?.orderForm?.fieldSettings ?? workspace.bookingFormSettings;
+  // DB stores field objects flat (e.g. { propertyType: {...}, sqft: {...}, gridColumns: 3 })
+  // Detect flat format: if rawSettings has field keys at root but no "fields" wrapper, lift them
   const baseSettings: BookingFormSettings = rawSettings
-    ? { ...DEFAULT_BOOKING_FORM_SETTINGS, ...(rawSettings as BookingFormSettings), fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...((rawSettings as BookingFormSettings).fields ?? {}) } }
+    ? (() => {
+        const rs = rawSettings as any;
+        // If already in BookingFormSettings shape (has a "fields" sub-object)
+        if (rs.fields && typeof rs.fields === "object" && rs.fields.propertyType) {
+          return { ...DEFAULT_BOOKING_FORM_SETTINGS, ...rs, fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...rs.fields } };
+        }
+        // Flat shape from DB — field objects are at root level alongside gridColumns etc.
+        const { gridColumns: gc, welcomeMessage, showMapPreview, ...fieldObjs } = rs;
+        return {
+          ...DEFAULT_BOOKING_FORM_SETTINGS,
+          ...(gc != null && { gridColumns: gc }),
+          ...(welcomeMessage != null && { welcomeMessage }),
+          ...(showMapPreview != null && { showMapPreview }),
+          fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...fieldObjs },
+        };
+      })()
     : DEFAULT_BOOKING_FORM_SETTINGS;
   // Live designer overrides field settings in real-time
   const formSettings: BookingFormSettings = liveFieldSettings

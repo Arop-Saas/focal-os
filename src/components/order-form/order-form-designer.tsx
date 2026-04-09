@@ -218,9 +218,31 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     if (stepNum) sendStepToPreview(stepNum);
   }
 
+  // ── Live sync: send state to iframe whenever fields/customFields change ───
+  const sendLiveUpdate = useCallback(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: "DESIGNER_LIVE_UPDATE",
+        fieldSettings: fields,
+        customFields,
+        gridColumns,
+      }, "*");
+    }
+  }, [fields, customFields, gridColumns]);
+
+  useEffect(() => { sendLiveUpdate(); }, [sendLiveUpdate]);
+
   const refreshPreview = useCallback(() => {
-    if (iframeRef.current) iframeRef.current.src = iframeRef.current.src;
-  }, []);
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const handler = () => {
+      iframe.removeEventListener("load", handler);
+      // Small delay to let React hydrate inside the iframe before posting
+      setTimeout(() => sendLiveUpdate(), 300);
+    };
+    iframe.addEventListener("load", handler);
+    iframe.src = iframe.src;
+  }, [sendLiveUpdate]);
 
   if (isLoading) {
     return (
@@ -271,20 +293,6 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setSavedCustom(true); refreshPreview();
     setTimeout(() => setSavedCustom(false), 3000);
   }
-
-  // ── Live sync: send state to iframe whenever fields/customFields change ───
-  const sendLiveUpdate = useCallback(() => {
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: "DESIGNER_LIVE_UPDATE",
-        fieldSettings: fields,
-        customFields,
-        gridColumns,
-      }, "*");
-    }
-  }, [fields, customFields, gridColumns]);
-
-  useEffect(() => { sendLiveUpdate(); }, [sendLiveUpdate]);
 
   // Helper for custom fields onChange — mark dirty + trigger live update
   function handleCustomFieldsChange(updated: CustomField[]) {

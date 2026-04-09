@@ -38,7 +38,7 @@ export const bookingRouter = router({
       let orderForm = null;
       if (input.formId) {
         orderForm = await ctx.prisma.orderForm.findFirst({
-          where: { id: input.formId, workspaceId: workspace.id, isPublic: true },
+          where: { id: input.formId, workspaceId: workspace.id },
           select: {
             id: true,
             title: true,
