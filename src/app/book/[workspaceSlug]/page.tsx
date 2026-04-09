@@ -1019,6 +1019,18 @@ export default function BookingPage() {
   const [form, setForm] = useState<FormData>(initialForm);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Listen for designer postMessage to jump to a step ─────────────────────
+  useEffect(() => {
+    function handleMessage(e: MessageEvent) {
+      if (e.data?.type === "DESIGNER_SET_STEP" && typeof e.data.step === "number") {
+        const s = e.data.step as Step;
+        if (s >= 1 && s <= 5) setStep(s);
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
   const { data, isLoading, isError } = trpc.booking.getWorkspaceInfo.useQuery(
     { slug: workspaceSlug, formId },
     { enabled: !!workspaceSlug }
