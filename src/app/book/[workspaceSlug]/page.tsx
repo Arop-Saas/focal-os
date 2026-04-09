@@ -2168,7 +2168,9 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
               <div />
             )}
 
-            {step < 5 && !(step === 1 && !form.propertyAddress.trim()) ? (
+            {step === 1 && !form.propertyAddress.trim() ? (
+              <div />
+            ) : step < 5 ? (
               <button
                 type="button"
                 onClick={handleNext}
