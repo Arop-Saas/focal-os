@@ -1680,10 +1680,19 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   // Validate each step before advancing
   const canAdvance = (): boolean => {
     setError(null);
+    const f = formSettings.fields;
     if (step === 1) {
+      // Always-required fields
       if (!form.propertyAddress.trim()) return !!setError("Property address is required.");
       if (!form.propertyCity.trim()) return !!setError("City is required.");
       if (!form.propertyState) return !!setError("State / Province is required.");
+      // Configurable required fields
+      if (f.propertyType.visible && f.propertyType.required && !form.propertyType) return !!setError("Property type is required.");
+      if (f.sqft.visible && f.sqft.required && !form.squareFootage.trim()) return !!setError("Square footage is required.");
+      if (f.beds.visible && f.beds.required && !form.bedrooms.trim()) return !!setError("Number of bedrooms is required.");
+      if (f.baths.visible && f.baths.required && !form.bathrooms.trim()) return !!setError("Number of bathrooms is required.");
+      if (f.mlsNumber.visible && f.mlsNumber.required && !form.mlsNumber.trim()) return !!setError("MLS number is required.");
+      if (f.accessNotes.visible && f.accessNotes.required && !form.accessNotes.trim()) return !!setError("Access notes are required.");
       return true;
     }
     if (step === 2) {
@@ -1698,10 +1707,24 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       return true;
     }
     if (step === 4) {
+      // Always-required fields
       if (!form.firstName.trim()) return !!setError("First name is required.");
       if (!form.lastName.trim()) return !!setError("Last name is required.");
       if (!form.email.trim()) return !!setError("Email is required.");
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return !!setError("Enter a valid email.");
+      // Configurable required fields
+      if (f.phone.visible && f.phone.required && !form.phone.trim()) return !!setError("Phone number is required.");
+      if (f.company.visible && f.company.required && !form.company.trim()) return !!setError("Company / Brokerage is required.");
+      if (f.clientNotes.visible && f.clientNotes.required && !form.clientNotes.trim()) return !!setError("Notes are required.");
+      // Custom fields validation
+      for (const field of customFields) {
+        if (field.required) {
+          const val = customFieldValues[field.id];
+          if (!val || (typeof val === "string" && !val.trim()) || (Array.isArray(val) && val.length === 0)) {
+            return !!setError(`${field.label} is required.`);
+          }
+        }
+      }
       return true;
     }
     return true;
