@@ -16,6 +16,8 @@ interface AddressResult {
   city: string;
   state: string;
   zip: string;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 interface AddressAutocompleteProps {

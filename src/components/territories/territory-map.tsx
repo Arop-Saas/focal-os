@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Loader2, AlertCircle } from "lucide-react";
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+const MAPBOX_STYLE = "mapbox://styles/mapbox/streets-v12";
+
 interface Territory {
   id: string;
   name: string;
@@ -39,43 +42,48 @@ async function geocodeCity(city: string): Promise<{ lat: number; lng: number } |
   return null;
 }
 
+// ─── Mapbox GL loader ───────────────────────────────────────────────────────
+
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    L: any;
-    _leafletLoaded?: boolean;
+    mapboxgl: any;
+    _mapboxGLLoaded?: boolean;
   }
 }
 
-async function loadLeaflet(): Promise<void> {
-  if (window._leafletLoaded) return;
+async function loadMapboxGL(): Promise<any> {
+  if (window._mapboxGLLoaded && window.mapboxgl) return window.mapboxgl;
 
   // Inject CSS
-  if (!document.getElementById("leaflet-css")) {
+  if (!document.getElementById("mapbox-gl-css")) {
     const link = document.createElement("link");
-    link.id = "leaflet-css";
+    link.id = "mapbox-gl-css";
     link.rel = "stylesheet";
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    link.href = "https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css";
     document.head.appendChild(link);
   }
 
   // Inject JS
   await new Promise<void>((resolve, reject) => {
-    if (window.L) { resolve(); return; }
+    if (window.mapboxgl) {
+      resolve();
+      return;
+    }
     const script = document.createElement("script");
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.src = "https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js";
     script.onload = () => resolve();
     script.onerror = reject;
     document.head.appendChild(script);
   });
 
-  window._leafletLoaded = true;
+  window._mapboxGLLoaded = true;
+  return window.mapboxgl;
 }
 
 export function TerritoryMap({ territories }: TerritoryMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [pointCount, setPointCount] = useState(0);
 
@@ -86,24 +94,29 @@ export function TerritoryMap({ territories }: TerritoryMapProps) {
     async function init() {
       setStatus("loading");
       try {
-        await loadLeaflet();
+        const mapboxgl = await loadMapboxGL();
         if (cancelled || !mapRef.current) return;
 
-        const L = window.L;
+        mapboxgl.accessToken = MAPBOX_TOKEN;
 
         // Destroy previous instance
+        markersRef.current.forEach((m) => m.remove());
+        markersRef.current = [];
         if (mapInstanceRef.current) {
           mapInstanceRef.current.remove();
           mapInstanceRef.current = null;
         }
 
-        const map = L.map(mapRef.current, { zoomControl: true });
-        mapInstanceRef.current = map;
+        const map = new mapboxgl.Map({
+          container: mapRef.current,
+          style: MAPBOX_STYLE,
+          center: [-98.5795, 39.8283], // Center of USA
+          zoom: 3,
+          attributionControl: false,
+        });
 
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a>',
-          maxZoom: 18,
-        }).addTo(map);
+        mapInstanceRef.current = map;
+        map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
         // Collect all cities to geocode
         const promises: Promise<GeoResult | null>[] = [];
@@ -128,55 +141,55 @@ export function TerritoryMap({ territories }: TerritoryMapProps) {
         if (cancelled) return;
         setPointCount(results.length);
 
-        if (results.length === 0) {
-          // Fallback: world view
-          map.setView([20, 0], 2);
-          setStatus("ready");
-          return;
-        }
+        map.on("load", () => {
+          if (cancelled) return;
 
-        const bounds: [number, number][] = [];
+          if (results.length === 0) {
+            setStatus("ready");
+            return;
+          }
 
-        for (const r of results) {
-          bounds.push([r.lat, r.lng]);
+          const bounds = new mapboxgl.LngLatBounds();
 
-          // Build a custom SVG marker in the territory's color
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
-            <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${r.territory.color}" stroke="white" stroke-width="1.5"/>
-            <circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
-          </svg>`;
+          for (const r of results) {
+            bounds.extend([r.lng, r.lat]);
 
-          const icon = L.divIcon({
-            html: svg,
-            iconSize: [24, 36],
-            iconAnchor: [12, 36],
-            popupAnchor: [0, -36],
-            className: "",
-          });
+            // Build a custom SVG marker in the territory's color
+            const el = document.createElement("div");
+            el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
+              <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${r.territory.color}" stroke="white" stroke-width="1.5"/>
+              <circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
+            </svg>`;
+            el.style.cursor = "pointer";
 
-          const feeLabel = r.territory.travelFee
-            ? `<br/><span style="color:#d97706;font-size:11px;">+$${r.territory.travelFee.toFixed(2)} travel fee</span>`
-            : "";
+            const feeLabel = r.territory.travelFee
+              ? `<br/><span style="color:#d97706;font-size:11px;">+$${r.territory.travelFee.toFixed(2)} travel fee</span>`
+              : "";
 
-          L.marker([r.lat, r.lng], { icon })
-            .addTo(map)
-            .bindPopup(
+            const popup = new mapboxgl.Popup({ offset: 25, maxWidth: "200px" }).setHTML(
               `<div style="font-size:13px;line-height:1.5;">
                 <strong style="color:${r.territory.color}">${r.territory.name}</strong><br/>
                 <span style="color:#6b7280">${r.city}</span>${feeLabel}
-              </div>`,
-              { maxWidth: 200 }
+              </div>`
             );
-        }
 
-        // Fit map to all markers with some padding
-        if (bounds.length === 1) {
-          map.setView(bounds[0], 10);
-        } else {
-          map.fitBounds(bounds, { padding: [40, 40] });
-        }
+            const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+              .setLngLat([r.lng, r.lat])
+              .setPopup(popup)
+              .addTo(map);
 
-        setStatus("ready");
+            markersRef.current.push(marker);
+          }
+
+          // Fit map to all markers with some padding
+          if (results.length === 1) {
+            map.flyTo({ center: [results[0].lng, results[0].lat], zoom: 10 });
+          } else {
+            map.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+          }
+
+          setStatus("ready");
+        });
       } catch (_) {
         if (!cancelled) setStatus("error");
       }
@@ -192,6 +205,7 @@ export function TerritoryMap({ territories }: TerritoryMapProps) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      markersRef.current.forEach((m) => m.remove());
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;

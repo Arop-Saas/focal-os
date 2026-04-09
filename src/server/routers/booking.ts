@@ -207,6 +207,8 @@ export const bookingRouter = router({
         bathrooms: z.number().optional(),
         mlsNumber: z.string().optional(),
         accessNotes: z.string().optional(),
+        propertyLat: z.number().optional(),
+        propertyLng: z.number().optional(),
 
         // Booking
         packageId: z.string().optional(),
@@ -301,6 +303,8 @@ export const bookingRouter = router({
             bathrooms: input.bathrooms,
             mlsNumber: input.mlsNumber,
             accessNotes: input.accessNotes,
+            propertyLat: input.propertyLat,
+            propertyLng: input.propertyLng,
             scheduledAt,
             clientNotes: input.clientNotes,
             status: "PENDING",

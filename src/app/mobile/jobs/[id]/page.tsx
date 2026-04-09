@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, differenceInMinutes } from "date-fns";
+import { MapboxMap } from "@/components/shared/mapbox-map";
 import BottomNav from "../../_components/BottomNav";
 
 function elapsed(startAt: Date | string): string {
@@ -196,6 +197,20 @@ export default function MobileJobDetailPage() {
                 Maps
               </a>
             </div>
+
+            {/* Property map */}
+            {job.propertyLat && job.propertyLng && (
+              <div className="px-4 pb-2">
+                <MapboxMap
+                  center={{ lat: job.propertyLat, lng: job.propertyLng }}
+                  markers={[{ lat: job.propertyLat, lng: job.propertyLng, color: "#3B82F6" }]}
+                  height={160}
+                  zoom={14}
+                  interactive={false}
+                  showControls={false}
+                />
+              </div>
+            )}
 
             {/* Client */}
             {job.client && (

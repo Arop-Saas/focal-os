@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
   url.searchParams.set("place_id", placeId);
-  url.searchParams.set("fields", "address_components,formatted_address");
+  url.searchParams.set("fields", "address_components,formatted_address,geometry");
   url.searchParams.set("key", key);
 
   const res = await fetch(url.toString());
@@ -37,11 +37,17 @@ export async function GET(req: NextRequest) {
   const route = get("route");
   const streetAddress = [streetNumber, route].filter(Boolean).join(" ");
 
+  // Extract lat/lng from geometry for map pin
+  const lat = data.result?.geometry?.location?.lat ?? null;
+  const lng = data.result?.geometry?.location?.lng ?? null;
+
   return NextResponse.json({
     streetAddress,
     city: get("locality") || get("sublocality") || get("neighborhood"),
     state: get("administrative_area_level_1", true), // short = "TX"
     zip: get("postal_code"),
     country: get("country", true),
+    lat,
+    lng,
   });
 }

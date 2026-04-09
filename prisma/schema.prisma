@@ -542,6 +542,8 @@ model Job {
   mlsNumber       String?
   listingUrl      String?
   accessNotes     String?
+  propertyLat     Float?
+  propertyLng     Float?
 
   // Scheduling
   status          JobStatus  @default(PENDING)

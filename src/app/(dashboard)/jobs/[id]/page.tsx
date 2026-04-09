@@ -17,6 +17,7 @@ import { JobMessageThread } from "@/components/messages/job-message-thread";
 import { JobChecklist } from "@/components/jobs/job-checklist";
 import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-button";
 import { JobScheduleEditor } from "@/components/jobs/job-schedule-editor";
+import { JobPropertyMap } from "@/components/jobs/job-property-map";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,12 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                     </div>
                   )}
                 </div>
+                {/* Property location map */}
+                <JobPropertyMap
+                  lat={job.propertyLat}
+                  lng={job.propertyLng}
+                  address={`${job.propertyAddress}, ${job.propertyCity}, ${job.propertyState}`}
+                />
               </div>
 
               {/* Schedule */}

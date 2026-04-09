@@ -759,8 +759,8 @@ function Step2Package({
               packages.map((pkg: any) => {
                 const selected = form.packageId === pkg.id;
                 return (
-                  <div key={pkg.id} className={`relative rounded-xl overflow-hidden border bg-white transition-all group ${selected ? "ring-2 ring-offset-1" : "hover:shadow-lg"}`}
-                    style={selected ? { borderColor: brandColor, ringColor: brandColor } : { borderColor: "#e5e7eb" }}
+                  <div key={pkg.id} className={`relative rounded-xl overflow-hidden border bg-white transition-all group ${selected ? "" : "hover:shadow-lg"}`}
+                    style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 2px ${brandColor}33` } : { borderColor: "#e5e7eb" }}
                   >
                     {/* Cover */}
                     <div className="relative h-36 bg-gray-100 overflow-hidden cursor-pointer" onClick={() => selectPackage(pkg.id)}>
@@ -827,8 +827,8 @@ function Step2Package({
               services.map((svc: any) => {
                 const selected = form.selectedServiceIds.includes(svc.id) && !form.packageId;
                 return (
-                  <div key={svc.id} className={`rounded-xl border bg-white overflow-hidden transition-all ${selected ? "ring-1 ring-offset-0" : "hover:shadow-sm"}`}
-                    style={selected ? { borderColor: brandColor, ringColor: `${brandColor}44` } : { borderColor: "#f3f4f6" }}
+                  <div key={svc.id} className={`rounded-xl border bg-white overflow-hidden transition-all ${selected ? "" : "hover:shadow-sm"}`}
+                    style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 1px ${brandColor}44` } : { borderColor: "#f3f4f6" }}
                   >
                     {/* Icon header */}
                     <div className="h-20 bg-gray-50 flex items-center justify-center">

@@ -3,6 +3,8 @@
 
 export interface BookingFormSettings {
   welcomeMessage?: string;
+  /** Show a Mapbox map pin after the address is entered on Step 1 */
+  showMapPreview?: boolean;
   fields: {
     propertyType: { visible: boolean; required: boolean };
     sqft:         { visible: boolean; required: boolean };
@@ -55,6 +57,7 @@ export const CUSTOM_FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
 
 export const DEFAULT_BOOKING_FORM_SETTINGS: BookingFormSettings = {
   welcomeMessage: "",
+  showMapPreview: true,
   fields: {
     propertyType: { visible: true,  required: false },
     sqft:         { visible: true,  required: false },
