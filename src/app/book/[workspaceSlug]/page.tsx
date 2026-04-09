@@ -1860,6 +1860,28 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            <div className="mt-6 flex items-center justify-between gap-4">
+              <button
+                type="button"
+                onClick={() => setStep((s) => (s - 1) as Step)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                ← Back
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                style={{ backgroundColor: brandColor }}
+                className="px-6 py-2.5 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Continue →
+              </button>
+            </div>
           </div>
         )}
 
