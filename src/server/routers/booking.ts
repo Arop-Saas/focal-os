@@ -8,6 +8,37 @@ import { notifyJobBooked } from "@/lib/notify";
 // No auth required — used by the client-facing booking form at /book/[slug]
 
 export const bookingRouter = router({
+  // List available order forms for the selection page
+  listOrderForms: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const workspace = await ctx.prisma.workspace.findUnique({
+        where: { slug: input.slug },
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+          brandColor: true,
+        },
+      });
+      if (!workspace) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found." });
+      }
+
+      const orderForms = await ctx.prisma.orderForm.findMany({
+        where: { workspaceId: workspace.id, isPublic: true },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          coverImage: true,
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      return { workspace, orderForms };
+    }),
+
   // Fetch workspace info + active packages for the booking form
   getWorkspaceInfo: publicProcedure
     .input(z.object({ slug: z.string(), formId: z.string().optional() }))

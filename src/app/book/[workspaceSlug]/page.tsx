@@ -1481,12 +1481,148 @@ function Step5Review({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// ─── Order Form Selection Screen ─────────────────────────────────────────────
+
+function OrderFormSelector({ workspaceSlug }: { workspaceSlug: string }) {
+  const router = useRouter();
+  const { data, isLoading, isError } = trpc.booking.listOrderForms.useQuery(
+    { slug: workspaceSlug },
+    { enabled: !!workspaceSlug }
+  );
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 text-center px-4">
+        <div className="text-5xl">🔍</div>
+        <h1 className="text-2xl font-bold text-gray-900">Booking page not found</h1>
+        <p className="text-gray-500 max-w-sm">This booking link doesn&apos;t exist or has been disabled.</p>
+      </div>
+    );
+  }
+
+  const { workspace, orderForms } = data;
+  const brandColor = workspace.brandColor ?? "#1B4F9E";
+
+  // If only one form, go straight to it
+  if (orderForms.length === 1) {
+    router.replace(`/book/${workspaceSlug}?form=${orderForms[0].id}`);
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // No forms available
+  if (orderForms.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 text-center px-4">
+        <div className="text-5xl">📋</div>
+        <h1 className="text-2xl font-bold text-gray-900">No order forms available</h1>
+        <p className="text-gray-500 max-w-sm">This company hasn&apos;t published any order forms yet. Please check back later.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="h-1" style={{ backgroundColor: brandColor }} />
+      <header className="bg-white border-b border-gray-100 py-6 px-6">
+        <div className="max-w-5xl mx-auto flex flex-col items-center gap-3">
+          {workspace.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={workspace.logoUrl} alt={workspace.name} className="h-12 w-auto object-contain" />
+          ) : (
+            <div
+              className="h-12 w-12 rounded-xl flex items-center justify-center text-white text-lg font-bold"
+              style={{ backgroundColor: brandColor }}
+            >
+              {workspace.name?.[0]?.toUpperCase() ?? "?"}
+            </div>
+          )}
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900">{workspace.name}</h1>
+            <p className="text-gray-500 mt-1">Select an order type to get started</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {orderForms.map((of) => (
+            <button
+              key={of.id}
+              onClick={() => router.push(`/book/${workspaceSlug}?form=${of.id}`)}
+              className="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden text-left transition-all hover:shadow-lg hover:border-gray-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2"
+              style={{ ["--tw-ring-color" as string]: brandColor }}
+            >
+              <div className="aspect-[16/10] bg-gray-100 relative overflow-hidden">
+                {of.coverImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={of.coverImage}
+                    alt={of.title}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex items-center justify-center"
+                    style={{ background: `linear-gradient(135deg, ${brandColor}22, ${brandColor}44)` }}
+                  >
+                    <svg className="w-12 h-12 opacity-30" style={{ color: brandColor }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="p-5">
+                <h3 className="font-semibold text-gray-900 text-lg group-hover:text-gray-700">{of.title}</h3>
+                {of.description && (
+                  <p className="text-gray-500 text-sm mt-1.5 line-clamp-2">{of.description}</p>
+                )}
+                <div className="mt-4 flex items-center gap-1.5 text-sm font-medium" style={{ color: brandColor }}>
+                  <span>Order now</span>
+                  <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ─── Main Booking Page ───────────────────────────────────────────────────────
+
 export default function BookingPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const workspaceSlug = params?.workspaceSlug as string;
   const formId = searchParams.get("form") ?? undefined;
+
+  // If no form is specified, show the order form selection screen
+  if (!formId) {
+    return <OrderFormSelector workspaceSlug={workspaceSlug} />;
+  }
+
+  return <BookingForm workspaceSlug={workspaceSlug} formId={formId} />;
+}
+
+function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId: string }) {
+  const router = useRouter();
 
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(initialForm);
