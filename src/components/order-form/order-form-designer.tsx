@@ -740,7 +740,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           {activeSection === "step-2" && (
             <Panel title="Step 2 — Services" desc="Manage your services, packages, and pricing">
               {/* Full Products & Services management embedded */}
-              <PackagesView />
+              <PackagesView compact />
 
               {/* Grid columns setting */}
               <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-4 mt-4">

@@ -117,7 +117,7 @@ function PackageBadge({ pkg }: { pkg: Pick<Package, "badgeLabel" | "badgeColor" 
 }
 
 /* ════════════════════════════════════════════════════════════════════ */
-export function PackagesView() {
+export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   const [activeTab, setActiveTab] = useState<"services" | "packages" | "brokerage">("services");
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -355,7 +355,7 @@ export function PackagesView() {
     <div className="space-y-4">
 
       {/* ── Tab bar ── */}
-      <div className="flex gap-4 border-b">
+      <div className="flex gap-1 border-b">
         {([
           { id: "services", label: "Services" },
           { id: "packages", label: "Products" },
@@ -365,7 +365,8 @@ export function PackagesView() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "px-4 py-3 font-medium text-sm border-b-2 -mb-px transition-colors",
+              "font-medium border-b-2 -mb-px transition-colors",
+              compact ? "px-2.5 py-2 text-xs" : "px-4 py-3 text-sm",
               activeTab === tab.id
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-gray-600 hover:text-gray-900"
@@ -378,7 +379,7 @@ export function PackagesView() {
 
       {/* ══════════ SERVICES TAB ══════════════════════════════════════ */}
       {activeTab === "services" && (
-        <div className="space-y-4">
+        <div className={compact ? "space-y-2" : "space-y-4"}>
           <div className="flex justify-end">
             <Button size="sm" onClick={() => {
               setEditingService(null); setServiceName(""); setServicePrice("");
@@ -399,6 +400,35 @@ export function PackagesView() {
               <Camera className="h-10 w-10 text-gray-300 mb-3" />
               <p className="text-base font-semibold text-gray-700">No services yet</p>
               <p className="text-sm text-muted-foreground mt-1">Create your first service to get started.</p>
+            </div>
+          ) : compact ? (
+            /* ── Compact list view for form designer ── */
+            <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              {(services as Service[]).map((service) => {
+                const meta = CATEGORY_META[service.category] ?? CATEGORY_META.OTHER;
+                const Icon = meta.icon;
+                return (
+                  <div key={service.id} className="flex items-center gap-3 px-3 py-2.5 bg-white hover:bg-gray-50 transition-colors group">
+                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0", meta.bg)}>
+                      <Icon className="h-3.5 w-3.5 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-gray-900 truncate">{service.name}</p>
+                      <p className="text-[10px] text-gray-400">{meta.label} · {service.durationMins} min</p>
+                    </div>
+                    <span className="text-xs font-bold text-gray-900 shrink-0">{formatCurrency(service.basePrice)}</span>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button onClick={() => handleOpenEditService(service)} className="p-1 hover:bg-gray-200 rounded transition-colors" title="Edit">
+                        <Pencil className="h-3 w-3 text-gray-400" />
+                      </button>
+                      <button onClick={() => handleToggleServiceActive(service.id, service.isActive)} className="p-1 hover:bg-gray-200 rounded transition-colors" title={service.isActive ? "Deactivate" : "Activate"}>
+                        {service.isActive ? <ToggleRight className="h-3.5 w-3.5 text-green-500" /> : <ToggleLeft className="h-3.5 w-3.5 text-gray-400" />}
+                      </button>
+                    </div>
+                    {!service.isActive && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full shrink-0">Off</span>}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -480,7 +510,7 @@ export function PackagesView() {
 
       {/* ══════════ PACKAGES TAB ══════════════════════════════════════ */}
       {activeTab === "packages" && (
-        <div className="space-y-4">
+        <div className={compact ? "space-y-2" : "space-y-4"}>
           <div className="flex justify-end">
             <Button size="sm" onClick={() => setShowPackageModal(true)}>
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Product
@@ -496,6 +526,31 @@ export function PackagesView() {
               <Boxes className="h-10 w-10 text-gray-300 mb-3" />
               <p className="text-base font-semibold text-gray-700">No products yet</p>
               <p className="text-sm text-muted-foreground mt-1">Create your first product to bundle services.</p>
+            </div>
+          ) : compact ? (
+            /* ── Compact list view for form designer ── */
+            <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              {(packages as Package[]).map((pkg) => (
+                <div key={pkg.id} className="px-3 py-2.5 bg-white hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-bold text-gray-900 truncate">{pkg.name}</p>
+                        <PackageBadge pkg={pkg} />
+                      </div>
+                      {pkg.items.length > 0 && (
+                        <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                          {pkg.items.map((item) => item.service.name).join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-bold text-gray-900">{formatCurrency(pkg.price)}</span>
+                      <p className="text-[9px] text-gray-400">{pkg._count.jobs} jobs</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
