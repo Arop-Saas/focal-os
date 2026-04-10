@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   Plus, X, ToggleRight, ToggleLeft, Star, Pencil, Clock, Camera,
   Video, Plane, Boxes, FileText, Layers, Sunset, Share2, Zap,
   HelpCircle, Timer, CheckCircle2, ChevronDown, Tag, Building2,
-  Upload, Loader2, Image as ImageIcon,
+  Upload, Loader2, Image as ImageIcon, Play,
 } from "lucide-react";
 import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 import { Button } from "@/components/ui/button";
@@ -92,6 +92,83 @@ async function compressImage(file: File, maxWidth = 1200, maxHeight = 900, quali
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
     img.src = url;
   });
+}
+
+/* ─── Inline image upload thumbnail (for compact rows) ────────────── */
+function InlineImageUpload({
+  currentImage,
+  onUpload,
+  onRemove,
+  accentBg,
+  accentIcon: AccentIcon,
+}: {
+  currentImage?: string | null;
+  onUpload: (file: File) => Promise<void>;
+  onRemove: () => void;
+  accentBg?: string;
+  accentIcon?: React.ElementType;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try { await onUpload(file); } finally { setUploading(false); }
+    e.target.value = "";
+  }
+
+  const isVideo = currentImage && /\.(mp4|webm|mov)$/i.test(currentImage);
+
+  return (
+    <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 group/img cursor-pointer" onClick={() => inputRef.current?.click()}>
+      {uploading ? (
+        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+          <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />
+        </div>
+      ) : currentImage ? (
+        <>
+          {isVideo ? (
+            <div className="w-full h-full bg-gray-900 flex items-center justify-center">
+              <Play className="w-3 h-3 text-white" />
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={currentImage} alt="" className="w-full h-full object-cover" />
+          )}
+          {/* Hover overlay: change or remove */}
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-0.5">
+            <Upload className="w-3 h-3 text-white" />
+          </div>
+          {/* Remove button */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10"
+          >
+            <X className="w-2 h-2" />
+          </button>
+        </>
+      ) : (
+        <>
+          {accentBg && AccentIcon ? (
+            <div className={cn("w-full h-full flex items-center justify-center", accentBg)}>
+              <AccentIcon className="h-3.5 w-3.5 text-white" />
+            </div>
+          ) : (
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              <ImageIcon className="w-3.5 h-3.5 text-gray-300" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+            <Upload className="w-3 h-3 text-white" />
+          </div>
+        </>
+      )}
+      <input ref={inputRef} type="file" accept="image/*,video/mp4,video/webm" className="hidden" onChange={handleFile} />
+    </div>
+  );
 }
 
 /* ─── Small reusable badge ──────────────────────────────────────────── */
@@ -447,9 +524,28 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                 const Icon = meta.icon;
                 return (
                   <div key={service.id} className="flex items-center gap-3 px-3 py-2.5 bg-white hover:bg-gray-50 transition-colors group">
-                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0", meta.bg)}>
-                      <Icon className="h-3.5 w-3.5 text-white" />
-                    </div>
+                    <InlineImageUpload
+                      currentImage={service.coverImage}
+                      accentBg={meta.bg}
+                      accentIcon={Icon}
+                      onUpload={async (file) => {
+                        const compressed = await compressImage(file);
+                        const fd = new FormData();
+                        fd.append("file", compressed);
+                        fd.append("type", "service");
+                        fd.append("productId", service.id);
+                        const res = await fetch("/api/product/image-upload", { method: "POST", body: fd });
+                        const json = await res.json();
+                        if (res.ok && json.coverImage) {
+                          await updateServiceMutation.mutateAsync({ id: service.id, coverImage: json.coverImage });
+                          refetchServices();
+                        }
+                      }}
+                      onRemove={async () => {
+                        await updateServiceMutation.mutateAsync({ id: service.id, coverImage: null });
+                        refetchServices();
+                      }}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-gray-900 truncate">{service.name}</p>
                       <p className="text-[10px] text-gray-400">{meta.label} · {service.durationMins} min</p>
@@ -570,7 +666,27 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
             <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
               {(packages as Package[]).map((pkg) => (
                 <div key={pkg.id} className="px-3 py-2.5 bg-white hover:bg-gray-50 transition-colors group">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <InlineImageUpload
+                      currentImage={pkg.coverImage}
+                      onUpload={async (file) => {
+                        const compressed = await compressImage(file);
+                        const fd = new FormData();
+                        fd.append("file", compressed);
+                        fd.append("type", "package");
+                        fd.append("productId", pkg.id);
+                        const res = await fetch("/api/product/image-upload", { method: "POST", body: fd });
+                        const json = await res.json();
+                        if (res.ok && json.coverImage) {
+                          await updatePackageMutation.mutateAsync({ id: pkg.id, coverImage: json.coverImage });
+                          refetchPackages();
+                        }
+                      }}
+                      onRemove={async () => {
+                        await updatePackageMutation.mutateAsync({ id: pkg.id, coverImage: null });
+                        refetchPackages();
+                      }}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className="text-xs font-bold text-gray-900 truncate">{pkg.name}</p>

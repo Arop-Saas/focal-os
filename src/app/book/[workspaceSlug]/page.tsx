@@ -972,8 +972,12 @@ function Step2Package({
                     {/* Cover */}
                     <div className="relative h-36 bg-gray-100 overflow-hidden cursor-pointer" onClick={() => selectPackage(pkg.id)}>
                       {pkg.coverImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        /\.(mp4|webm|mov)$/i.test(pkg.coverImage) ? (
+                          <video src={pkg.coverImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" muted autoPlay loop playsInline />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        )
                       ) : (
                         <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(145deg, ${brandColor}15, ${brandColor}05)` }}>
                           <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -1037,10 +1041,14 @@ function Step2Package({
                   <div key={svc.id} className={`rounded-xl border bg-white overflow-hidden transition-all ${selected ? "" : "hover:shadow-sm"}`}
                     style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 1px ${brandColor}44` } : { borderColor: "#f3f4f6" }}
                   >
-                    {/* Cover image or icon header */}
+                    {/* Cover image/video or icon header */}
                     {svc.coverImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={svc.coverImage} alt={svc.name} className="w-full h-20 object-cover" />
+                      /\.(mp4|webm|mov)$/i.test(svc.coverImage) ? (
+                        <video src={svc.coverImage} className="w-full h-20 object-cover" muted autoPlay loop playsInline />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={svc.coverImage} alt={svc.name} className="w-full h-20 object-cover" />
+                      )
                     ) : (
                       <div className="h-20 bg-gray-50 flex items-center justify-center">
                         <span className="text-2xl">{svcIcon(svc.category)}</span>
