@@ -44,19 +44,14 @@ const navGroups = [
       { label: "Schedule", href: "/scheduling", icon: CalendarDays },
       { label: "Clients", href: "/clients", icon: Users },
       { label: "Messages", href: "/messages", icon: MessageCircle },
-    ],
-  },
-  {
-    label: "Team",
-    items: [
       { label: "Staff", href: "/staff", icon: UserCheck },
+      { label: "Listings", href: "/gallery", icon: Image },
     ],
   },
   {
     label: "OrderForm",
     items: [
       { label: "Invoices", href: "/invoices", icon: Receipt },
-      { label: "Listings", href: "/gallery", icon: Image },
       { label: "Availability", href: "/availability", icon: Clock },
       { label: "Forms/Services", href: "/order-form", icon: ClipboardList },
       { label: "Integrations", href: "/integrations", icon: Puzzle },
