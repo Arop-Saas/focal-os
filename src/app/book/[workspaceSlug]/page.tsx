@@ -867,7 +867,13 @@ function Step2Package({
   const columns = gridColumns;
 
   const selectPackage = (pkgId: string) => {
-    setForm({ ...form, packageId: pkgId, selectedServiceIds: [...selectedAddOns] });
+    if (form.packageId === pkgId) {
+      // Already selected — deselect (remove from cart)
+      setForm({ ...form, packageId: "", selectedServiceIds: [] });
+      setSelectedAddOns([]);
+    } else {
+      setForm({ ...form, packageId: pkgId, selectedServiceIds: [...selectedAddOns] });
+    }
   };
 
   const removePkg = () => {
