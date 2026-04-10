@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
@@ -639,6 +639,71 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
   );
 }
 
+// ── Client-side image compression ────────────────────────────────────────────
+async function compressBookingImage(file: File, maxWidth = 1200, maxHeight = 900, quality = 0.85): Promise<File> {
+  if (file.size <= 1.5 * 1024 * 1024) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; }
+        resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
+// ── Designer-only image upload overlay for cards ─────────────────────────────
+function DesignerImageOverlay({ onUpload }: { onUpload: (file: File) => Promise<void> }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try { await onUpload(file); } finally { setUploading(false); }
+    e.target.value = "";
+  }
+
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 hover:bg-black/50 transition-all cursor-pointer group/overlay"
+      onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+    >
+      {uploading ? (
+        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg">
+          <svg className="w-4 h-4 animate-spin text-gray-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+          <span className="text-xs font-medium text-gray-700">Uploading...</span>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-1.5 opacity-0 group-hover/overlay:opacity-100 transition-opacity">
+          <div className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
+            <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+          </div>
+          <span className="text-xs font-semibold text-white drop-shadow-md">Upload Image</span>
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="image/*,video/mp4,video/webm" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
+
 // ── Order Cart Sidebar ───────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -854,6 +919,8 @@ function Step2Package({
   orderDetails,
   workspaceSlug,
   onCouponApplied,
+  isDesignerPreview = false,
+  onImageUpdated,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -866,7 +933,24 @@ function Step2Package({
   orderDetails?: BookingFormSettings["orderDetails"];
   workspaceSlug: string;
   onCouponApplied?: (coupon: { couponId: string; code: string; discountType: string; discountValue: number } | null) => void;
+  isDesignerPreview?: boolean;
+  onImageUpdated?: () => void;
 }) {
+  const updateServiceMut = trpc.packages.updateService.useMutation();
+  const updatePackageMut = trpc.packages.updatePackage.useMutation();
+
+  async function uploadProductImage(file: File, type: "service" | "package", productId: string) {
+    const compressed = await compressBookingImage(file);
+    const fd = new FormData();
+    fd.append("file", compressed);
+    fd.append("type", type);
+    fd.append("productId", productId);
+    const res = await fetch("/api/product/image-upload", { method: "POST", body: fd });
+    const json = await res.json();
+    if (!res.ok || !json.coverImage) return null;
+    return json.coverImage as string;
+  }
+
   const [tab, setTab] = useState<"packages" | "services">("packages");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [detailPkg, setDetailPkg] = useState<any | null>(null);
@@ -985,13 +1069,20 @@ function Step2Package({
                           </svg>
                         </div>
                       )}
+                      {/* Designer-only upload overlay */}
+                      {isDesignerPreview && (
+                        <DesignerImageOverlay onUpload={async (file) => {
+                          const url = await uploadProductImage(file, "package", pkg.id);
+                          if (url) { await updatePackageMut.mutateAsync({ id: pkg.id, coverImage: url }); onImageUpdated?.(); }
+                        }} />
+                      )}
                       {pkg.isPopular && (
-                        <span className="absolute top-2 left-2 text-[10px] font-bold text-white px-2 py-0.5 rounded" style={{ backgroundColor: pkg.badgeColor || brandColor }}>
+                        <span className="absolute top-2 left-2 text-[10px] font-bold text-white px-2 py-0.5 rounded z-20" style={{ backgroundColor: pkg.badgeColor || brandColor }}>
                           {pkg.badgeLabel || "Most Popular"}
                         </span>
                       )}
                       {selected && (
-                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: brandColor }}>
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white z-20" style={{ backgroundColor: brandColor }}>
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>
                         </div>
                       )}
@@ -1042,18 +1133,26 @@ function Step2Package({
                     style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 1px ${brandColor}44` } : { borderColor: "#f3f4f6" }}
                   >
                     {/* Cover image/video or icon header */}
-                    {svc.coverImage ? (
-                      /\.(mp4|webm|mov)$/i.test(svc.coverImage) ? (
-                        <video src={svc.coverImage} className="w-full h-20 object-cover" muted autoPlay loop playsInline />
+                    <div className="relative">
+                      {svc.coverImage ? (
+                        /\.(mp4|webm|mov)$/i.test(svc.coverImage) ? (
+                          <video src={svc.coverImage} className="w-full h-20 object-cover" muted autoPlay loop playsInline />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={svc.coverImage} alt={svc.name} className="w-full h-20 object-cover" />
+                        )
                       ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={svc.coverImage} alt={svc.name} className="w-full h-20 object-cover" />
-                      )
-                    ) : (
-                      <div className="h-20 bg-gray-50 flex items-center justify-center">
-                        <span className="text-2xl">{svcIcon(svc.category)}</span>
-                      </div>
-                    )}
+                        <div className="h-20 bg-gray-50 flex items-center justify-center">
+                          <span className="text-2xl">{svcIcon(svc.category)}</span>
+                        </div>
+                      )}
+                      {isDesignerPreview && (
+                        <DesignerImageOverlay onUpload={async (file) => {
+                          const url = await uploadProductImage(file, "service", svc.id);
+                          if (url) { await updateServiceMut.mutateAsync({ id: svc.id, coverImage: url }); onImageUpdated?.(); }
+                        }} />
+                      )}
+                    </div>
                     <div className="p-3">
                       <p className="text-sm font-semibold text-gray-900">{svc.name}</p>
                       {svc.description && <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{svc.description}</p>}
@@ -1896,6 +1995,12 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [liveOrderDetails, setLiveOrderDetails] = useState<BookingFormSettings["orderDetails"] | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
   const [appliedCouponData, setAppliedCouponData] = useState<{ couponId: string; code: string; discountType: string; discountValue: number } | null>(null);
+  const [isDesignerPreview, setIsDesignerPreview] = useState(false);
+
+  // Detect if we're inside the form designer iframe
+  useEffect(() => {
+    try { if (window.parent !== window) setIsDesignerPreview(true); } catch { /* cross-origin */ }
+  }, []);
 
   // ── Check if customer is signed in via portal session ───────────────────
   const { data: clientData } = trpc.booking.getCurrentClient.useQuery(
@@ -1937,7 +2042,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  const { data, isLoading, isError } = trpc.booking.getWorkspaceInfo.useQuery(
+  const { data, isLoading, isError, refetch: refetchWorkspaceInfo } = trpc.booking.getWorkspaceInfo.useQuery(
     { slug: workspaceSlug, formId },
     { enabled: !!workspaceSlug }
   );
@@ -2269,7 +2374,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
