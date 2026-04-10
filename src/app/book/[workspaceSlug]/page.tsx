@@ -551,8 +551,17 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
                   <div className="space-y-1">
                     {pkg.items.map((item: any) => (
                       <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                          <span className="text-base">{svcIcon(item.service.category)}</span>
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
+                          {item.service.coverImage ? (
+                            /\.(mp4|webm|mov)$/i.test(item.service.coverImage) ? (
+                              <video src={item.service.coverImage} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                            ) : (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={item.service.coverImage} alt={item.service.name} className="w-full h-full object-cover" />
+                            )
+                          ) : (
+                            <span className="text-base">{svcIcon(item.service.category)}</span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-sky-700 bg-sky-50">Core</span>
@@ -584,8 +593,17 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
                         const isAdded = selectedAddOns.includes(svc.id);
                         return (
                           <div key={svc.id} className="w-[160px] shrink-0 rounded-xl border border-gray-200 overflow-hidden bg-white hover:shadow-md transition-shadow">
-                            <div className="h-20 bg-gray-100 flex items-center justify-center relative">
-                              <span className="text-2xl">{svcIcon(svc.category)}</span>
+                            <div className="h-20 bg-gray-100 flex items-center justify-center relative overflow-hidden">
+                              {svc.coverImage ? (
+                                /\.(mp4|webm|mov)$/i.test(svc.coverImage) ? (
+                                  <video src={svc.coverImage} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                                ) : (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={svc.coverImage} alt={svc.name} className="w-full h-full object-cover" />
+                                )
+                              ) : (
+                                <span className="text-2xl">{svcIcon(svc.category)}</span>
+                              )}
                               <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-orange-700 bg-orange-50">Add-on</span>
                             </div>
                             <div className="p-3">
