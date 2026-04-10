@@ -642,18 +642,23 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
 // ── Order Cart Sidebar ───────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService }: {
+function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService, orderDetails }: {
   selectedPkg: any | null; selectedAddOns: string[]; selectedServiceIds: string[]; services: any[]; brandColor: string;
   onRemovePkg: () => void; onRemoveAddOn: (id: string) => void; onRemoveService: (id: string) => void;
+  orderDetails?: BookingFormSettings["orderDetails"];
 }) {
+  const od = { ...DEFAULT_BOOKING_FORM_SETTINGS.orderDetails, ...orderDetails };
   const addOnItems = services.filter((s: any) => selectedAddOns.includes(s.id));
   const serviceItems = services.filter((s: any) => selectedServiceIds.includes(s.id));
   const pkgPrice = selectedPkg?.price ?? 0;
   const addOnTotal = addOnItems.reduce((sum: number, s: any) => sum + s.basePrice, 0);
   const svcTotal = serviceItems.reduce((sum: number, s: any) => sum + s.basePrice, 0);
-  const total = selectedPkg ? pkgPrice + addOnTotal : svcTotal;
+  const subtotal = selectedPkg ? pkgPrice + addOnTotal : svcTotal;
+  const taxAmt = (od.taxRate ?? 0) > 0 ? subtotal * ((od.taxRate ?? 0) / 100) : 0;
+  const total = subtotal + taxAmt;
   const hasItems = !!selectedPkg || serviceItems.length > 0;
   const itemCount = (selectedPkg ? 1 : 0) + addOnItems.length + (!selectedPkg ? serviceItems.length : 0);
+  const [couponCode, setCouponCode] = useState("");
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden sticky top-28">
@@ -685,7 +690,7 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
               <p className="text-[11px] text-gray-400 mt-0.5">Package</p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-sm font-bold text-gray-900">${pkgPrice.toLocaleString()}</span>
+              {od.showPriceBreakdown && <span className="text-sm font-bold text-gray-900">${pkgPrice.toLocaleString()}</span>}
               <button type="button" onClick={onRemovePkg} className="w-5 h-5 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Remove">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -700,7 +705,7 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
               <p className="text-[11px] font-medium mt-0.5" style={{ color: brandColor }}>Add-on</p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-sm text-gray-600">${svc.basePrice.toLocaleString()}</span>
+              {od.showPriceBreakdown && <span className="text-sm text-gray-600">${svc.basePrice.toLocaleString()}</span>}
               <button type="button" onClick={() => onRemoveAddOn(svc.id)} className="w-5 h-5 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Remove">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -714,7 +719,7 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
               <p className="text-sm text-gray-700 truncate">{svc.name}</p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-sm text-gray-600">${svc.basePrice.toLocaleString()}</span>
+              {od.showPriceBreakdown && <span className="text-sm text-gray-600">${svc.basePrice.toLocaleString()}</span>}
               <button type="button" onClick={() => onRemoveService(svc.id)} className="w-5 h-5 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Remove">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -723,13 +728,50 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
         ))}
       </div>
 
-      {/* Total */}
-      <div className="px-5 py-4 border-t border-gray-100" style={{ backgroundColor: `${brandColor}08` }}>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Total</span>
-          <span className="text-xl font-bold text-gray-900">${total.toLocaleString()}</span>
+      {/* Coupon field */}
+      {od.showCouponField && (
+        <div className="px-5 py-3 border-t border-gray-100">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              placeholder="Promo code"
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              disabled={!couponCode.trim()}
+              className="px-3 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 transition-colors"
+              style={{ backgroundColor: brandColor }}
+            >
+              Apply
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Total / Tax */}
+      {od.showTotal && (
+        <div className="px-5 py-4 border-t border-gray-100" style={{ backgroundColor: `${brandColor}08` }}>
+          {od.showPriceBreakdown && taxAmt > 0 && (
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-gray-400">Subtotal</span>
+              <span className="text-sm text-gray-600">${subtotal.toLocaleString()}</span>
+            </div>
+          )}
+          {taxAmt > 0 && (
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-gray-400">{od.taxLabel ?? "Tax"} ({od.taxRate}%)</span>
+              <span className="text-sm text-gray-600">${taxAmt.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Total</span>
+            <span className="text-xl font-bold text-gray-900">${total.toLocaleString()}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -741,6 +783,7 @@ function Step2Package({
   services,
   brandColor,
   gridColumns = 3,
+  orderDetails,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -750,6 +793,7 @@ function Step2Package({
   services: any[];
   brandColor: string;
   gridColumns?: number;
+  orderDetails?: BookingFormSettings["orderDetails"];
 }) {
   const [tab, setTab] = useState<"packages" | "services">("packages");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -954,28 +998,36 @@ function Step2Package({
           onRemovePkg={removePkg}
           onRemoveAddOn={removeAddOn}
           onRemoveService={removeService}
+          orderDetails={orderDetails}
         />
       </div>
 
       {/* Mobile: sticky bottom cart summary */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden z-40 bg-white border-t border-gray-200 shadow-lg px-4 py-3">
-        <div className="flex items-center justify-between max-w-2xl mx-auto">
-          <div>
-            <p className="text-sm font-bold text-gray-900">
-              {selectedPkg ? selectedPkg.name : `${form.selectedServiceIds.length} item${form.selectedServiceIds.length !== 1 ? "s" : ""}`}
-            </p>
-            <p className="text-xs text-gray-500">
-              {selectedAddOns.length > 0 && selectedPkg ? `+ ${selectedAddOns.length} add-on${selectedAddOns.length !== 1 ? "s" : ""}` : ""}
-            </p>
+      {(() => {
+        const mOd = { ...DEFAULT_BOOKING_FORM_SETTINGS.orderDetails, ...orderDetails };
+        const mSub = selectedPkg
+          ? selectedPkg.price + services.filter((s: any) => selectedAddOns.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0)
+          : services.filter((s: any) => form.selectedServiceIds.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0);
+        const mTax = (mOd.taxRate ?? 0) > 0 ? mSub * ((mOd.taxRate ?? 0) / 100) : 0;
+        const mTotal = mSub + mTax;
+        return (
+          <div className="fixed bottom-0 left-0 right-0 md:hidden z-40 bg-white border-t border-gray-200 shadow-lg px-4 py-3">
+            <div className="flex items-center justify-between max-w-2xl mx-auto">
+              <div>
+                <p className="text-sm font-bold text-gray-900">
+                  {selectedPkg ? selectedPkg.name : `${form.selectedServiceIds.length} item${form.selectedServiceIds.length !== 1 ? "s" : ""}`}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {selectedAddOns.length > 0 && selectedPkg ? `+ ${selectedAddOns.length} add-on${selectedAddOns.length !== 1 ? "s" : ""}` : ""}
+                </p>
+              </div>
+              {mOd.showTotal && (
+                <span className="text-lg font-bold text-gray-900">${mTotal.toLocaleString()}</span>
+              )}
+            </div>
           </div>
-          <span className="text-lg font-bold text-gray-900">
-            ${(selectedPkg
-              ? selectedPkg.price + services.filter((s: any) => selectedAddOns.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0)
-              : services.filter((s: any) => form.selectedServiceIds.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0)
-            ).toLocaleString()}
-          </span>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Detail Modal */}
       {detailPkg && (
@@ -1752,6 +1804,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [liveFieldSettings, setLiveFieldSettings] = useState<BookingFormSettings["fields"] | null>(null);
   const [liveCustomFields, setLiveCustomFields] = useState<CustomField[] | null>(null);
   const [liveGridColumns, setLiveGridColumns] = useState<number | null>(null);
+  const [liveOrderDetails, setLiveOrderDetails] = useState<BookingFormSettings["orderDetails"] | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
 
   // ── Check if customer is signed in via portal session ───────────────────
@@ -1787,6 +1840,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         if (e.data.fieldSettings) setLiveFieldSettings(e.data.fieldSettings);
         if (e.data.customFields) setLiveCustomFields(e.data.customFields);
         if (e.data.gridColumns != null) setLiveGridColumns(e.data.gridColumns);
+        if (e.data.orderDetails) setLiveOrderDetails(e.data.orderDetails);
       }
     }
     window.addEventListener("message", handleMessage);
@@ -1974,20 +2028,23 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           return { ...DEFAULT_BOOKING_FORM_SETTINGS, ...rs, fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...rs.fields } };
         }
         // Flat shape from DB — field objects are at root level alongside gridColumns etc.
-        const { gridColumns: gc, welcomeMessage, showMapPreview, ...fieldObjs } = rs;
+        const { gridColumns: gc, welcomeMessage, showMapPreview, orderDetails: od, ...fieldObjs } = rs;
         return {
           ...DEFAULT_BOOKING_FORM_SETTINGS,
           ...(gc != null && { gridColumns: gc }),
           ...(welcomeMessage != null && { welcomeMessage }),
           ...(showMapPreview != null && { showMapPreview }),
+          ...(od != null && { orderDetails: { ...DEFAULT_BOOKING_FORM_SETTINGS.orderDetails, ...od } }),
           fields: { ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...fieldObjs },
         };
       })()
     : DEFAULT_BOOKING_FORM_SETTINGS;
   // Live designer overrides field settings in real-time
-  const formSettings: BookingFormSettings = liveFieldSettings
-    ? { ...baseSettings, fields: liveFieldSettings }
-    : baseSettings;
+  const formSettings: BookingFormSettings = {
+    ...baseSettings,
+    ...(liveFieldSettings && { fields: liveFieldSettings }),
+    ...(liveOrderDetails && { orderDetails: { ...baseSettings.orderDetails, ...liveOrderDetails } }),
+  };
   // Custom fields: live override > saved on form > empty
   const customFields: CustomField[] = liveCustomFields
     ?? ((data?.orderForm as any)?.customFields as CustomField[] | undefined)
@@ -2117,7 +2174,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>

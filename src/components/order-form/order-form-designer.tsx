@@ -329,9 +329,10 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
         fieldSettings: fields,
         customFields,
         gridColumns,
+        orderDetails: { showCouponField, showPriceBreakdown, showTotal, taxRate, taxLabel, showLineItemDetails },
       }, "*");
     }
-  }, [fields, customFields, gridColumns]);
+  }, [fields, customFields, gridColumns, showCouponField, showPriceBreakdown, showTotal, taxRate, taxLabel, showLineItemDetails]);
 
   useEffect(() => { sendLiveUpdate(); }, [sendLiveUpdate]);
 
