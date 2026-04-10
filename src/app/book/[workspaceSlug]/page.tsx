@@ -730,19 +730,19 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
 
       {/* Coupon field */}
       {od.showCouponField && (
-        <div className="px-5 py-3 border-t border-gray-100">
-          <div className="flex gap-2">
+        <div className="px-3 py-3 border-t border-gray-100">
+          <div className="flex gap-1.5 min-w-0">
             <input
               type="text"
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value)}
               placeholder="Promo code"
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
               type="button"
               disabled={!couponCode.trim()}
-              className="px-3 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 transition-colors"
+              className="shrink-0 px-2.5 py-1.5 text-xs font-medium text-white rounded-md disabled:opacity-40 transition-colors"
               style={{ backgroundColor: brandColor }}
             >
               Apply
