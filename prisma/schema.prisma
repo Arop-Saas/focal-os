@@ -84,6 +84,7 @@ model Workspace {
   brokerageGroups  BrokerageGroup[]
   customerTeams    CustomerTeam[]
   orderForms       OrderForm[]
+  coupons          Coupon[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -440,6 +441,30 @@ model CustomerTeam {
 enum DiscountType {
   PERCENTAGE
   FLAT
+}
+
+// ─────────────────────────────────────────────────────────────
+// COUPONS / PROMO CODES
+// ─────────────────────────────────────────────────────────────
+
+model Coupon {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  code          String                        // e.g. "SAVE10", "WELCOME20"
+  discountType  DiscountType @default(PERCENTAGE)
+  discountValue Float        @default(0)     // 10 = 10% off, or $10 flat
+  maxUses       Int?                          // null = unlimited
+  usedCount     Int          @default(0)
+  expiresAt     DateTime?                     // null = never expires
+  isActive      Boolean      @default(true)
+
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId])
 }
 
 // ─────────────────────────────────────────────────────────────

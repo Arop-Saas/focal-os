@@ -17,6 +17,7 @@ import { brokeragesRouter } from "./brokerages";
 import { teamsRouter } from "./teams";
 import { mobileRouter } from "./mobile";
 import { orderFormRouter } from "./order-form";
+import { couponsRouter } from "./coupons";
 
 export const appRouter = router({
   workspace: workspaceRouter,
@@ -37,6 +38,7 @@ export const appRouter = router({
   teams: teamsRouter,
   mobile: mobileRouter,
   orderForm: orderFormRouter,
+  coupons: couponsRouter,
 });
 
 export type AppRouter = typeof appRouter;

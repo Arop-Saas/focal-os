@@ -642,10 +642,11 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
 // ── Order Cart Sidebar ───────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService, orderDetails }: {
+function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService, orderDetails, workspaceSlug }: {
   selectedPkg: any | null; selectedAddOns: string[]; selectedServiceIds: string[]; services: any[]; brandColor: string;
   onRemovePkg: () => void; onRemoveAddOn: (id: string) => void; onRemoveService: (id: string) => void;
   orderDetails?: BookingFormSettings["orderDetails"];
+  workspaceSlug: string;
 }) {
   const od = { ...DEFAULT_BOOKING_FORM_SETTINGS.orderDetails, ...orderDetails };
   const addOnItems = services.filter((s: any) => selectedAddOns.includes(s.id));
@@ -653,12 +654,49 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
   const pkgPrice = selectedPkg?.price ?? 0;
   const addOnTotal = addOnItems.reduce((sum: number, s: any) => sum + s.basePrice, 0);
   const svcTotal = serviceItems.reduce((sum: number, s: any) => sum + s.basePrice, 0);
-  const subtotal = selectedPkg ? pkgPrice + addOnTotal : svcTotal;
+  const rawSubtotal = selectedPkg ? pkgPrice + addOnTotal : svcTotal;
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountType: string; discountValue: number } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const validateCoupon = trpc.coupons.validate.useMutation();
+
+  async function handleApplyCoupon() {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError("");
+    try {
+      const result = await validateCoupon.mutateAsync({ slug: workspaceSlug, code: couponCode });
+      if (result.valid) {
+        setAppliedCoupon({ code: result.code, discountType: result.discountType, discountValue: result.discountValue });
+        setCouponError("");
+      } else {
+        setAppliedCoupon(null);
+        setCouponError(result.message);
+      }
+    } catch {
+      setCouponError("Could not validate code");
+    }
+    setCouponLoading(false);
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null); setCouponCode(""); setCouponError("");
+  }
+
+  // Calculate discount
+  const discountAmt = appliedCoupon
+    ? appliedCoupon.discountType === "PERCENTAGE"
+      ? rawSubtotal * (appliedCoupon.discountValue / 100)
+      : Math.min(appliedCoupon.discountValue, rawSubtotal)
+    : 0;
+  const subtotal = rawSubtotal - discountAmt;
   const taxAmt = (od.taxRate ?? 0) > 0 ? subtotal * ((od.taxRate ?? 0) / 100) : 0;
   const total = subtotal + taxAmt;
   const hasItems = !!selectedPkg || serviceItems.length > 0;
   const itemCount = (selectedPkg ? 1 : 0) + addOnItems.length + (!selectedPkg ? serviceItems.length : 0);
-  const [couponCode, setCouponCode] = useState("");
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden sticky top-28">
@@ -731,33 +769,58 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
       {/* Coupon field */}
       {od.showCouponField && (
         <div className="px-3 py-3 border-t border-gray-100">
-          <div className="flex gap-1.5 min-w-0">
-            <input
-              type="text"
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value)}
-              placeholder="Promo code"
-              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="button"
-              disabled={!couponCode.trim()}
-              className="shrink-0 px-2.5 py-1.5 text-xs font-medium text-white rounded-md disabled:opacity-40 transition-colors"
-              style={{ backgroundColor: brandColor }}
-            >
-              Apply
-            </button>
-          </div>
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between bg-green-50 rounded-md px-2.5 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-green-700 truncate">{appliedCoupon.code}</p>
+                <p className="text-[10px] text-green-600">
+                  {appliedCoupon.discountType === "PERCENTAGE" ? `${appliedCoupon.discountValue}% off` : `$${appliedCoupon.discountValue} off`}
+                </p>
+              </div>
+              <button type="button" onClick={removeCoupon} className="shrink-0 p-1 text-green-400 hover:text-red-500 transition-colors" title="Remove coupon">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-1.5 min-w-0">
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(""); }}
+                  placeholder="Promo code"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleApplyCoupon(); }}
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={!couponCode.trim() || couponLoading}
+                  className="shrink-0 px-2.5 py-1.5 text-xs font-medium text-white rounded-md disabled:opacity-40 transition-colors"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  {couponLoading ? "..." : "Apply"}
+                </button>
+              </div>
+              {couponError && <p className="text-[10px] text-red-500 mt-1">{couponError}</p>}
+            </>
+          )}
         </div>
       )}
 
       {/* Total / Tax */}
       {od.showTotal && (
         <div className="px-5 py-4 border-t border-gray-100" style={{ backgroundColor: `${brandColor}08` }}>
-          {od.showPriceBreakdown && taxAmt > 0 && (
+          {od.showPriceBreakdown && (discountAmt > 0 || taxAmt > 0) && (
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs text-gray-400">Subtotal</span>
-              <span className="text-sm text-gray-600">${subtotal.toLocaleString()}</span>
+              <span className="text-sm text-gray-600">${rawSubtotal.toLocaleString()}</span>
+            </div>
+          )}
+          {discountAmt > 0 && (
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-green-600">Discount</span>
+              <span className="text-sm font-medium text-green-600">-${discountAmt.toFixed(2)}</span>
             </div>
           )}
           {taxAmt > 0 && (
@@ -784,6 +847,7 @@ function Step2Package({
   brandColor,
   gridColumns = 3,
   orderDetails,
+  workspaceSlug,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -794,6 +858,7 @@ function Step2Package({
   brandColor: string;
   gridColumns?: number;
   orderDetails?: BookingFormSettings["orderDetails"];
+  workspaceSlug: string;
 }) {
   const [tab, setTab] = useState<"packages" | "services">("packages");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -999,6 +1064,7 @@ function Step2Package({
           onRemoveAddOn={removeAddOn}
           onRemoveService={removeService}
           orderDetails={orderDetails}
+          workspaceSlug={workspaceSlug}
         />
       </div>
 
@@ -2174,7 +2240,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>

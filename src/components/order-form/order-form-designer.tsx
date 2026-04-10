@@ -138,6 +138,139 @@ function SavePill({ onClick, loading, saved }: { onClick: () => void; loading: b
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Coupon Manager (embedded in Order Details)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CouponManager() {
+  const utils = api.useUtils();
+  const { data: coupons, isLoading } = api.coupons.list.useQuery();
+  const createMut = api.coupons.create.useMutation({ onSuccess: () => utils.coupons.list.invalidate() });
+  const updateMut = api.coupons.update.useMutation({ onSuccess: () => utils.coupons.list.invalidate() });
+  const deleteMut = api.coupons.delete.useMutation({ onSuccess: () => utils.coupons.list.invalidate() });
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [discountType, setDiscountType] = useState<"PERCENTAGE" | "FLAT">("PERCENTAGE");
+  const [discountValue, setDiscountValue] = useState(10);
+  const [maxUses, setMaxUses] = useState<string>("");
+  const [expiresAt, setExpiresAt] = useState("");
+
+  function resetForm() {
+    setCode(""); setDiscountType("PERCENTAGE"); setDiscountValue(10); setMaxUses(""); setExpiresAt(""); setEditingId(null); setShowForm(false);
+  }
+
+  function openEdit(c: NonNullable<typeof coupons>[number]) {
+    setEditingId(c.id);
+    setCode(c.code);
+    setDiscountType(c.discountType);
+    setDiscountValue(c.discountValue);
+    setMaxUses(c.maxUses?.toString() ?? "");
+    setExpiresAt(c.expiresAt ? new Date(c.expiresAt).toISOString().slice(0, 10) : "");
+    setShowForm(true);
+  }
+
+  async function handleSubmit() {
+    if (!code.trim()) return;
+    if (editingId) {
+      await updateMut.mutateAsync({ id: editingId, code, discountType, discountValue, maxUses: maxUses ? parseInt(maxUses) : null, expiresAt: expiresAt || null });
+    } else {
+      await createMut.mutateAsync({ code, discountType, discountValue, maxUses: maxUses ? parseInt(maxUses) : null, expiresAt: expiresAt || null });
+    }
+    resetForm();
+  }
+
+  const isBusy = createMut.isPending || updateMut.isPending;
+
+  return (
+    <div className="pl-1 space-y-2">
+      {/* Existing coupons list */}
+      {isLoading ? (
+        <p className="text-[10px] text-gray-400">Loading coupons...</p>
+      ) : coupons && coupons.length > 0 ? (
+        <div className="space-y-1">
+          {coupons.map((c) => (
+            <div key={c.id} className="flex items-center justify-between gap-1 py-1.5 px-2 bg-white rounded-lg border border-gray-100">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-mono font-bold text-gray-800 truncate">{c.code}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${c.isActive ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                    {c.isActive ? "Active" : "Off"}
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-400">
+                  {c.discountType === "PERCENTAGE" ? `${c.discountValue}% off` : `$${c.discountValue} off`}
+                  {c.maxUses ? ` · ${c.usedCount}/${c.maxUses} used` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button type="button" onClick={() => updateMut.mutate({ id: c.id, isActive: !c.isActive })}
+                  className="p-1 text-gray-300 hover:text-blue-600 transition-colors" title={c.isActive ? "Deactivate" : "Activate"}>
+                  {c.isActive ? <Eye className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                </button>
+                <button type="button" onClick={() => openEdit(c)}
+                  className="p-1 text-gray-300 hover:text-gray-600 transition-colors" title="Edit">
+                  <Settings2 className="w-3 h-3" />
+                </button>
+                <button type="button" onClick={() => { if (confirm("Delete this coupon?")) deleteMut.mutate({ id: c.id }); }}
+                  className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Delete">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Create / Edit form */}
+      {showForm ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+          <p className="text-[11px] font-semibold text-gray-700">{editingId ? "Edit Coupon" : "New Coupon"}</p>
+          <input type="text" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE e.g. SAVE10"
+            className="w-full px-2.5 py-1.5 text-xs font-mono border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase" />
+          <div className="flex gap-2">
+            <select value={discountType} onChange={(e) => setDiscountType(e.target.value as "PERCENTAGE" | "FLAT")}
+              className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="PERCENTAGE">% Off</option>
+              <option value="FLAT">$ Off</option>
+            </select>
+            <input type="number" min="0" value={discountValue} onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+              className="w-20 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[10px] text-gray-400 mb-0.5 block">Max uses</label>
+              <input type="number" min="1" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="∞"
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-gray-400 mb-0.5 block">Expires</label>
+              <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          {createMut.error && <p className="text-[10px] text-red-500">{createMut.error.message}</p>}
+          {updateMut.error && <p className="text-[10px] text-red-500">{updateMut.error.message}</p>}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={resetForm} className="flex-1 px-2 py-1.5 text-xs text-gray-500 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">Cancel</button>
+            <button type="button" onClick={handleSubmit} disabled={!code.trim() || isBusy}
+              className="flex-1 px-2 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 disabled:opacity-40 transition-colors">
+              {isBusy ? "Saving..." : editingId ? "Update" : "Create"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => { resetForm(); setShowForm(true); }}
+          className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 transition-colors">
+          <Plus className="w-3 h-3" />
+          Create Coupon
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Main Designer
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -772,6 +905,9 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
                   <input type="checkbox" checked={showCouponField} onChange={(e) => { setShowCouponField(e.target.checked); setSavedFields(false); }}
                     className="w-8 h-4 rounded-full appearance-none bg-gray-300 checked:bg-blue-600 relative cursor-pointer transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-3 after:h-3 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-4" />
                 </label>
+
+                {/* Coupon management section */}
+                {showCouponField && <CouponManager />}
 
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
