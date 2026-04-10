@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/trpc/client";
 import {
   Loader2, Save, CheckCircle2, ArrowLeft, ExternalLink,
@@ -143,6 +143,7 @@ function SavePill({ onClick, loading, saved }: { onClick: () => void; loading: b
 
 export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; workspaceSlug: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { data: form, isLoading } = api.orderForm.get.useQuery({ id: formId });
 
@@ -157,7 +158,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const { data: portalData } = api.workspace.getPortalSettings.useQuery();
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [activeSection, setActiveSection] = useState<SidebarSection>("general");
+  const initialSection = (searchParams.get("section") as SidebarSection) || "general";
+  const [activeSection, setActiveSection] = useState<SidebarSection>(initialSection);
   const [previewSize, setPreviewSize]     = useState<PreviewSize>("desktop");
 
   // General
