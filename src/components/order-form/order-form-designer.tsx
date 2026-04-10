@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { DEFAULT_BOOKING_FORM_SETTINGS, DEFAULT_PORTAL_SETTINGS, type BookingFormSettings, type CustomField, type PortalSettings } from "@/lib/booking-form-types";
 import { CustomFieldBuilder } from "./custom-field-builder";
+import { PackagesView } from "@/components/packages/packages-view";
 
 // ── Client-side image compression ───────────────────────────────────────────
 // Resizes large images to max 1600px and compresses to JPEG ≤ 1.5MB
@@ -119,71 +120,6 @@ function Toggle({ value, onChange, color = "blue" }: { value: boolean; onChange:
   );
 }
 
-// ─── Quick-add section (inline create for services/packages) ───────────────
-
-function QuickAddSection({ title, items, onAdd, loading, itemLabel }: {
-  title: string;
-  items: Array<{ id: string; name: string; price?: number; basePrice?: number; isActive?: boolean }>;
-  onAdd: (name: string, price: number) => Promise<void>;
-  loading: boolean;
-  itemLabel: string;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim() || !price) return;
-    await onAdd(name.trim(), parseFloat(price));
-    setName(""); setPrice(""); setExpanded(false);
-  }
-
-  return (
-    <div className="rounded-xl border border-gray-200 overflow-hidden">
-      <button onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors"
-      >
-        <span>{title}</span>
-        <Plus className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? "rotate-45" : ""}`} />
-      </button>
-      {expanded && (
-        <form onSubmit={handleSubmit} className="p-3 space-y-2 border-t">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${itemLabel} name`}
-            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-              <input type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00"
-                className="w-full pl-6 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
-            </div>
-            <button type="submit" disabled={loading || !name.trim() || !price}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-1"
-            >
-              {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-              Add
-            </button>
-          </div>
-        </form>
-      )}
-      {/* Existing items list */}
-      {items.length > 0 && (
-        <div className="max-h-32 overflow-y-auto border-t divide-y divide-gray-100">
-          {items.map((item) => (
-            <div key={item.id} className="flex items-center justify-between px-3.5 py-2">
-              <span className="text-xs text-gray-700 truncate">{item.name}</span>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs font-medium text-gray-500">${(item.price ?? item.basePrice ?? 0).toFixed(2)}</span>
-                {item.isActive === false && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Off</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Save pill ──────────────────────────────────────────────────────────────
 
 function SavePill({ onClick, loading, saved }: { onClick: () => void; loading: boolean; saved: boolean }) {
@@ -219,12 +155,6 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const updateCustomFields = api.orderForm.updateCustomFields.useMutation();
   const savePortalSettings = api.workspace.savePortalSettings.useMutation();
   const { data: portalData } = api.workspace.getPortalSettings.useQuery();
-
-  // Products — for quick-add in Step 2
-  const { data: productServices, refetch: refetchProductServices } = api.packages.listServices.useQuery({});
-  const { data: productPackages, refetch: refetchProductPackages } = api.packages.listPackages.useQuery({});
-  const createServiceMut = api.packages.createService.useMutation();
-  const createPackageMut = api.packages.createPackage.useMutation();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<SidebarSection>("general");
@@ -808,51 +738,12 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           )}
 
           {activeSection === "step-2" && (
-            <Panel title="Step 2 — Services" desc="Packages, add-ons, and custom fields">
-              {/* Product management link */}
-              <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                    <ShoppingBag className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-blue-900 font-semibold">Products &amp; Packages</p>
-                    <p className="text-xs text-blue-600 mt-0.5">Full management of packages, services, and pricing on the Products page.</p>
-                    <button onClick={() => router.push("/packages")} className="mt-2 text-xs font-bold text-blue-700 hover:text-blue-900 underline underline-offset-2 transition-colors">
-                      Go to Products &rarr;
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick-add service */}
-              <QuickAddSection
-                title="Quick Add Service"
-                items={(productServices as any[]) ?? []}
-                onAdd={async (name, price) => {
-                  await createServiceMut.mutateAsync({ name, category: "PHOTOGRAPHY" as any, basePrice: price, isActive: true });
-                  await refetchProductServices();
-                  refreshPreview();
-                }}
-                loading={createServiceMut.isPending}
-                itemLabel="service"
-              />
-
-              {/* Quick-add package */}
-              <QuickAddSection
-                title="Quick Add Package"
-                items={(productPackages as any[]) ?? []}
-                onAdd={async (name, price) => {
-                  await createPackageMut.mutateAsync({ name, price, items: [], isActive: true });
-                  await refetchProductPackages();
-                  refreshPreview();
-                }}
-                loading={createPackageMut.isPending}
-                itemLabel="package"
-              />
+            <Panel title="Step 2 — Services" desc="Manage your services, packages, and pricing">
+              {/* Full Products & Services management embedded */}
+              <PackagesView />
 
               {/* Grid columns setting */}
-              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-4">
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-4 mt-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Layout Settings</p>
                 <div>
                   <div className="flex items-center justify-between mb-2">
