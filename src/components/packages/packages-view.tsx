@@ -12,6 +12,7 @@ import {
 import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getEffectiveCover } from "@/lib/stock-covers";
 
 /* ─── Category metadata ────────────────────────────────────────────── */
 const CATEGORY_META: Record<string, { label: string; color: string; bg: string; light: string; icon: React.ElementType }> = {
@@ -101,12 +102,14 @@ function InlineImageUpload({
   onRemove,
   accentBg,
   accentIcon: AccentIcon,
+  stockUrl,
 }: {
   currentImage?: string | null;
   onUpload: (file: File) => Promise<void>;
   onRemove: () => void;
   accentBg?: string;
   accentIcon?: React.ElementType;
+  stockUrl?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -149,6 +152,14 @@ function InlineImageUpload({
           >
             <X className="w-2 h-2" />
           </button>
+        </>
+      ) : stockUrl ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={stockUrl} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+            <Upload className="w-3 h-3 text-white" />
+          </div>
         </>
       ) : (
         <>
@@ -528,6 +539,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                       currentImage={service.coverImage}
                       accentBg={meta.bg}
                       accentIcon={Icon}
+                      stockUrl={!service.coverImage ? getEffectiveCover(null, service.category).url : undefined}
                       onUpload={async (file) => {
                         const compressed = await compressImage(file);
                         const fd = new FormData();
@@ -571,13 +583,16 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                 const Icon = meta.icon;
                 return (
                   <div key={service.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
-                    {/* Cover image or color accent */}
-                    {service.coverImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={service.coverImage} alt={service.name} className="w-full h-32 object-cover" />
-                    ) : (
-                      <div className={cn("h-1.5 w-full", meta.bg)} />
-                    )}
+                    {/* Cover image / video / stock fallback */}
+                    {(() => {
+                      const cover = getEffectiveCover(service.coverImage, service.category);
+                      return cover.isVideo ? (
+                        <video src={cover.url} className="w-full h-32 object-cover" muted autoPlay loop playsInline />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={cover.url} alt={service.name} className="w-full h-32 object-cover" />
+                      );
+                    })()}
                     <div className="p-4 space-y-3">
                       {/* Header row */}
                       <div className="flex items-start justify-between gap-2">
@@ -669,6 +684,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                   <div className="flex items-center gap-3">
                     <InlineImageUpload
                       currentImage={pkg.coverImage}
+                      stockUrl={!pkg.coverImage ? getEffectiveCover(null, pkg.items?.[0]?.service?.category ?? "PHOTOGRAPHY").url : undefined}
                       onUpload={async (file) => {
                         const compressed = await compressImage(file);
                         const fd = new FormData();
@@ -710,13 +726,17 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(packages as Package[]).map((pkg) => (
                 <div key={pkg.id} className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-blue-200 transition-all group">
-                  {/* Cover image or gradient accent */}
-                  {pkg.coverImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pkg.coverImage} alt={pkg.name} className="w-full h-36 object-cover" />
-                  ) : (
-                    <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
-                  )}
+                  {/* Cover image / video / stock fallback */}
+                  {(() => {
+                    const firstCat = pkg.items?.[0]?.service?.category ?? "PHOTOGRAPHY";
+                    const cover = getEffectiveCover(pkg.coverImage, firstCat);
+                    return cover.isVideo ? (
+                      <video src={cover.url} className="w-full h-36 object-cover" muted autoPlay loop playsInline />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cover.url} alt={pkg.name} className="w-full h-36 object-cover" />
+                    );
+                  })()}
                   <div className="p-4 space-y-3">
                     {/* Name + badge row */}
                     <div className="flex items-start justify-between gap-2">

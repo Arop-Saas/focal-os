@@ -7,6 +7,7 @@ import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
 import { MapboxMap } from "@/components/shared/mapbox-map";
 import { type BookingFormSettings, type CustomField, DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
+import { getEffectiveCover } from "@/lib/stock-covers";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -552,16 +553,15 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
                     {pkg.items.map((item: any) => (
                       <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
                         <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
-                          {item.service.coverImage ? (
-                            /\.(mp4|webm|mov)$/i.test(item.service.coverImage) ? (
-                              <video src={item.service.coverImage} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                          {(() => {
+                            const cover = getEffectiveCover(item.service.coverImage, item.service.category);
+                            return cover.isVideo ? (
+                              <video src={cover.url} className="w-full h-full object-cover" muted autoPlay loop playsInline />
                             ) : (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={item.service.coverImage} alt={item.service.name} className="w-full h-full object-cover" />
-                            )
-                          ) : (
-                            <span className="text-base">{svcIcon(item.service.category)}</span>
-                          )}
+                              <img src={cover.url} alt={item.service.name} className="w-full h-full object-cover" />
+                            );
+                          })()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-sky-700 bg-sky-50">Core</span>
@@ -594,16 +594,15 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
                         return (
                           <div key={svc.id} className="w-[160px] shrink-0 rounded-xl border border-gray-200 overflow-hidden bg-white hover:shadow-md transition-shadow">
                             <div className="h-20 bg-gray-100 flex items-center justify-center relative overflow-hidden">
-                              {svc.coverImage ? (
-                                /\.(mp4|webm|mov)$/i.test(svc.coverImage) ? (
-                                  <video src={svc.coverImage} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                              {(() => {
+                                const cover = getEffectiveCover(svc.coverImage, svc.category);
+                                return cover.isVideo ? (
+                                  <video src={cover.url} className="w-full h-full object-cover" muted autoPlay loop playsInline />
                                 ) : (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={svc.coverImage} alt={svc.name} className="w-full h-full object-cover" />
-                                )
-                              ) : (
-                                <span className="text-2xl">{svcIcon(svc.category)}</span>
-                              )}
+                                  <img src={cover.url} alt={svc.name} className="w-full h-full object-cover" />
+                                );
+                              })()}
                               <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-orange-700 bg-orange-50">Add-on</span>
                             </div>
                             <div className="p-3">
@@ -1073,20 +1072,16 @@ function Step2Package({
                   >
                     {/* Cover */}
                     <div className="relative h-36 bg-gray-100 overflow-hidden cursor-pointer" onClick={() => selectPackage(pkg.id)}>
-                      {pkg.coverImage ? (
-                        /\.(mp4|webm|mov)$/i.test(pkg.coverImage) ? (
-                          <video src={pkg.coverImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" muted autoPlay loop playsInline />
+                      {(() => {
+                        const firstCat = pkg.items?.[0]?.service?.category ?? "PHOTOGRAPHY";
+                        const cover = getEffectiveCover(pkg.coverImage, firstCat);
+                        return cover.isVideo ? (
+                          <video src={cover.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" muted autoPlay loop playsInline />
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={pkg.coverImage} alt={pkg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                        )
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(145deg, ${brandColor}15, ${brandColor}05)` }}>
-                          <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                            <path strokeLinecap="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-                          </svg>
-                        </div>
-                      )}
+                          <img src={cover.url} alt={pkg.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        );
+                      })()}
                       {/* Designer-only upload overlay */}
                       {isDesignerPreview && (
                         <DesignerImageOverlay onUpload={async (file) => {
@@ -1150,20 +1145,17 @@ function Step2Package({
                   <div key={svc.id} className={`rounded-xl border bg-white overflow-hidden transition-all ${selected ? "" : "hover:shadow-sm"}`}
                     style={selected ? { borderColor: brandColor, boxShadow: `0 0 0 1px ${brandColor}44` } : { borderColor: "#f3f4f6" }}
                   >
-                    {/* Cover image/video or icon header */}
+                    {/* Cover image/video or stock fallback */}
                     <div className="relative">
-                      {svc.coverImage ? (
-                        /\.(mp4|webm|mov)$/i.test(svc.coverImage) ? (
-                          <video src={svc.coverImage} className="w-full h-20 object-cover" muted autoPlay loop playsInline />
+                      {(() => {
+                        const cover = getEffectiveCover(svc.coverImage, svc.category);
+                        return cover.isVideo ? (
+                          <video src={cover.url} className="w-full h-20 object-cover" muted autoPlay loop playsInline />
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={svc.coverImage} alt={svc.name} className="w-full h-20 object-cover" />
-                        )
-                      ) : (
-                        <div className="h-20 bg-gray-50 flex items-center justify-center">
-                          <span className="text-2xl">{svcIcon(svc.category)}</span>
-                        </div>
-                      )}
+                          <img src={cover.url} alt={svc.name} className="w-full h-20 object-cover" />
+                        );
+                      })()}
                       {isDesignerPreview && (
                         <DesignerImageOverlay onUpload={async (file) => {
                           const url = await uploadProductImage(file, "service", svc.id);
@@ -2315,14 +2307,15 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
                         : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                     }`}
                   >
-                    {svc.coverImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={svc.coverImage} alt={svc.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-xl shrink-0">
-                        {svc.name?.[0]?.toUpperCase() ?? "S"}
-                      </div>
-                    )}
+                    {(() => {
+                      const cover = getEffectiveCover(svc.coverImage, svc.category);
+                      return cover.isVideo ? (
+                        <video src={cover.url} className="w-12 h-12 rounded-lg object-cover shrink-0" muted autoPlay loop playsInline />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={cover.url} alt={svc.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                      );
+                    })()}
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-900">{svc.name}</div>
                       {svc.description && (
