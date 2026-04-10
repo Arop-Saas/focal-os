@@ -47,13 +47,22 @@ export function OrderFormList() {
         <p className="text-sm text-gray-500">
           {forms?.length ?? 0} form{forms?.length !== 1 ? "s" : ""}
         </p>
-        <button
-          onClick={() => setCreating(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Order Form
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push("/packages")}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Service
+          </button>
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Order Form
+          </button>
+        </div>
       </div>
 
       {/* Create inline row */}
