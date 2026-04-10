@@ -12,7 +12,7 @@ import {
 import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getEffectiveCover } from "@/lib/stock-covers";
+import { getEffectiveCover, STOCK_COVERS, isVideoUrl } from "@/lib/stock-covers";
 
 /* ─── Category metadata ────────────────────────────────────────────── */
 const CATEGORY_META: Record<string, { label: string; color: string; bg: string; light: string; icon: React.ElementType }> = {
@@ -927,8 +927,12 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image <span className="text-gray-400 font-normal">(optional)</span></label>
                     {serviceCoverImage ? (
                       <div className="relative group rounded-lg overflow-hidden border border-gray-200">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={serviceCoverImage} alt="Cover" className="w-full h-28 object-cover" />
+                        {isVideoUrl(serviceCoverImage) ? (
+                          <video src={serviceCoverImage} className="w-full h-28 object-cover" muted autoPlay loop playsInline />
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={serviceCoverImage} alt="Cover" className="w-full h-28 object-cover" />
+                        )}
                         <button type="button" onClick={() => setServiceCoverImage("")}
                           className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
                           <X className="w-3 h-3" />
@@ -948,6 +952,45 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProductImageUpload(f, setServiceImageUploading, setServiceCoverImage); }} />
                       </label>
                     )}
+
+                    {/* Stock Media Picker */}
+                    <div className="mt-2.5">
+                      <p className="text-[11px] font-medium text-gray-400 mb-1.5">Or choose from stock media</p>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {Object.entries(STOCK_COVERS).map(([cat, media]) => {
+                          const meta = CATEGORY_META[cat] ?? CATEGORY_META.OTHER;
+                          const isSelected = serviceCoverImage === media.url;
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setServiceCoverImage(isSelected ? "" : media.url)}
+                              className={`relative rounded-md overflow-hidden aspect-square border-2 transition-all group/stock ${
+                                isSelected ? "border-blue-500 ring-1 ring-blue-500" : "border-transparent hover:border-gray-300"
+                              }`}
+                              title={meta.label}
+                            >
+                              {media.type === "video" ? (
+                                <div className="w-full h-full bg-gray-900 flex items-center justify-center">
+                                  <Play className="w-3 h-3 text-white" />
+                                </div>
+                              ) : (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={media.url} alt={meta.label} className="w-full h-full object-cover" />
+                              )}
+                              <div className="absolute inset-x-0 bottom-0 bg-black/60 px-0.5 py-px">
+                                <span className="text-[8px] text-white font-medium leading-none block truncate">{meta.label}</span>
+                              </div>
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                                  <CheckCircle2 className="w-4 h-4 text-blue-600 drop-shadow" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </form>
 
@@ -1033,8 +1076,12 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image <span className="text-gray-400 font-normal">(optional)</span></label>
                     {packageCoverImage ? (
                       <div className="relative group rounded-lg overflow-hidden border border-gray-200">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={packageCoverImage} alt="Cover" className="w-full h-28 object-cover" />
+                        {isVideoUrl(packageCoverImage) ? (
+                          <video src={packageCoverImage} className="w-full h-28 object-cover" muted autoPlay loop playsInline />
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={packageCoverImage} alt="Cover" className="w-full h-28 object-cover" />
+                        )}
                         <button type="button" onClick={() => setPackageCoverImage("")}
                           className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
                           <X className="w-3 h-3" />
@@ -1054,6 +1101,45 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProductImageUpload(f, setPackageImageUploading, setPackageCoverImage); }} />
                       </label>
                     )}
+
+                    {/* Stock Media Picker */}
+                    <div className="mt-2.5">
+                      <p className="text-[11px] font-medium text-gray-400 mb-1.5">Or choose from stock media</p>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {Object.entries(STOCK_COVERS).map(([cat, media]) => {
+                          const meta = CATEGORY_META[cat] ?? CATEGORY_META.OTHER;
+                          const isSelected = packageCoverImage === media.url;
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setPackageCoverImage(isSelected ? "" : media.url)}
+                              className={`relative rounded-md overflow-hidden aspect-square border-2 transition-all group/stock ${
+                                isSelected ? "border-blue-500 ring-1 ring-blue-500" : "border-transparent hover:border-gray-300"
+                              }`}
+                              title={meta.label}
+                            >
+                              {media.type === "video" ? (
+                                <div className="w-full h-full bg-gray-900 flex items-center justify-center">
+                                  <Play className="w-3 h-3 text-white" />
+                                </div>
+                              ) : (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={media.url} alt={meta.label} className="w-full h-full object-cover" />
+                              )}
+                              <div className="absolute inset-x-0 bottom-0 bg-black/60 px-0.5 py-px">
+                                <span className="text-[8px] text-white font-medium leading-none block truncate">{meta.label}</span>
+                              </div>
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                                  <CheckCircle2 className="w-4 h-4 text-blue-600 drop-shadow" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Turnaround */}
