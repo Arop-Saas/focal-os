@@ -459,12 +459,28 @@ model Coupon {
   isActive      Boolean      @default(true)
 
   workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  usages        CouponUsage[]
 
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
   @@unique([workspaceId, code])
   @@index([workspaceId])
+}
+
+model CouponUsage {
+  id         String   @id @default(cuid())
+  couponId   String
+  email      String                          // customer email who redeemed
+  orderId    String?                         // linked order (if available)
+
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([couponId, email])               // one use per email per coupon
+  @@index([couponId])
+  @@index([email])
 }
 
 // ─────────────────────────────────────────────────────────────

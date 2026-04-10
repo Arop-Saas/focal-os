@@ -98,6 +98,7 @@ export const couponsRouter = router({
       z.object({
         slug: z.string(),
         code: z.string().transform((v) => v.toUpperCase().trim()),
+        email: z.string().email().optional(), // customer email to check per-account usage
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -124,11 +125,46 @@ export const couponsRouter = router({
       if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
         return { valid: false as const, message: "This promo code has reached its usage limit" };
       }
+      // Check if this customer already used this coupon
+      if (input.email) {
+        const existing = await ctx.prisma.couponUsage.findUnique({
+          where: { couponId_email: { couponId: coupon.id, email: input.email.toLowerCase() } },
+        });
+        if (existing) {
+          return { valid: false as const, message: "You have already used this promo code" };
+        }
+      }
       return {
         valid: true as const,
         discountType: coupon.discountType,
         discountValue: coupon.discountValue,
         code: coupon.code,
+        couponId: coupon.id,
       };
+    }),
+
+  // ─── Record coupon usage (called after booking submission) ──────────────────
+  recordUsage: publicProcedure
+    .input(
+      z.object({
+        couponId: z.string(),
+        email: z.string().email(),
+        orderId: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Upsert to avoid duplicates, and increment usedCount
+      await ctx.prisma.$transaction([
+        ctx.prisma.couponUsage.upsert({
+          where: { couponId_email: { couponId: input.couponId, email: input.email.toLowerCase() } },
+          create: { couponId: input.couponId, email: input.email.toLowerCase(), orderId: input.orderId },
+          update: {},
+        }),
+        ctx.prisma.coupon.update({
+          where: { id: input.couponId },
+          data: { usedCount: { increment: 1 } },
+        }),
+      ]);
+      return { success: true };
     }),
 });

@@ -642,11 +642,13 @@ function PackageDetailModal({ pkg, brandColor, onSelect, onClose, services, togg
 // ── Order Cart Sidebar ───────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService, orderDetails, workspaceSlug }: {
+function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService, orderDetails, workspaceSlug, customerEmail, onCouponApplied }: {
   selectedPkg: any | null; selectedAddOns: string[]; selectedServiceIds: string[]; services: any[]; brandColor: string;
   onRemovePkg: () => void; onRemoveAddOn: (id: string) => void; onRemoveService: (id: string) => void;
   orderDetails?: BookingFormSettings["orderDetails"];
   workspaceSlug: string;
+  customerEmail?: string;
+  onCouponApplied?: (coupon: { couponId: string; code: string; discountType: string; discountValue: number } | null) => void;
 }) {
   const od = { ...DEFAULT_BOOKING_FORM_SETTINGS.orderDetails, ...orderDetails };
   const addOnItems = services.filter((s: any) => selectedAddOns.includes(s.id));
@@ -658,7 +660,7 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountType: string; discountValue: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ couponId: string; code: string; discountType: string; discountValue: number } | null>(null);
   const [couponError, setCouponError] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const validateCoupon = trpc.coupons.validate.useMutation();
@@ -668,9 +670,11 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
     setCouponLoading(true);
     setCouponError("");
     try {
-      const result = await validateCoupon.mutateAsync({ slug: workspaceSlug, code: couponCode });
+      const result = await validateCoupon.mutateAsync({ slug: workspaceSlug, code: couponCode, ...(customerEmail ? { email: customerEmail } : {}) });
       if (result.valid) {
-        setAppliedCoupon({ code: result.code, discountType: result.discountType, discountValue: result.discountValue });
+        const couponData = { couponId: result.couponId, code: result.code, discountType: result.discountType, discountValue: result.discountValue };
+        setAppliedCoupon(couponData);
+        onCouponApplied?.(couponData);
         setCouponError("");
       } else {
         setAppliedCoupon(null);
@@ -684,6 +688,7 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
 
   function removeCoupon() {
     setAppliedCoupon(null); setCouponCode(""); setCouponError("");
+    onCouponApplied?.(null);
   }
 
   // Calculate discount
@@ -848,6 +853,7 @@ function Step2Package({
   gridColumns = 3,
   orderDetails,
   workspaceSlug,
+  onCouponApplied,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -859,6 +865,7 @@ function Step2Package({
   gridColumns?: number;
   orderDetails?: BookingFormSettings["orderDetails"];
   workspaceSlug: string;
+  onCouponApplied?: (coupon: { couponId: string; code: string; discountType: string; discountValue: number } | null) => void;
 }) {
   const [tab, setTab] = useState<"packages" | "services">("packages");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1071,6 +1078,8 @@ function Step2Package({
           onRemoveService={removeService}
           orderDetails={orderDetails}
           workspaceSlug={workspaceSlug}
+          customerEmail={form.email}
+          onCouponApplied={onCouponApplied}
         />
       </div>
 
@@ -1878,6 +1887,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [liveGridColumns, setLiveGridColumns] = useState<number | null>(null);
   const [liveOrderDetails, setLiveOrderDetails] = useState<BookingFormSettings["orderDetails"] | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
+  const [appliedCouponData, setAppliedCouponData] = useState<{ couponId: string; code: string; discountType: string; discountValue: number } | null>(null);
 
   // ── Check if customer is signed in via portal session ───────────────────
   const { data: clientData } = trpc.booking.getCurrentClient.useQuery(
@@ -1931,8 +1941,13 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   );
   const reviewPhotographers = reviewPhotographersData?.photographers ?? [];
 
+  const recordCouponUsage = trpc.coupons.recordUsage.useMutation();
   const submitMutation = trpc.booking.submit.useMutation({
     onSuccess: (result) => {
+      // Record coupon usage so the same customer can't reuse it
+      if (appliedCouponData && form.email) {
+        recordCouponUsage.mutate({ couponId: appliedCouponData.couponId, email: form.email, orderId: (result as any).orderId });
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const selectedPkg = data?.packages?.find((p: any) => p.id === form.packageId);
       const pkgName = selectedPkg?.name ?? "";
@@ -2246,7 +2261,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
