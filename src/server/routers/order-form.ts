@@ -14,6 +14,14 @@ const fieldSettingsSchema = z.object({
   company:      z.object({ visible: z.boolean(), required: z.boolean() }),
   clientNotes:  z.object({ visible: z.boolean(), required: z.boolean() }),
   gridColumns:  z.number().int().min(3).max(5).optional(),
+  orderDetails: z.object({
+    showCouponField:     z.boolean().optional(),
+    showPriceBreakdown:  z.boolean().optional(),
+    showTotal:           z.boolean().optional(),
+    taxRate:             z.number().optional(),
+    taxLabel:            z.string().optional(),
+    showLineItemDetails: z.boolean().optional(),
+  }).optional(),
 }).optional();
 
 export const orderFormRouter = router({
