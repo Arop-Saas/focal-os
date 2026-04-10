@@ -928,6 +928,11 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
                 borderRadius: previewSize === "mobile" ? "28px" : previewSize === "tablet" ? "12px" : "12px",
               }}
               title="Form Preview"
+              onLoad={() => {
+                const stepNum = STEP_MAP[activeSection];
+                if (stepNum) sendStepToPreview(stepNum);
+                sendLiveUpdate();
+              }}
             />
           </div>
         </div>
