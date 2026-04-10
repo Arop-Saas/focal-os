@@ -18,8 +18,8 @@ export const STOCK_COVERS: Record<string, StockMedia> = {
     alt: "Modern home interior with natural light",
   },
   VIDEO: {
-    url: "https://videos.pexels.com/video-files/5977256/5977256-uhd_2560_1440_30fps.mp4",
-    type: "video",
+    url: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=640&h=400&fit=crop&q=80",
+    type: "image",
     alt: "Cinematic property walkthrough",
   },
   DRONE: {
@@ -48,8 +48,8 @@ export const STOCK_COVERS: Record<string, StockMedia> = {
     alt: "Luxury home at blue hour with warm interior glow",
   },
   SOCIAL_MEDIA: {
-    url: "https://videos.pexels.com/video-files/6077449/6077449-uhd_2560_1440_25fps.mp4",
-    type: "video",
+    url: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=640&h=400&fit=crop&q=80",
+    type: "image",
     alt: "Property highlights reel",
   },
   RUSH_EDITING: {
