@@ -123,6 +123,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  const [editingPackage, setEditingPackage] = useState<Package | null>(null);
 
   /* ── Service form ── */
   const [serviceName, setServiceName] = useState("");
@@ -155,6 +156,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   const createServiceMutation = trpc.packages.createService.useMutation();
   const updateServiceMutation = trpc.packages.updateService.useMutation();
   const createPackageMutation = trpc.packages.createPackage.useMutation();
+  const updatePackageMutation = trpc.packages.updatePackage.useMutation();
 
   /* ── Helpers ── */
   const resetServiceForm = () => {
@@ -219,28 +221,64 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
     }
   };
 
+  const handleOpenEditPackage = (pkg: Package) => {
+    setEditingPackage(pkg);
+    setPackageName(pkg.name);
+    setPackagePrice(String(pkg.price));
+    setPackageDescription(pkg.description ?? "");
+    setPackageCoverImage(pkg.coverImage ?? "");
+    setPackageIsPopular(pkg.isPopular);
+    setPackageBadgeLabel(pkg.badgeLabel ?? "");
+    setPackageBadgeColor(pkg.badgeColor ?? "#f59e0b");
+    setPackagePhotoCount(pkg.photoCount ? String(pkg.photoCount) : "");
+    setPackageTurnaroundHours(pkg.turnaroundHours ? String(pkg.turnaroundHours) : "");
+    setPackageServices(pkg.items.map((item) => ({ serviceId: item.serviceId, quantity: item.quantity })));
+    setShowPackageModal(true);
+  };
+
+  const resetPackageForm = () => {
+    setEditingPackage(null);
+    setShowPackageModal(false);
+    setPackageName(""); setPackagePrice(""); setPackageDescription(""); setPackageCoverImage("");
+    setPackageIsPopular(false); setPackageBadgeLabel(""); setPackageBadgeColor("#f59e0b");
+    setPackagePhotoCount(""); setPackageTurnaroundHours(""); setPackageServices([]);
+  };
+
   const handleCreatePackage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!packageName || !packagePrice || packageServices.length === 0) return;
     setIsSubmitting(true);
     try {
-      await createPackageMutation.mutateAsync({
-        name: packageName,
-        price: parseFloat(packagePrice),
-        description: packageDescription || undefined,
-        coverImage: packageCoverImage || null,
-        isActive: true,
-        isPopular: packageIsPopular,
-        badgeLabel: packageBadgeLabel || undefined,
-        badgeColor: packageBadgeLabel ? packageBadgeColor : undefined,
-        photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : undefined,
-        turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : undefined,
-        items: packageServices,
-      });
-      setShowPackageModal(false);
-      setPackageName(""); setPackagePrice(""); setPackageDescription(""); setPackageCoverImage("");
-      setPackageIsPopular(false); setPackageBadgeLabel(""); setPackageBadgeColor("#f59e0b");
-      setPackagePhotoCount(""); setPackageTurnaroundHours(""); setPackageServices([]);
+      if (editingPackage) {
+        await updatePackageMutation.mutateAsync({
+          id: editingPackage.id,
+          name: packageName,
+          price: parseFloat(packagePrice),
+          description: packageDescription || undefined,
+          coverImage: packageCoverImage || null,
+          isPopular: packageIsPopular,
+          badgeLabel: packageBadgeLabel || null,
+          badgeColor: packageBadgeLabel ? packageBadgeColor : null,
+          photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : null,
+          turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : null,
+          items: packageServices,
+        });
+      } else {
+        await createPackageMutation.mutateAsync({
+          name: packageName,
+          price: parseFloat(packagePrice),
+          description: packageDescription || undefined,
+          coverImage: packageCoverImage || null,
+          isActive: true,
+          isPopular: packageIsPopular,
+          badgeLabel: packageBadgeLabel || undefined,
+          badgeColor: packageBadgeLabel ? packageBadgeColor : undefined,
+          photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : undefined,
+          turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : undefined,
+          items: packageServices,
+        });
+      }
+      resetPackageForm();
       await refetchPackages();
     } finally {
       setIsSubmitting(false);
@@ -316,7 +354,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
-            <p className="font-bold text-gray-900 leading-tight">{packageName || "Product Name"}</p>
+            <p className="font-bold text-gray-900 leading-tight">{packageName || "Package Name"}</p>
             {packageDescription && (
               <p className="text-xs text-gray-500 line-clamp-2">{packageDescription}</p>
             )}
@@ -358,7 +396,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
       <div className="flex gap-1 border-b">
         {([
           { id: "services", label: "Services" },
-          { id: "packages", label: "Products" },
+          { id: "packages", label: "Packages" },
           { id: "brokerage", label: "Brokerage Groups" },
         ] as const).map((tab) => (
           <button
@@ -512,26 +550,26 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
       {activeTab === "packages" && (
         <div className={compact ? "space-y-2" : "space-y-4"}>
           <div className="flex justify-end">
-            <Button size="sm" onClick={() => setShowPackageModal(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Product
+            <Button size="sm" onClick={() => { setEditingPackage(null); resetPackageForm(); setShowPackageModal(true); }}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Package
             </Button>
           </div>
 
           {packagesLoading ? (
             <div className="bg-white rounded-xl border p-8 text-center">
-              <p className="text-gray-500">Loading products...</p>
+              <p className="text-gray-500">Loading packages...</p>
             </div>
           ) : !packages || packages.length === 0 ? (
             <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-16 text-center">
               <Boxes className="h-10 w-10 text-gray-300 mb-3" />
-              <p className="text-base font-semibold text-gray-700">No products yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Create your first product to bundle services.</p>
+              <p className="text-base font-semibold text-gray-700">No packages yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Create your first package to bundle services.</p>
             </div>
           ) : compact ? (
             /* ── Compact list view for form designer ── */
             <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
               {(packages as Package[]).map((pkg) => (
-                <div key={pkg.id} className="px-3 py-2.5 bg-white hover:bg-gray-50 transition-colors">
+                <div key={pkg.id} className="px-3 py-2.5 bg-white hover:bg-gray-50 transition-colors group">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -544,10 +582,10 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                         </p>
                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-xs font-bold text-gray-900">{formatCurrency(pkg.price)}</span>
-                      <p className="text-[9px] text-gray-400">{pkg._count.jobs} jobs</p>
-                    </div>
+                    <span className="text-xs font-bold text-gray-900 shrink-0">{formatCurrency(pkg.price)}</span>
+                    <button onClick={() => handleOpenEditPackage(pkg)} className="p-1 hover:bg-gray-200 rounded transition-colors opacity-0 group-hover:opacity-100 shrink-0" title="Edit">
+                      <Pencil className="h-3 w-3 text-gray-400" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -575,6 +613,13 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                           <p className="text-xs text-gray-500 mt-1 line-clamp-2">{pkg.description}</p>
                         )}
                       </div>
+                      <button
+                        onClick={() => handleOpenEditPackage(pkg)}
+                        className="p-1.5 hover:bg-gray-100 rounded-md transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                        title="Edit"
+                      >
+                        <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                      </button>
                     </div>
 
                     {/* Included services */}
@@ -804,10 +849,10 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Create Product</h2>
+                <h2 className="text-lg font-bold text-gray-900">{editingPackage ? "Edit Package" : "Create Package"}</h2>
                 <p className="text-xs text-gray-500 mt-0.5">Bundle services into a package — preview updates live.</p>
               </div>
-              <button onClick={() => setShowPackageModal(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={resetPackageForm} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="h-4 w-4 text-gray-500" />
               </button>
             </div>
@@ -821,7 +866,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
 
                   {/* Name */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Product Name <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Package Name <span className="text-red-500">*</span></label>
                     <Input value={packageName} onChange={(e) => setPackageName(e.target.value)} placeholder="e.g. Premium Package" disabled={isSubmitting} className="h-10" />
                   </div>
 
@@ -965,20 +1010,20 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                 <div className="sm:col-span-2 p-6 bg-gray-50 flex flex-col gap-4">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Live Preview</p>
                   {packagePreview}
-                  <p className="text-[10px] text-gray-400 text-center">This is how your product card will look.</p>
+                  <p className="text-[10px] text-gray-400 text-center">This is how your package card will look.</p>
                 </div>
               </div>
             </div>
 
             {/* Footer */}
             <div className="flex gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
-              <button type="button" onClick={() => setShowPackageModal(false)} disabled={isSubmitting}
+              <button type="button" onClick={resetPackageForm} disabled={isSubmitting}
                 className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
                 Cancel
               </button>
               <button form="package-form" type="submit" disabled={isSubmitting || !packageName || !packagePrice || packageServices.length === 0}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
-                {isSubmitting ? "Creating…" : "Create Product"}
+                {isSubmitting ? (editingPackage ? "Saving..." : "Creating...") : (editingPackage ? "Save Changes" : "Create Package")}
               </button>
             </div>
           </div>
