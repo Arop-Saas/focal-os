@@ -7,6 +7,21 @@ export interface BookingFormSettings {
   showMapPreview?: boolean;
   /** Number of columns in the package/service grid on Step 2 (3–5) */
   gridColumns?: number;
+  /** Order Details sidebar settings */
+  orderDetails?: {
+    /** Allow customers to enter a coupon/promo code */
+    showCouponField?: boolean;
+    /** Show price breakdown per service in the sidebar */
+    showPriceBreakdown?: boolean;
+    /** Show estimated total in the sidebar */
+    showTotal?: boolean;
+    /** Apply tax rate (percentage, 0 = no tax) */
+    taxRate?: number;
+    /** Label shown for tax line (e.g. "Sales Tax", "HST", "VAT") */
+    taxLabel?: string;
+    /** Show a "View Details" link per line item */
+    showLineItemDetails?: boolean;
+  };
   fields: {
     propertyType: { visible: boolean; required: boolean };
     sqft:         { visible: boolean; required: boolean };
@@ -110,6 +125,14 @@ export const DEFAULT_BOOKING_FORM_SETTINGS: BookingFormSettings = {
   welcomeMessage: "",
   showMapPreview: true,
   gridColumns: 3,
+  orderDetails: {
+    showCouponField: false,
+    showPriceBreakdown: true,
+    showTotal: true,
+    taxRate: 0,
+    taxLabel: "Tax",
+    showLineItemDetails: true,
+  },
   fields: {
     propertyType: { visible: true,  required: false },
     sqft:         { visible: true,  required: false },

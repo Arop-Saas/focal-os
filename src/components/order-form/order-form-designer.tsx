@@ -209,6 +209,14 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   // Grid columns (Step 2)
   const [gridColumns, setGridColumns] = useState(3);
 
+  // Order Details settings (Step 2)
+  const [showCouponField, setShowCouponField] = useState(false);
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(true);
+  const [showTotal, setShowTotal] = useState(true);
+  const [taxRate, setTaxRate] = useState(0);
+  const [taxLabel, setTaxLabel] = useState("Tax");
+  const [showLineItemDetails, setShowLineItemDetails] = useState(true);
+
   // Custom fields
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
@@ -253,6 +261,13 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setSeoImage((form as any).seoImage ?? "");
     setCustomFields(((form as any).customFields as CustomField[]) ?? []);
     setGridColumns((form.fieldSettings as any)?.gridColumns ?? DEFAULT_BOOKING_FORM_SETTINGS.gridColumns ?? 3);
+    const od = (form.fieldSettings as any)?.orderDetails ?? DEFAULT_BOOKING_FORM_SETTINGS.orderDetails ?? {};
+    setShowCouponField(od.showCouponField ?? false);
+    setShowPriceBreakdown(od.showPriceBreakdown ?? true);
+    setShowTotal(od.showTotal ?? true);
+    setTaxRate(od.taxRate ?? 0);
+    setTaxLabel(od.taxLabel ?? "Tax");
+    setShowLineItemDetails(od.showLineItemDetails ?? true);
     if (form.fieldSettings) {
       setFields({ ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...(form.fieldSettings as BookingFormSettings["fields"]) });
     }
@@ -354,7 +369,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setTimeout(() => setSavedGeneral(false), 3000);
   }
   async function saveFields() {
-    await updateFields.mutateAsync({ id: formId, fieldSettings: { ...fields, gridColumns } as any });
+    await updateFields.mutateAsync({ id: formId, fieldSettings: { ...fields, gridColumns, orderDetails: { showCouponField, showPriceBreakdown, showTotal, taxRate, taxLabel, showLineItemDetails } } as any });
     setSavedFields(true); refreshPreview();
     setTimeout(() => setSavedFields(false), 3000);
   }
@@ -744,8 +759,70 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               {/* Full Products & Services management embedded */}
               <PackagesView compact />
 
+              {/* Order Details settings */}
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3 mt-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Order Details</p>
+
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Coupon / Promo Code</p>
+                    <p className="text-[10px] text-gray-400">Let customers apply discount codes</p>
+                  </div>
+                  <input type="checkbox" checked={showCouponField} onChange={(e) => { setShowCouponField(e.target.checked); setSavedFields(false); }}
+                    className="w-8 h-4 rounded-full appearance-none bg-gray-300 checked:bg-blue-600 relative cursor-pointer transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-3 after:h-3 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-4" />
+                </label>
+
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Price Breakdown</p>
+                    <p className="text-[10px] text-gray-400">Show individual line items in sidebar</p>
+                  </div>
+                  <input type="checkbox" checked={showPriceBreakdown} onChange={(e) => { setShowPriceBreakdown(e.target.checked); setSavedFields(false); }}
+                    className="w-8 h-4 rounded-full appearance-none bg-gray-300 checked:bg-blue-600 relative cursor-pointer transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-3 after:h-3 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-4" />
+                </label>
+
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Show Total</p>
+                    <p className="text-[10px] text-gray-400">Display total amount in order summary</p>
+                  </div>
+                  <input type="checkbox" checked={showTotal} onChange={(e) => { setShowTotal(e.target.checked); setSavedFields(false); }}
+                    className="w-8 h-4 rounded-full appearance-none bg-gray-300 checked:bg-blue-600 relative cursor-pointer transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-3 after:h-3 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-4" />
+                </label>
+
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Line Item Details</p>
+                    <p className="text-[10px] text-gray-400">Show service details per line item</p>
+                  </div>
+                  <input type="checkbox" checked={showLineItemDetails} onChange={(e) => { setShowLineItemDetails(e.target.checked); setSavedFields(false); }}
+                    className="w-8 h-4 rounded-full appearance-none bg-gray-300 checked:bg-blue-600 relative cursor-pointer transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-3 after:h-3 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-4" />
+                </label>
+
+                <div className="pt-1 border-t border-gray-200">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Tax Rate</p>
+                      <p className="text-[10px] text-gray-400">Applied to subtotal (0 = no tax)</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input type="number" min="0" max="30" step="0.5" value={taxRate} onChange={(e) => { setTaxRate(parseFloat(e.target.value) || 0); setSavedFields(false); }}
+                        className="w-16 px-2 py-1 text-xs text-right border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <span className="text-xs text-gray-400">%</span>
+                    </div>
+                  </div>
+                  {taxRate > 0 && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-gray-700">Tax Label</p>
+                      <input type="text" value={taxLabel} onChange={(e) => { setTaxLabel(e.target.value); setSavedFields(false); }} placeholder="Tax"
+                        className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Grid columns setting */}
-              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-4 mt-4">
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Layout Settings</p>
                 <div>
                   <div className="flex items-center justify-between mb-2">
