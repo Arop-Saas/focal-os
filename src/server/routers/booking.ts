@@ -153,7 +153,20 @@ export const bookingRouter = router({
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       });
 
-      return { workspace, orderForm, packages, services };
+      // Load territories relevant to this form (all workspace territories, or filtered by form's territoryIds)
+      const formTerritoryIds = orderForm?.territoryIds as string[] | null | undefined;
+      const territories = await ctx.prisma.serviceTerritory.findMany({
+        where: {
+          workspaceId: workspace.id,
+          ...(formTerritoryIds && formTerritoryIds.length > 0
+            ? { id: { in: formTerritoryIds } }
+            : {}),
+        },
+        select: { id: true, name: true, color: true, travelFee: true, description: true, cities: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      return { workspace, orderForm, packages, services, territories };
     }),
 
   // Get available photographers for a given date
