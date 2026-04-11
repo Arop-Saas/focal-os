@@ -144,8 +144,8 @@ model OrderForm {
   seoDescription  String?
   seoImage        String?                      // Open Graph image URL
 
-  // Territory restrictions — when linked, only these territories' areas are served
-  territories ServiceTerritory[]
+  // Territory restrictions — JSON array of territory IDs (no join table needed)
+  territoryIds Json?   // string[] e.g. ["clxyz...", "clabc..."]
 
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
@@ -326,7 +326,6 @@ model ServiceTerritory {
   outsideMaxKm          Float?   // Max km outside boundary before booking is blocked (null = unlimited)
 
   workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  orderForms  OrderForm[] // Many-to-many: order forms linked to this territory
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

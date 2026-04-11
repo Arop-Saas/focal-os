@@ -140,9 +140,7 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
     if (form.fieldSettings) {
       setFields({ ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...(form.fieldSettings as BookingFormSettings["fields"]) });
     }
-    if ((form as any).territories) {
-      setSelectedTerritoryIds((form as any).territories.map((t: any) => t.id));
-    }
+    setSelectedTerritoryIds(((form as any).territoryIds as string[]) ?? []);
   }, [form]);
 
   function setField(key: FieldKey, prop: "visible" | "required", value: boolean) {

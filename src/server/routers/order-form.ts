@@ -42,16 +42,7 @@ export const orderFormRouter = router({
         where: { id: input.id, workspaceId: ctx.workspace.id },
       });
       if (!form) throw new TRPCError({ code: "NOT_FOUND" });
-      // Load linked territories separately (safe if join table doesn't exist yet)
-      let territories: { id: string; name: string; color: string }[] = [];
-      try {
-        const withT = await ctx.prisma.orderForm.findFirst({
-          where: { id: input.id },
-          select: { territories: { select: { id: true, name: true, color: true } } },
-        });
-        territories = (withT?.territories as any) ?? [];
-      } catch { /* join table not created yet */ }
-      return { ...form, territories };
+      return form;
     }),
 
   // ─── Create ──────────────────────────────────────────────────────────────────
@@ -182,7 +173,7 @@ export const orderFormRouter = router({
       });
     }),
 
-  // ─── Update linked territories ──────────────────────────────────────────────
+  // ─── Update linked territories (stored as JSON array) ───────────────────────
   updateTerritories: ownerProcedure
     .input(z.object({
       id: z.string(),
@@ -190,22 +181,10 @@ export const orderFormRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertOwns(ctx, input.id);
-      const updated = await ctx.prisma.orderForm.update({
+      return ctx.prisma.orderForm.update({
         where: { id: input.id },
-        data: {
-          territories: { set: input.territoryIds.map((id) => ({ id })) },
-        },
+        data: { territoryIds: input.territoryIds },
       });
-      // Fetch territories separately for the response
-      let territories: { id: string; name: string; color: string }[] = [];
-      try {
-        const withT = await ctx.prisma.orderForm.findFirst({
-          where: { id: input.id },
-          select: { territories: { select: { id: true, name: true, color: true } } },
-        });
-        territories = (withT?.territories as any) ?? [];
-      } catch { /* */ }
-      return { ...updated, territories };
     }),
 
   // ─── Delete ───────────────────────────────────────────────────────────────────

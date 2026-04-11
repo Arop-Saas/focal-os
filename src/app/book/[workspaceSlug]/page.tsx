@@ -2154,8 +2154,8 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   // Territory detection for auto travel fee
   const [detectedTerritory, setDetectedTerritory] = useState<{ name: string; travelFee: number | null; color: string } | null>(null);
   const [outsideInfo, setOutsideInfo] = useState<{ allowed: boolean; fee: number | null; feeType: string; distanceKm: number } | null>(null);
-  // Extract territory IDs from the order form (if form has linked territories, only check those)
-  const formTerritoryIds = (data?.orderForm as any)?.territories?.map((t: any) => t.id) as string[] | undefined;
+  // Extract territory IDs from the order form (stored as JSON array)
+  const formTerritoryIds = (data?.orderForm as any)?.territoryIds as string[] | undefined;
 
   const detectTerritoryQuery = trpc.territories.detectTerritory.useQuery(
     {

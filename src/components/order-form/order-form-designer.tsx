@@ -419,9 +419,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setSeoDesc((form as any).seoDescription ?? "");
     setSeoImage((form as any).seoImage ?? "");
     setCustomFields(((form as any).customFields as CustomField[]) ?? []);
-    if ((form as any).territories) {
-      setSelectedTerritoryIds((form as any).territories.map((t: any) => t.id));
-    }
+    setSelectedTerritoryIds(((form as any).territoryIds as string[]) ?? []);
     setGridColumns((form.fieldSettings as any)?.gridColumns ?? DEFAULT_BOOKING_FORM_SETTINGS.gridColumns ?? 3);
     const od = (form.fieldSettings as any)?.orderDetails ?? DEFAULT_BOOKING_FORM_SETTINGS.orderDetails ?? {};
     setShowCouponField(od.showCouponField ?? false);

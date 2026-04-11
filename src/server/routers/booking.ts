@@ -110,20 +110,9 @@ export const bookingRouter = router({
             paymentMode: true,
             depositPercent: true,
             customFields: true,
+            territoryIds: true,
           },
         });
-        // Load linked territories separately (safe if join table doesn't exist yet)
-        if (orderForm) {
-          try {
-            const withTerritories = await ctx.prisma.orderForm.findFirst({
-              where: { id: input.formId },
-              select: { territories: { select: { id: true } } },
-            });
-            orderForm = { ...orderForm, territories: withTerritories?.territories ?? [] };
-          } catch {
-            orderForm = { ...orderForm, territories: [] };
-          }
-        }
       }
 
       const packages = await ctx.prisma.package.findMany({
