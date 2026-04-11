@@ -63,6 +63,12 @@ model Workspace {
   autoCreateInvoice     Boolean  @default(false)
   invoiceDueDays        Int      @default(30)
   jobBufferMins         Int      @default(15)   // Buffer/travel time between jobs in minutes
+  // Outside-territory booking settings
+  outsideBookingEnabled Boolean  @default(true)   // Whether to allow bookings outside all territories
+  outsideFeeType        String   @default("flat") // "flat" | "per_km"
+  outsideTerritoryFee   Float?   // Flat travel fee for outside-territory bookings
+  outsidePerKmRate      Float?   // Per-km rate for outside-territory bookings
+  outsideFeeBaseKm      Float?   // Free km before per-km charge kicks in (distance from nearest boundary)
   lockDownloads         Boolean  @default(false)
   bookingFormSettings   Json?    // Serialized BookingFormSettings object
   portalSettings        Json?    // Serialized PortalSettings object

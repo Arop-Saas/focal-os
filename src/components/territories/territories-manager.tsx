@@ -52,8 +52,17 @@ interface BoundaryData {
   radiusKm?: number;
 }
 
+interface OutsideSettings {
+  outsideBookingEnabled: boolean;
+  outsideFeeType: "flat" | "per_km";
+  outsideTerritoryFee: number | null;
+  outsidePerKmRate: number | null;
+  outsideFeeBaseKm: number | null;
+}
+
 interface Props {
   initialTerritories: Territory[];
+  initialOutsideSettings?: OutsideSettings;
 }
 
 function TerritoryForm({
@@ -193,7 +202,7 @@ function TerritoryForm({
   );
 }
 
-export function TerritoriesManager({ initialTerritories }: Props) {
+export function TerritoriesManager({ initialTerritories, initialOutsideSettings }: Props) {
   const router = useRouter();
   const [territories, setTerritories] = useState<Territory[]>(initialTerritories);
   const [showCreate, setShowCreate] = useState(false);
@@ -201,6 +210,42 @@ export function TerritoriesManager({ initialTerritories }: Props) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [drawingTerritoryId, setDrawingTerritoryId] = useState<string | null>(null);
+
+  // Outside-territory settings
+  const defaults: OutsideSettings = {
+    outsideBookingEnabled: true,
+    outsideFeeType: "flat",
+    outsideTerritoryFee: null,
+    outsidePerKmRate: null,
+    outsideFeeBaseKm: null,
+  };
+  const initial = { ...defaults, ...initialOutsideSettings };
+  const [outsideEnabled, setOutsideEnabled] = useState(initial.outsideBookingEnabled);
+  const [outsideFeeType, setOutsideFeeType] = useState<"flat" | "per_km">(initial.outsideFeeType);
+  const [outsideFlatFee, setOutsideFlatFee] = useState(initial.outsideTerritoryFee != null ? String(initial.outsideTerritoryFee) : "");
+  const [outsidePerKmRate, setOutsidePerKmRate] = useState(initial.outsidePerKmRate != null ? String(initial.outsidePerKmRate) : "");
+  const [outsideBaseKm, setOutsideBaseKm] = useState(initial.outsideFeeBaseKm != null ? String(initial.outsideFeeBaseKm) : "");
+  const [outsideSaved, setOutsideSaved] = useState(false);
+
+  const saveOutsideSettingsMutation = api.territories.saveOutsideSettings.useMutation({
+    onSuccess: () => {
+      setOutsideSaved(true);
+      setTimeout(() => setOutsideSaved(false), 2000);
+    },
+  });
+
+  function handleSaveOutsideSettings() {
+    const flatFee = parseFloat(outsideFlatFee);
+    const perKm = parseFloat(outsidePerKmRate);
+    const baseKm = parseFloat(outsideBaseKm);
+    saveOutsideSettingsMutation.mutate({
+      outsideBookingEnabled: outsideEnabled,
+      outsideFeeType,
+      outsideTerritoryFee: isNaN(flatFee) ? null : flatFee,
+      outsidePerKmRate: isNaN(perKm) ? null : perKm,
+      outsideFeeBaseKm: isNaN(baseKm) ? null : baseKm,
+    });
+  }
 
   const createMutation = api.territories.create.useMutation({
     onSuccess: (newT) => {
@@ -321,6 +366,170 @@ export function TerritoriesManager({ initialTerritories }: Props) {
           )}
         </div>
       </div>
+
+      {/* Outside-territory booking settings */}
+      {territories.some((t) => t.boundaryType !== "none") && (
+        <div className="bg-white rounded-xl border p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Outside Territory Bookings</p>
+                <p className="text-xs text-gray-500">
+                  Control what happens when a booking address is outside all your territories.
+                </p>
+              </div>
+            </div>
+            {/* Enable/Disable toggle */}
+            <button
+              type="button"
+              onClick={() => { setOutsideEnabled(!outsideEnabled); setOutsideSaved(false); }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                outsideEnabled ? "bg-blue-600" : "bg-gray-200"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                  outsideEnabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {!outsideEnabled && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <X className="w-4 h-4 text-red-500 shrink-0" />
+              <p className="text-xs text-red-700">
+                Bookings outside your defined territories will be blocked. Customers will see a message that the address is not in your service area.
+              </p>
+            </div>
+          )}
+
+          {outsideEnabled && (
+            <div className="space-y-4">
+              {/* Fee type selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Fee type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setOutsideFeeType("flat"); setOutsideSaved(false); }}
+                    className={`flex-1 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                      outsideFeeType === "flat"
+                        ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                        : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">Flat Rate</span>
+                    <span className="block text-[11px] text-gray-400 mt-0.5">Same fee regardless of distance</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setOutsideFeeType("per_km"); setOutsideSaved(false); }}
+                    className={`flex-1 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                      outsideFeeType === "per_km"
+                        ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                        : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">Per Kilometer</span>
+                    <span className="block text-[11px] text-gray-400 mt-0.5">Charge based on distance from boundary</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Flat rate fields */}
+              {outsideFeeType === "flat" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Travel fee amount</label>
+                  <div className="relative w-40">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={outsideFlatFee}
+                      onChange={(e) => { setOutsideFlatFee(e.target.value); setOutsideSaved(false); }}
+                      placeholder="0.00"
+                      className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Per-km rate fields */}
+              {outsideFeeType === "per_km" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Rate per kilometer</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={outsidePerKmRate}
+                        onChange={(e) => { setOutsidePerKmRate(e.target.value); setOutsideSaved(false); }}
+                        placeholder="1.50"
+                        className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Per km beyond the nearest territory boundary
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Free kilometers</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={outsideBaseKm}
+                        onChange={(e) => { setOutsideBaseKm(e.target.value); setOutsideSaved(false); }}
+                        placeholder="0"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">km</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      No charge for the first N km outside boundary
+                    </p>
+                  </div>
+                  {outsidePerKmRate && outsideBaseKm && (
+                    <div className="col-span-2 text-xs text-gray-500 bg-gray-50 rounded-lg p-2.5">
+                      Example: A job 25km outside your territory =
+                      <strong className="text-gray-700">
+                        {" "}${(Math.max(0, 25 - (parseFloat(outsideBaseKm) || 0)) * (parseFloat(outsidePerKmRate) || 0)).toFixed(2)}
+                      </strong>
+                      {" "}travel fee ({Math.max(0, 25 - (parseFloat(outsideBaseKm) || 0))}km x ${parseFloat(outsidePerKmRate) || 0}/km)
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Save button */}
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleSaveOutsideSettings}
+              disabled={saveOutsideSettingsMutation.isPending}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {saveOutsideSettingsMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : outsideSaved ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : null}
+              {outsideSaved ? "Saved" : "Save Settings"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create form */}
       {showCreate && (

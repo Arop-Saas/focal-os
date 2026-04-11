@@ -8,7 +8,7 @@ const boundaryInput = z.discriminatedUnion("boundaryType", [
   z.object({ boundaryType: z.literal("none") }),
   z.object({
     boundaryType: z.literal("polygon"),
-    polygonCoords: z.array(coordinatePair).min(3), // at least a triangle
+    polygonCoords: z.array(coordinatePair).min(3),
   }),
   z.object({
     boundaryType: z.literal("radius"),
@@ -90,7 +90,55 @@ export const territoriesRouter = router({
       return { ok: true };
     }),
 
-  // Public endpoint: detect which territory a coordinate falls in
+  // ── Outside-territory booking settings ─────────────────────
+
+  getOutsideSettings: workspaceProcedure.query(async ({ ctx }) => {
+    const ws = await ctx.prisma.workspace.findUnique({
+      where: { id: ctx.workspace.id },
+      select: {
+        outsideBookingEnabled: true,
+        outsideFeeType: true,
+        outsideTerritoryFee: true,
+        outsidePerKmRate: true,
+        outsideFeeBaseKm: true,
+      },
+    });
+    return {
+      outsideBookingEnabled: ws?.outsideBookingEnabled ?? true,
+      outsideFeeType: (ws?.outsideFeeType as "flat" | "per_km") ?? "flat",
+      outsideTerritoryFee: ws?.outsideTerritoryFee ?? null,
+      outsidePerKmRate: ws?.outsidePerKmRate ?? null,
+      outsideFeeBaseKm: ws?.outsideFeeBaseKm ?? null,
+    };
+  }),
+
+  saveOutsideSettings: workspaceProcedure
+    .input(
+      z.object({
+        outsideBookingEnabled: z.boolean(),
+        outsideFeeType: z.enum(["flat", "per_km"]),
+        outsideTerritoryFee: z.number().min(0).nullable(),
+        outsidePerKmRate: z.number().min(0).nullable(),
+        outsideFeeBaseKm: z.number().min(0).nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.workspace.update({
+        where: { id: ctx.workspace.id },
+        data: {
+          outsideBookingEnabled: input.outsideBookingEnabled,
+          outsideFeeType: input.outsideFeeType,
+          outsideTerritoryFee: input.outsideTerritoryFee,
+          outsidePerKmRate: input.outsidePerKmRate,
+          outsideFeeBaseKm: input.outsideFeeBaseKm,
+        },
+        select: { outsideBookingEnabled: true },
+      });
+    }),
+
+  // ── Public: detect territory for a booking address ─────────
+  // Overlapping territories → pick lowest travel fee.
+  // Outside all territories → return outside settings + distance from nearest boundary.
   detectTerritory: publicProcedure
     .input(
       z.object({
@@ -102,26 +150,37 @@ export const territoriesRouter = router({
     .query(async ({ ctx, input }) => {
       const workspace = await ctx.prisma.workspace.findUnique({
         where: { slug: input.workspaceSlug },
-        select: { id: true },
+        select: {
+          id: true,
+          outsideBookingEnabled: true,
+          outsideFeeType: true,
+          outsideTerritoryFee: true,
+          outsidePerKmRate: true,
+          outsideFeeBaseKm: true,
+        },
       });
-      if (!workspace) return { territory: null };
+      if (!workspace) {
+        return { territory: null, outside: null };
+      }
 
       const territories = await ctx.prisma.serviceTerritory.findMany({
         where: { workspaceId: workspace.id },
       });
 
+      // Collect ALL matching territories
+      const matches: { id: string; name: string; travelFee: number | null; color: string }[] = [];
+      let nearestBoundaryDistKm = Infinity;
+
       for (const t of territories) {
+        let isInside = false;
+
         if (t.boundaryType === "polygon" && t.polygonCoords) {
           const coords = t.polygonCoords as [number, number][];
-          if (pointInPolygon(input.lng, input.lat, coords)) {
-            return {
-              territory: {
-                id: t.id,
-                name: t.name,
-                travelFee: t.travelFee,
-                color: t.color,
-              },
-            };
+          isInside = pointInPolygon(input.lng, input.lat, coords);
+          if (!isInside) {
+            // Find distance to nearest polygon edge
+            const dist = distanceToPolygonKm(input.lat, input.lng, coords);
+            if (dist < nearestBoundaryDistKm) nearestBoundaryDistKm = dist;
           }
         } else if (
           t.boundaryType === "radius" &&
@@ -130,20 +189,57 @@ export const territoriesRouter = router({
           t.radiusKm != null
         ) {
           const dist = haversineKm(input.lat, input.lng, t.centerLat, t.centerLng);
-          if (dist <= t.radiusKm) {
-            return {
-              territory: {
-                id: t.id,
-                name: t.name,
-                travelFee: t.travelFee,
-                color: t.color,
-              },
-            };
+          isInside = dist <= t.radiusKm;
+          if (!isInside) {
+            const beyondEdge = dist - t.radiusKm;
+            if (beyondEdge < nearestBoundaryDistKm) nearestBoundaryDistKm = beyondEdge;
           }
+        }
+
+        if (isInside) {
+          matches.push({
+            id: t.id,
+            name: t.name,
+            travelFee: t.travelFee,
+            color: t.color,
+          });
         }
       }
 
-      return { territory: null };
+      // Inside a territory — pick lowest fee
+      if (matches.length > 0) {
+        matches.sort((a, b) => (a.travelFee ?? 0) - (b.travelFee ?? 0));
+        return { territory: matches[0], outside: null };
+      }
+
+      // Outside all territories
+      const hasBoundaries = territories.some((t) => t.boundaryType !== "none");
+      if (!hasBoundaries) {
+        return { territory: null, outside: null };
+      }
+
+      // Calculate the effective outside fee
+      const distKm = nearestBoundaryDistKm === Infinity ? 0 : Math.round(nearestBoundaryDistKm * 10) / 10;
+
+      let calculatedFee: number | null = null;
+      if (workspace.outsideFeeType === "per_km") {
+        const rate = workspace.outsidePerKmRate ?? 0;
+        const baseKm = workspace.outsideFeeBaseKm ?? 0;
+        const chargeableKm = Math.max(0, distKm - baseKm);
+        calculatedFee = Math.round(chargeableKm * rate * 100) / 100;
+      } else {
+        calculatedFee = workspace.outsideTerritoryFee;
+      }
+
+      return {
+        territory: null,
+        outside: {
+          allowed: workspace.outsideBookingEnabled,
+          feeType: workspace.outsideFeeType as "flat" | "per_km",
+          fee: calculatedFee,
+          distanceKm: distKm,
+        },
+      };
     }),
 });
 
@@ -179,30 +275,44 @@ function getBoundaryData(boundary?: z.infer<typeof boundaryInput>) {
   };
 }
 
-/** Ray-casting point-in-polygon (works for non-self-intersecting polygons) */
+/** Ray-casting point-in-polygon */
 function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][0],
-      yi = polygon[i][1];
-    const xj = polygon[j][0],
-      yj = polygon[j][1];
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
     const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;
 }
 
-/** Haversine distance in km between two lat/lng points */
+/** Haversine distance in km */
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Minimum distance from a point to the nearest edge of a polygon (in km) */
+function distanceToPolygonKm(lat: number, lng: number, polygon: [number, number][]): number {
+  let minDist = Infinity;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [x1, y1] = polygon[j]; // lng, lat
+    const [x2, y2] = polygon[i];
+    // Project point onto segment and find nearest point on segment
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 === 0 ? 0 : ((lng - x1) * dx + (lat - y1) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const nearLng = x1 + t * dx;
+    const nearLat = y1 + t * dy;
+    const dist = haversineKm(lat, lng, nearLat, nearLng);
+    if (dist < minDist) minDist = dist;
+  }
+  return minDist;
 }

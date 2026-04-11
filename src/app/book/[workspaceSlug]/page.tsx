@@ -331,11 +331,19 @@ function Step1Property({
   setForm,
   settings,
   showErrors = false,
+  outsideBlocked = false,
+  outsideDistanceKm,
+  effectiveTravelFee,
+  effectiveTerritoryName,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   settings: BookingFormSettings;
   showErrors?: boolean;
+  outsideBlocked?: boolean;
+  outsideDistanceKm?: number | null;
+  effectiveTravelFee?: number | null;
+  effectiveTerritoryName?: string | null;
 }) {
   const [manualEntry, setManualEntry] = useState(false);
   const set = (key: keyof FormData) => (v: string) => setForm({ ...form, [key]: v });
@@ -427,6 +435,34 @@ function Step1Property({
               interactive={false}
               showControls={false}
             />
+          )}
+
+          {/* Outside territory blocked banner */}
+          {outsideBlocked && form.propertyLat && (
+            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-red-800">Outside our service area</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  Unfortunately, this address is outside our current service territories. Please try a different address or contact us for arrangements.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Outside territory travel fee notice */}
+          {!outsideBlocked && effectiveTravelFee && effectiveTravelFee > 0 && effectiveTerritoryName && form.propertyLat && (
+            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-amber-700">
+                This address is outside our standard service area. A travel fee of <strong>${effectiveTravelFee.toFixed(2)}</strong> will be added
+                {outsideDistanceKm ? ` (${outsideDistanceKm.toFixed(1)}km from nearest territory)` : ""}.
+              </p>
+            </div>
           )}
 
           {/* Auto-filled address summary (when using autocomplete) */}
@@ -2117,6 +2153,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
 
   // Territory detection for auto travel fee
   const [detectedTerritory, setDetectedTerritory] = useState<{ name: string; travelFee: number | null; color: string } | null>(null);
+  const [outsideInfo, setOutsideInfo] = useState<{ allowed: boolean; fee: number | null; feeType: string; distanceKm: number } | null>(null);
   const detectTerritoryQuery = trpc.territories.detectTerritory.useQuery(
     { workspaceSlug, lat: form.propertyLat!, lng: form.propertyLng! },
     { enabled: !!form.propertyLat && !!form.propertyLng && !!workspaceSlug }
@@ -2125,10 +2162,22 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   useEffect(() => {
     if (detectTerritoryQuery.data?.territory) {
       setDetectedTerritory(detectTerritoryQuery.data.territory);
-    } else if (detectTerritoryQuery.data && !detectTerritoryQuery.data.territory) {
+      setOutsideInfo(null);
+    } else if (detectTerritoryQuery.data) {
       setDetectedTerritory(null);
+      setOutsideInfo(detectTerritoryQuery.data.outside ?? null);
     }
   }, [detectTerritoryQuery.data]);
+
+  // Effective travel fee: territory fee, outside fee, or blocked
+  const outsideBlocked = outsideInfo && !outsideInfo.allowed;
+  const outsideFeeAmt = outsideInfo?.allowed ? (outsideInfo.fee ?? null) : null;
+  const effectiveTravelFee = detectedTerritory?.travelFee ?? outsideFeeAmt;
+  const effectiveTerritoryName = detectedTerritory?.name
+    ?? (outsideFeeAmt && outsideFeeAmt > 0
+      ? `Outside service area (${outsideInfo?.distanceKm?.toFixed(1)}km away)`
+      : outsideBlocked ? null : null);
+  const outsideDistanceKm = outsideInfo?.distanceKm ?? null;
 
   // Detect if we're inside the form designer iframe
   useEffect(() => {
@@ -2223,6 +2272,8 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       if (f.baths.visible && f.baths.required && !form.bathrooms.trim()) errors.push("Bathrooms");
       if (f.mlsNumber.visible && f.mlsNumber.required && !form.mlsNumber.trim()) errors.push("MLS number");
       if (f.accessNotes.visible && f.accessNotes.required && !form.accessNotes.trim()) errors.push("Access notes");
+      // Block if outside territories and outside bookings are disabled
+      if (outsideBlocked) errors.push("This address is outside our service area");
     }
     if (step === 2) {
       if (!form.packageId && form.selectedServiceIds.length === 0) errors.push("Please select a package or at least one service");
@@ -2508,7 +2559,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} travelFee={detectedTerritory?.travelFee} territoryName={detectedTerritory?.name} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
@@ -2543,7 +2594,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 ${step === 2 ? "hidden" : ""}`}>
           {step === 1 && (
             <>
-              <Step1Property form={form} setForm={setForm} settings={formSettings} showErrors={showFieldErrors} />
+              <Step1Property form={form} setForm={setForm} settings={formSettings} showErrors={showFieldErrors} outsideBlocked={!!outsideBlocked} outsideDistanceKm={outsideDistanceKm} effectiveTravelFee={effectiveTravelFee} effectiveTerritoryName={effectiveTerritoryName} />
               <CustomFieldsRenderer step={1} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
@@ -2561,7 +2612,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 5 && (
             <>
-              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} travelFee={detectedTerritory?.travelFee} territoryName={detectedTerritory?.name} />
+              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} />
               <CustomFieldsRenderer step={5} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
