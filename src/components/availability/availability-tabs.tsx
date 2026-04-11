@@ -31,6 +31,7 @@ interface Territory {
   outsidePerKmRate: number | null;
   outsideFeeBaseKm: number | null;
   outsideMaxKm: number | null;
+  serviceIds: string[];
 }
 
 interface StaffMember {

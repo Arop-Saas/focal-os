@@ -15,6 +15,7 @@ import {
   List,
   Map,
   Target,
+  Package,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { TerritoryMap } from "./territory-map";
@@ -50,6 +51,7 @@ interface Territory {
   outsidePerKmRate: number | null;
   outsideFeeBaseKm: number | null;
   outsideMaxKm: number | null;
+  serviceIds: string[];
 }
 
 interface BoundaryData {
@@ -73,6 +75,7 @@ interface TerritoryFormData {
   outsidePerKmRate?: number | null;
   outsideFeeBaseKm?: number | null;
   outsideMaxKm?: number | null;
+  serviceIds?: string[];
 }
 
 interface Props {
@@ -302,6 +305,11 @@ function TerritoryForm({
     initial?.outsideMaxKm != null ? String(initial.outsideMaxKm) : ""
   );
 
+  // Service linking
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(initial?.serviceIds ?? []);
+  const servicesQuery = api.territories.listServices.useQuery();
+  const availableServices = servicesQuery.data ?? [];
+
   // Geocode cities for map preview
   const [cityMarkers, setCityMarkers] = useState<{ lat: number; lng: number; name: string }[]>([]);
   const geocodeCacheRef = useRef<Record<string, { lat: number; lng: number } | null>>({});
@@ -367,6 +375,7 @@ function TerritoryForm({
       outsidePerKmRate: isNaN(perKm) ? null : perKm,
       outsideFeeBaseKm: isNaN(baseKm) ? null : baseKm,
       outsideMaxKm: isNaN(maxKm) ? null : maxKm,
+      serviceIds: selectedServiceIds,
     });
   }
 
@@ -455,6 +464,54 @@ function TerritoryForm({
         </div>
       </div>
 
+      {/* Service linking */}
+      {availableServices.length > 0 && (
+        <div className="space-y-2 p-3.5 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Package className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-xs font-semibold text-gray-700">Connected Services</span>
+          </div>
+          <p className="text-[11px] text-gray-500 mb-2">
+            {selectedServiceIds.length === 0
+              ? "All services are available in this territory. Select specific services to restrict."
+              : `${selectedServiceIds.length} service${selectedServiceIds.length !== 1 ? "s" : ""} linked — only these will appear when this territory is detected.`}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {availableServices.map((svc) => {
+              const isSelected = selectedServiceIds.includes(svc.id);
+              return (
+                <button
+                  key={svc.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedServiceIds((prev) =>
+                      isSelected ? prev.filter((id) => id !== svc.id) : [...prev, svc.id]
+                    )
+                  }
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    isSelected
+                      ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                      : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-white"
+                  }`}
+                >
+                  {isSelected && <Check className="w-3 h-3" />}
+                  {svc.name}
+                </button>
+              );
+            })}
+          </div>
+          {selectedServiceIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedServiceIds([])}
+              className="text-[11px] text-gray-400 hover:text-gray-600 underline mt-1"
+            >
+              Clear selection (allow all)
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Outside boundary settings — inline in form */}
       <OutsideSettingsSection
         enabled={outsideEnabled}
@@ -508,7 +565,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [drawingTerritoryId, setDrawingTerritoryId] = useState<string | null>(null);
   function buildMutationData(data: TerritoryFormData) {
-    const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, ...rest } = data;
+    const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, serviceIds, ...rest } = data;
     const boundaryInput = boundary
       ? boundary.boundaryType === "polygon"
         ? { boundaryType: "polygon" as const, polygonCoords: boundary.polygonCoords! }
@@ -525,6 +582,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
       outsidePerKmRate,
       outsideFeeBaseKm,
       outsideMaxKm,
+      serviceIds,
     };
   }
 
@@ -547,6 +605,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
       outsidePerKmRate: t.outsidePerKmRate ?? null,
       outsideFeeBaseKm: t.outsideFeeBaseKm ?? null,
       outsideMaxKm: t.outsideMaxKm ?? null,
+      serviceIds: t.services?.map((s: any) => s.id) ?? [],
     };
   }
 
@@ -756,6 +815,13 @@ export function TerritoriesManager({ initialTerritories }: Props) {
                           }`}
                         >
                           {territory.outsideBookingEnabled ? "Outside: allowed" : "Outside: blocked"}
+                        </span>
+                      )}
+                      {/* Services badge */}
+                      {territory.serviceIds.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-200">
+                          <Package className="w-3 h-3" />
+                          {territory.serviceIds.length} service{territory.serviceIds.length !== 1 ? "s" : ""}
                         </span>
                       )}
                     </div>

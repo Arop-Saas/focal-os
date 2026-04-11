@@ -323,6 +323,7 @@ model ServiceTerritory {
   outsideMaxKm          Float?   // Max km outside boundary before booking is blocked (null = unlimited)
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  services    Service[] // Many-to-many: services available in this territory
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -526,9 +527,10 @@ model Service {
   isActive      Boolean  @default(true)
   sortOrder     Int      @default(0)
 
-  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   packageItems  PackageItem[]
   jobServices   JobService[]
+  territories   ServiceTerritory[] // Many-to-many: territories this service is available in
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

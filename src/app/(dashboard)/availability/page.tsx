@@ -50,6 +50,7 @@ export default async function AvailabilityPage() {
   const [territories, staffProfiles] = await Promise.all([
     prisma.serviceTerritory.findMany({
       where: { workspaceId },
+      include: { services: { select: { id: true } } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.staffProfile.findMany({
@@ -94,6 +95,7 @@ export default async function AvailabilityPage() {
             outsidePerKmRate: (t as any).outsidePerKmRate ?? null,
             outsideFeeBaseKm: (t as any).outsideFeeBaseKm ?? null,
             outsideMaxKm: (t as any).outsideMaxKm ?? null,
+            serviceIds: t.services?.map((s) => s.id) ?? [],
           }))}
           staffMembers={staffMembers}
         />

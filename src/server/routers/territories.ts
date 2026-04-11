@@ -19,9 +19,19 @@ const boundaryInput = z.discriminatedUnion("boundaryType", [
 ]);
 
 export const territoriesRouter = router({
+  // List active services for service-territory linking UI
+  listServices: workspaceProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.service.findMany({
+      where: { workspaceId: ctx.workspace.id, isActive: true },
+      select: { id: true, name: true, category: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    });
+  }),
+
   list: workspaceProcedure.query(async ({ ctx }) => {
     return ctx.prisma.serviceTerritory.findMany({
       where: { workspaceId: ctx.workspace.id },
+      include: { services: { select: { id: true } } },
       orderBy: { createdAt: "asc" },
     });
   }),
@@ -41,10 +51,11 @@ export const territoriesRouter = router({
         outsidePerKmRate: z.number().min(0).nullable().optional(),
         outsideFeeBaseKm: z.number().min(0).nullable().optional(),
         outsideMaxKm: z.number().min(0).nullable().optional(),
+        serviceIds: z.array(z.string()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, ...rest } = input;
+      const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, serviceIds, ...rest } = input;
       const boundaryData = getBoundaryData(boundary);
       return ctx.prisma.serviceTerritory.create({
         data: {
@@ -57,7 +68,9 @@ export const territoriesRouter = router({
           ...(outsidePerKmRate !== undefined ? { outsidePerKmRate } : {}),
           ...(outsideFeeBaseKm !== undefined ? { outsideFeeBaseKm } : {}),
           ...(outsideMaxKm !== undefined ? { outsideMaxKm } : {}),
+          ...(serviceIds ? { services: { connect: serviceIds.map((id) => ({ id })) } } : {}),
         } as any,
+        include: { services: { select: { id: true } } },
       });
     }),
 
@@ -77,6 +90,7 @@ export const territoriesRouter = router({
         outsidePerKmRate: z.number().min(0).nullable().optional(),
         outsideFeeBaseKm: z.number().min(0).nullable().optional(),
         outsideMaxKm: z.number().min(0).nullable().optional(),
+        serviceIds: z.array(z.string()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -85,7 +99,7 @@ export const territoriesRouter = router({
       });
       if (!territory) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const { id, boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, ...rest } = input;
+      const { id, boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, serviceIds, ...rest } = input;
       const boundaryData = getBoundaryData(boundary);
       return ctx.prisma.serviceTerritory.update({
         where: { id },
@@ -98,7 +112,9 @@ export const territoriesRouter = router({
           ...(outsidePerKmRate !== undefined ? { outsidePerKmRate } : {}),
           ...(outsideFeeBaseKm !== undefined ? { outsideFeeBaseKm } : {}),
           ...(outsideMaxKm !== undefined ? { outsideMaxKm } : {}),
+          ...(serviceIds !== undefined ? { services: { set: serviceIds.map((id) => ({ id })) } } : {}),
         } as any,
+        include: { services: { select: { id: true } } },
       });
     }),
 
@@ -189,10 +205,11 @@ export const territoriesRouter = router({
 
       const territories = await ctx.prisma.serviceTerritory.findMany({
         where: { workspaceId: workspace.id },
+        include: { services: { select: { id: true } } },
       });
 
       // Collect ALL matching territories
-      const matches: { id: string; name: string; travelFee: number | null; color: string }[] = [];
+      const matches: { id: string; name: string; travelFee: number | null; color: string; serviceIds: string[] }[] = [];
       let nearestBoundaryDistKm = Infinity;
       let nearestTerritory: (typeof territories)[number] | null = null;
 
@@ -232,6 +249,7 @@ export const territoriesRouter = router({
             name: t.name,
             travelFee: t.travelFee,
             color: t.color,
+            serviceIds: t.services.map((s) => s.id),
           });
         }
       }
@@ -239,7 +257,17 @@ export const territoriesRouter = router({
       // Inside a territory — pick lowest fee
       if (matches.length > 0) {
         matches.sort((a, b) => (a.travelFee ?? 0) - (b.travelFee ?? 0));
-        return { territory: matches[0], outside: null };
+        const best = matches[0];
+        return {
+          territory: {
+            id: best.id,
+            name: best.name,
+            travelFee: best.travelFee,
+            color: best.color,
+            serviceIds: best.serviceIds, // empty array = all services allowed
+          },
+          outside: null,
+        };
       }
 
       // Outside all territories
@@ -249,6 +277,20 @@ export const territoriesRouter = router({
       }
 
       const distKm = nearestBoundaryDistKm === Infinity ? 0 : Math.round(nearestBoundaryDistKm * 10) / 10;
+
+      // Global max-km check: if ALL territories with a maxKm have been exceeded, block
+      const territoriesWithMaxKm = territories.filter((t) => t.boundaryType !== "none" && (t as any).outsideMaxKm != null);
+      const globalMaxExceeded = territoriesWithMaxKm.length > 0 && territoriesWithMaxKm.every((t) => {
+        // Calculate this point's distance from each territory's boundary
+        let distFromT = Infinity;
+        if (t.boundaryType === "polygon" && t.polygonCoords) {
+          const coords = t.polygonCoords as [number, number][];
+          distFromT = distanceToPolygonKm(input.lat, input.lng, coords);
+        } else if (t.boundaryType === "radius" && t.centerLat != null && t.centerLng != null && t.radiusKm != null) {
+          distFromT = Math.max(0, haversineKm(input.lat, input.lng, t.centerLat, t.centerLng) - t.radiusKm);
+        }
+        return distFromT > ((t as any).outsideMaxKm ?? Infinity);
+      });
 
       // Use nearest territory's outside settings, fall back to workspace settings
       const outsideEnabled = nearestTerritory
@@ -261,8 +303,8 @@ export const territoriesRouter = router({
         ? (nearestTerritory as any).outsideMaxKm ?? null
         : null;
 
-      // Enforce max km limit — if distance exceeds max, block the booking
-      const beyondMaxKm = maxKm != null && distKm > maxKm;
+      // Enforce max km limit — block if nearest territory's max exceeded OR all territories' max exceeded
+      const beyondMaxKm = globalMaxExceeded || (maxKm != null && distKm > maxKm);
 
       let calculatedFee: number | null = null;
       if (feeType === "per_km") {

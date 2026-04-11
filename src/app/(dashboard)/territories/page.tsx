@@ -15,6 +15,7 @@ export default async function TerritoriesPage() {
 
   const territories = await prisma.serviceTerritory.findMany({
     where: { workspaceId },
+    include: { services: { select: { id: true } } },
     orderBy: { createdAt: "asc" },
   });
 
@@ -44,6 +45,7 @@ export default async function TerritoriesPage() {
             outsidePerKmRate: (t as any).outsidePerKmRate ?? null,
             outsideFeeBaseKm: (t as any).outsideFeeBaseKm ?? null,
             outsideMaxKm: (t as any).outsideMaxKm ?? null,
+            serviceIds: t.services?.map((s) => s.id) ?? [],
           }))}
         />
       </div>
