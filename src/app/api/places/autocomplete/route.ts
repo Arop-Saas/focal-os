@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Address autocomplete via Mapbox Search Box API (suggest endpoint).
- * Designed for real-time autocomplete — returns suggestions as user types.
+ * Address autocomplete via Google Places API (New) — v2.
+ * Uses POST to places.googleapis.com/v1/places:autocomplete
+ * with session tokens for billing optimization.
  */
 export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("q");
@@ -10,56 +11,60 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ predictions: [] });
   }
 
-  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-  if (!token) {
-    return NextResponse.json({ error: "Mapbox token not configured" }, { status: 500 });
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) {
+    return NextResponse.json({ error: "Maps API not configured" }, { status: 500 });
   }
 
-  // Use a stable session token per search session (reduces billing cost)
-  const sessionToken = req.nextUrl.searchParams.get("session") || crypto.randomUUID();
+  // Session token passed from client (groups suggest + detail into one billable session)
+  const sessionToken = req.nextUrl.searchParams.get("session") || undefined;
 
-  const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
-  url.searchParams.set("q", query);
-  url.searchParams.set("access_token", token);
-  url.searchParams.set("session_token", sessionToken);
-  url.searchParams.set("language", "en");
-  url.searchParams.set("country", "US,CA");
-  url.searchParams.set("types", "address,street,place");
-  url.searchParams.set("limit", "5");
+  const body: Record<string, unknown> = {
+    input: query,
+    includedPrimaryTypes: ["street_address", "subpremise", "route", "premise"],
+    includedRegionCodes: ["us", "ca"],
+    languageCode: "en",
+  };
+  if (sessionToken) {
+    body.sessionToken = sessionToken;
+  }
 
-  const res = await fetch(url.toString());
+  const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+    },
+    body: JSON.stringify(body),
+  });
+
   if (!res.ok) {
-    console.warn("[places/autocomplete] Mapbox suggest error:", res.status);
+    console.warn("[places/autocomplete] Google v2 error:", res.status);
     return NextResponse.json({ predictions: [] });
   }
 
   const data = await res.json();
 
-  const predictions = (data.suggestions ?? []).map(
-    (s: {
-      mapbox_id: string;
-      name: string;
-      full_address?: string;
-      address?: string;
-      place_formatted?: string;
-      context?: {
-        place?: { name: string };
-        region?: { name: string; region_code?: string };
-        postcode?: { name: string };
-        country?: { name: string; country_code?: string };
+  const predictions = (data.suggestions ?? [])
+    .filter((s: { placePrediction?: unknown }) => s.placePrediction)
+    .map((s: {
+      placePrediction: {
+        placeId: string;
+        text: { text: string };
+        structuredFormat: {
+          mainText: { text: string };
+          secondaryText: { text: string };
+        };
       };
     }) => {
-      const mainText = s.full_address?.split(",")[0] || s.name;
-      const secondaryText = s.place_formatted || s.full_address?.replace(`${mainText}, `, "") || "";
-
+      const p = s.placePrediction;
       return {
-        placeId: s.mapbox_id,
-        description: s.full_address || `${s.name}, ${s.place_formatted || ""}`,
-        mainText,
-        secondaryText,
+        placeId: p.placeId,
+        description: p.text.text,
+        mainText: p.structuredFormat.mainText.text,
+        secondaryText: p.structuredFormat.secondaryText.text,
       };
-    }
-  );
+    });
 
-  return NextResponse.json({ predictions, sessionToken });
+  return NextResponse.json({ predictions });
 }

@@ -29,7 +29,7 @@ interface AddressAutocompleteProps {
   required?: boolean;
 }
 
-// Generate a stable session token per component instance (reduces Mapbox billing)
+// Generate a UUID v4 session token (groups autocomplete + details into one billing session)
 function generateSessionToken() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -55,7 +55,7 @@ export function AddressAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionRef = useRef(generateSessionToken());
 
-  // Fetch suggestions via Mapbox Search Box API
+  // Fetch predictions with debounce (Google Places API v2)
   const fetchPredictions = useCallback(async (query: string) => {
     if (query.trim().length < 1) {
       setPredictions([]);
@@ -64,10 +64,7 @@ export function AddressAutocomplete({
     }
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({
-        q: query,
-        session: sessionRef.current,
-      });
+      const params = new URLSearchParams({ q: query, session: sessionRef.current });
       const res = await fetch(`/api/places/autocomplete?${params}`);
       const data = await res.json();
       setPredictions(data.predictions ?? []);
@@ -92,7 +89,7 @@ export function AddressAutocomplete({
     setIsOpen(false);
     setPredictions([]);
 
-    // Retrieve full address details via Mapbox retrieve endpoint
+    // Fetch full address via Place Details (closes the billing session)
     try {
       const params = new URLSearchParams({
         placeId: prediction.placeId,
@@ -194,9 +191,6 @@ export function AddressAutocomplete({
               </div>
             </button>
           ))}
-          <div className="px-4 py-1.5 bg-gray-50 border-t border-gray-100">
-            <span className="text-[10px] text-gray-300">Powered by Mapbox</span>
-          </div>
         </div>
       )}
     </div>

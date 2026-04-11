@@ -1,29 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Address details via Mapbox Search Box API (retrieve endpoint).
- * Fetches full address components + coordinates for a selected suggestion.
+ * Place details via Google Places API (New) — v2.
+ * Uses GET to places.googleapis.com/v1/places/{placeId}
+ * with X-Goog-FieldMask for efficient billing.
  */
 export async function GET(req: NextRequest) {
-  const mapboxId = req.nextUrl.searchParams.get("placeId") || req.nextUrl.searchParams.get("mapboxId");
-  const sessionToken = req.nextUrl.searchParams.get("session") || crypto.randomUUID();
-
-  if (!mapboxId) {
-    return NextResponse.json({ error: "placeId/mapboxId required" }, { status: 400 });
+  const placeId = req.nextUrl.searchParams.get("placeId");
+  if (!placeId) {
+    return NextResponse.json({ error: "placeId required" }, { status: 400 });
   }
 
-  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-  if (!token) {
-    return NextResponse.json({ error: "Mapbox token not configured" }, { status: 500 });
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) {
+    return NextResponse.json({ error: "Maps API not configured" }, { status: 500 });
   }
 
-  const url = new URL(`https://api.mapbox.com/search/searchbox/v1/retrieve/${mapboxId}`);
-  url.searchParams.set("access_token", token);
-  url.searchParams.set("session_token", sessionToken);
+  const sessionToken = req.nextUrl.searchParams.get("session") || undefined;
 
-  const res = await fetch(url.toString());
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Goog-Api-Key": key,
+    "X-Goog-FieldMask": "id,formattedAddress,addressComponents,location",
+  };
+
+  // Append session token as query param to close the billing session
+  const url = new URL(`https://places.googleapis.com/v1/places/${placeId}`);
+  if (sessionToken) {
+    url.searchParams.set("sessionToken", sessionToken);
+  }
+
+  const res = await fetch(url.toString(), { headers });
+
   if (!res.ok) {
-    console.warn("[places/details] Mapbox retrieve error:", res.status);
+    console.warn("[places/details] Google v2 error:", res.status);
     return NextResponse.json({
       streetAddress: "",
       city: "",
@@ -36,36 +46,29 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await res.json();
-  const feature = data.features?.[0];
 
-  if (!feature) {
-    return NextResponse.json({
-      streetAddress: "",
-      city: "",
-      state: "",
-      zip: "",
-      country: "",
-      lat: null,
-      lng: null,
-    });
+  const components: Array<{
+    longText: string;
+    shortText: string;
+    types: string[];
+  }> = data.addressComponents ?? [];
+
+  function get(type: string, useShort = false): string {
+    const c = components.find((c) => c.types.includes(type));
+    return c ? (useShort ? c.shortText : c.longText) : "";
   }
 
-  const props = feature.properties || {};
-  const ctx = props.context || {};
-
-  // Build street address from Mapbox Search Box properties
-  // props.address = full street line (e.g. "1751 Cunningham Drive SW")
-  // props.name = feature name (usually the street name only)
-  // props.full_address = complete formatted address with city/state
-  const streetAddress = props.address || props.full_address?.split(",")[0] || props.name || "";
+  const streetNumber = get("street_number");
+  const route = get("route");
+  const streetAddress = [streetNumber, route].filter(Boolean).join(" ");
 
   return NextResponse.json({
     streetAddress,
-    city: ctx.place?.name || ctx.locality?.name || "",
-    state: ctx.region?.region_code || ctx.region?.name || "",
-    zip: ctx.postcode?.name || "",
-    country: ctx.country?.country_code?.toUpperCase() || ctx.country?.name || "",
-    lat: feature.geometry?.coordinates?.[1] ?? null,
-    lng: feature.geometry?.coordinates?.[0] ?? null,
+    city: get("locality") || get("sublocality") || get("neighborhood"),
+    state: get("administrative_area_level_1", true), // "TX", "AB", etc.
+    zip: get("postal_code"),
+    country: get("country", true),
+    lat: data.location?.latitude ?? null,
+    lng: data.location?.longitude ?? null,
   });
 }
