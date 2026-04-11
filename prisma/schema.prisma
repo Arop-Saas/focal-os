@@ -314,6 +314,13 @@ model ServiceTerritory {
   centerLng     Float?
   radiusKm      Float?
 
+  // Outside-territory booking settings (per-territory)
+  outsideBookingEnabled Boolean  @default(true)
+  outsideFeeType        String   @default("flat")  // "flat" | "per_km"
+  outsideTerritoryFee   Float?
+  outsidePerKmRate      Float?
+  outsideFeeBaseKm      Float?
+
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())

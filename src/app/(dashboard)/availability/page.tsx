@@ -88,6 +88,11 @@ export default async function AvailabilityPage() {
             centerLat: t.centerLat,
             centerLng: t.centerLng,
             radiusKm: t.radiusKm,
+            outsideBookingEnabled: (t as any).outsideBookingEnabled ?? true,
+            outsideFeeType: (t as any).outsideFeeType ?? "flat",
+            outsideTerritoryFee: (t as any).outsideTerritoryFee ?? null,
+            outsidePerKmRate: (t as any).outsidePerKmRate ?? null,
+            outsideFeeBaseKm: (t as any).outsideFeeBaseKm ?? null,
           }))}
           staffMembers={staffMembers}
         />

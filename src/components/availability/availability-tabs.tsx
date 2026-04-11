@@ -25,6 +25,11 @@ interface Territory {
   centerLat: number | null;
   centerLng: number | null;
   radiusKm: number | null;
+  outsideBookingEnabled: boolean;
+  outsideFeeType: string;
+  outsideTerritoryFee: number | null;
+  outsidePerKmRate: number | null;
+  outsideFeeBaseKm: number | null;
 }
 
 interface StaffMember {

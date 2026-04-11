@@ -18,6 +18,14 @@ const boundaryInput = z.discriminatedUnion("boundaryType", [
   }),
 ]);
 
+const outsideSettingsInput = z.object({
+  outsideBookingEnabled: z.boolean().optional(),
+  outsideFeeType: z.enum(["flat", "per_km"]).optional(),
+  outsideTerritoryFee: z.number().min(0).nullable().optional(),
+  outsidePerKmRate: z.number().min(0).nullable().optional(),
+  outsideFeeBaseKm: z.number().min(0).nullable().optional(),
+});
+
 export const territoriesRouter = router({
   list: workspaceProcedure.query(async ({ ctx }) => {
     return ctx.prisma.serviceTerritory.findMany({
@@ -35,20 +43,27 @@ export const territoriesRouter = router({
         cities: z.string().optional(),
         travelFee: z.number().min(0).optional(),
         boundary: boundaryInput.optional(),
+        outsideBookingEnabled: z.boolean().optional(),
+        outsideFeeType: z.enum(["flat", "per_km"]).optional(),
+        outsideTerritoryFee: z.number().min(0).nullable().optional(),
+        outsidePerKmRate: z.number().min(0).nullable().optional(),
+        outsideFeeBaseKm: z.number().min(0).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const boundaryData = getBoundaryData(input.boundary);
+      const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, ...rest } = input;
+      const boundaryData = getBoundaryData(boundary);
       return ctx.prisma.serviceTerritory.create({
         data: {
           workspaceId: ctx.workspace.id,
-          name: input.name,
-          color: input.color,
-          description: input.description,
-          cities: input.cities,
-          travelFee: input.travelFee,
+          ...rest,
           ...boundaryData,
-        },
+          ...(outsideBookingEnabled !== undefined ? { outsideBookingEnabled } : {}),
+          ...(outsideFeeType !== undefined ? { outsideFeeType } : {}),
+          ...(outsideTerritoryFee !== undefined ? { outsideTerritoryFee } : {}),
+          ...(outsidePerKmRate !== undefined ? { outsidePerKmRate } : {}),
+          ...(outsideFeeBaseKm !== undefined ? { outsideFeeBaseKm } : {}),
+        } as any,
       });
     }),
 
@@ -62,6 +77,11 @@ export const territoriesRouter = router({
         cities: z.string().optional(),
         travelFee: z.number().min(0).nullable().optional(),
         boundary: boundaryInput.optional(),
+        outsideBookingEnabled: z.boolean().optional(),
+        outsideFeeType: z.enum(["flat", "per_km"]).optional(),
+        outsideTerritoryFee: z.number().min(0).nullable().optional(),
+        outsidePerKmRate: z.number().min(0).nullable().optional(),
+        outsideFeeBaseKm: z.number().min(0).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -70,11 +90,19 @@ export const territoriesRouter = router({
       });
       if (!territory) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const { id, boundary, ...rest } = input;
+      const { id, boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, ...rest } = input;
       const boundaryData = getBoundaryData(boundary);
       return ctx.prisma.serviceTerritory.update({
         where: { id },
-        data: { ...rest, ...boundaryData },
+        data: {
+          ...rest,
+          ...boundaryData,
+          ...(outsideBookingEnabled !== undefined ? { outsideBookingEnabled } : {}),
+          ...(outsideFeeType !== undefined ? { outsideFeeType } : {}),
+          ...(outsideTerritoryFee !== undefined ? { outsideTerritoryFee } : {}),
+          ...(outsidePerKmRate !== undefined ? { outsidePerKmRate } : {}),
+          ...(outsideFeeBaseKm !== undefined ? { outsideFeeBaseKm } : {}),
+        } as any,
       });
     }),
 
@@ -90,8 +118,7 @@ export const territoriesRouter = router({
       return { ok: true };
     }),
 
-  // ── Outside-territory booking settings ─────────────────────
-
+  // ── Kept for backwards compat — reads workspace-level settings ──
   getOutsideSettings: workspaceProcedure.query(async ({ ctx }) => {
     const ws = await ctx.prisma.workspace.findUnique({
       where: { id: ctx.workspace.id },
@@ -138,7 +165,7 @@ export const territoriesRouter = router({
 
   // ── Public: detect territory for a booking address ─────────
   // Overlapping territories → pick lowest travel fee.
-  // Outside all territories → return outside settings + distance from nearest boundary.
+  // Outside all territories → use the nearest territory's outside settings.
   detectTerritory: publicProcedure
     .input(
       z.object({
@@ -152,6 +179,7 @@ export const territoriesRouter = router({
         where: { slug: input.workspaceSlug },
         select: {
           id: true,
+          // Fallback workspace-level settings
           outsideBookingEnabled: true,
           outsideFeeType: true,
           outsideTerritoryFee: true,
@@ -170,6 +198,7 @@ export const territoriesRouter = router({
       // Collect ALL matching territories
       const matches: { id: string; name: string; travelFee: number | null; color: string }[] = [];
       let nearestBoundaryDistKm = Infinity;
+      let nearestTerritory: (typeof territories)[number] | null = null;
 
       for (const t of territories) {
         let isInside = false;
@@ -178,9 +207,11 @@ export const territoriesRouter = router({
           const coords = t.polygonCoords as [number, number][];
           isInside = pointInPolygon(input.lng, input.lat, coords);
           if (!isInside) {
-            // Find distance to nearest polygon edge
             const dist = distanceToPolygonKm(input.lat, input.lng, coords);
-            if (dist < nearestBoundaryDistKm) nearestBoundaryDistKm = dist;
+            if (dist < nearestBoundaryDistKm) {
+              nearestBoundaryDistKm = dist;
+              nearestTerritory = t;
+            }
           }
         } else if (
           t.boundaryType === "radius" &&
@@ -192,7 +223,10 @@ export const territoriesRouter = router({
           isInside = dist <= t.radiusKm;
           if (!isInside) {
             const beyondEdge = dist - t.radiusKm;
-            if (beyondEdge < nearestBoundaryDistKm) nearestBoundaryDistKm = beyondEdge;
+            if (beyondEdge < nearestBoundaryDistKm) {
+              nearestBoundaryDistKm = beyondEdge;
+              nearestTerritory = t;
+            }
           }
         }
 
@@ -218,24 +252,31 @@ export const territoriesRouter = router({
         return { territory: null, outside: null };
       }
 
-      // Calculate the effective outside fee
       const distKm = nearestBoundaryDistKm === Infinity ? 0 : Math.round(nearestBoundaryDistKm * 10) / 10;
 
+      // Use nearest territory's outside settings, fall back to workspace settings
+      const outsideEnabled = nearestTerritory
+        ? (nearestTerritory as any).outsideBookingEnabled ?? workspace.outsideBookingEnabled
+        : workspace.outsideBookingEnabled;
+      const feeType = nearestTerritory
+        ? ((nearestTerritory as any).outsideFeeType as "flat" | "per_km") ?? (workspace.outsideFeeType as "flat" | "per_km")
+        : (workspace.outsideFeeType as "flat" | "per_km");
+
       let calculatedFee: number | null = null;
-      if (workspace.outsideFeeType === "per_km") {
-        const rate = workspace.outsidePerKmRate ?? 0;
-        const baseKm = workspace.outsideFeeBaseKm ?? 0;
+      if (feeType === "per_km") {
+        const rate = (nearestTerritory ? (nearestTerritory as any).outsidePerKmRate : workspace.outsidePerKmRate) ?? 0;
+        const baseKm = (nearestTerritory ? (nearestTerritory as any).outsideFeeBaseKm : workspace.outsideFeeBaseKm) ?? 0;
         const chargeableKm = Math.max(0, distKm - baseKm);
         calculatedFee = Math.round(chargeableKm * rate * 100) / 100;
       } else {
-        calculatedFee = workspace.outsideTerritoryFee;
+        calculatedFee = (nearestTerritory ? (nearestTerritory as any).outsideTerritoryFee : workspace.outsideTerritoryFee) ?? null;
       }
 
       return {
         territory: null,
         outside: {
-          allowed: workspace.outsideBookingEnabled,
-          feeType: workspace.outsideFeeType as "flat" | "per_km",
+          allowed: outsideEnabled,
+          feeType,
           fee: calculatedFee,
           distanceKm: distKm,
         },
@@ -304,7 +345,6 @@ function distanceToPolygonKm(lat: number, lng: number, polygon: [number, number]
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const [x1, y1] = polygon[j]; // lng, lat
     const [x2, y2] = polygon[i];
-    // Project point onto segment and find nearest point on segment
     const dx = x2 - x1, dy = y2 - y1;
     const len2 = dx * dx + dy * dy;
     let t = len2 === 0 ? 0 : ((lng - x1) * dx + (lat - y1) * dy) / len2;

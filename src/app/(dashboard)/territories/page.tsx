@@ -13,32 +13,10 @@ export default async function TerritoriesPage() {
 
   const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
 
-  const [territories, workspace] = await Promise.all([
-    prisma.serviceTerritory.findMany({
-      where: { workspaceId },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: {
-        outsideBookingEnabled: true,
-        outsideFeeType: true,
-        outsideTerritoryFee: true,
-        outsidePerKmRate: true,
-        outsideFeeBaseKm: true,
-      },
-    }),
-  ]);
-
-  const outsideSettings = workspace
-    ? {
-        outsideBookingEnabled: workspace.outsideBookingEnabled,
-        outsideFeeType: workspace.outsideFeeType as "flat" | "per_km",
-        outsideTerritoryFee: workspace.outsideTerritoryFee,
-        outsidePerKmRate: workspace.outsidePerKmRate,
-        outsideFeeBaseKm: workspace.outsideFeeBaseKm,
-      }
-    : undefined;
+  const territories = await prisma.serviceTerritory.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "asc" },
+  });
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -60,8 +38,12 @@ export default async function TerritoriesPage() {
             centerLat: t.centerLat,
             centerLng: t.centerLng,
             radiusKm: t.radiusKm,
+            outsideBookingEnabled: (t as any).outsideBookingEnabled ?? true,
+            outsideFeeType: (t as any).outsideFeeType ?? "flat",
+            outsideTerritoryFee: (t as any).outsideTerritoryFee ?? null,
+            outsidePerKmRate: (t as any).outsidePerKmRate ?? null,
+            outsideFeeBaseKm: (t as any).outsideFeeBaseKm ?? null,
           }))}
-          initialOutsideSettings={outsideSettings}
         />
       </div>
     </div>
