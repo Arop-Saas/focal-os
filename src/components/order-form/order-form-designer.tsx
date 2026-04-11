@@ -721,6 +721,61 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           {activeSection === "general" && (
             <Panel title="General Settings" desc="Name, visibility, and welcome text">
               <InputField label="Form Title" value={title} onChange={(v) => { setTitle(v); setSavedGeneral(false); }} placeholder="e.g. Standard Booking" />
+
+              {/* Territory linking — right after title */}
+              {allTerritories && allTerritories.length > 0 && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" /> Service Territories
+                  </label>
+                  <p className="text-[11px] text-gray-400 mt-1 mb-2.5">
+                    {selectedTerritoryIds.length === 0
+                      ? "No restrictions — accepts bookings from any address."
+                      : `${selectedTerritoryIds.length} territor${selectedTerritoryIds.length !== 1 ? "ies" : "y"} linked — only these areas served.`}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {allTerritories.map((t: any) => {
+                      const isSelected = selectedTerritoryIds.includes(t.id);
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTerritoryIds((prev) =>
+                              isSelected ? prev.filter((id: string) => id !== t.id) : [...prev, t.id]
+                            );
+                            setSavedTerritories(false);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                            isSelected
+                              ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                              : "border-gray-200 text-gray-500 hover:border-gray-300 bg-white"
+                          }`}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color ?? "#3B82F6" }} />
+                          {isSelected && <Check className="w-3 h-3" />}
+                          {t.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedTerritoryIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedTerritoryIds([]); setSavedTerritories(false); }}
+                      className="text-[11px] text-gray-400 hover:text-gray-600 underline mt-2"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                  {!savedTerritories && (
+                    <div className="mt-2.5">
+                      <SavePill loading={updateTerritories.isPending} saved={savedTerritories} onClick={saveTerritories} />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <TextareaField label="Description" value={description} onChange={(v) => { setDescription(v); setSavedGeneral(false); }} placeholder="Short description shown on portal cards…" optional rows={2} maxLength={300} counter />
 
               {/* Cover image upload */}
@@ -756,58 +811,6 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               <TextareaField label="Welcome Message" value={welcomeMsg} onChange={(v) => { setWelcomeMsg(v); setSavedGeneral(false); }} placeholder="Shown at the top of your booking page…" optional rows={3} />
               <ToggleRow label="Public" desc="Visible on your booking page" value={isPublic} onChange={(v) => { setIsPublic(v); setSavedGeneral(false); }} />
               <SaveBar><SavePill loading={updateGeneral.isPending} saved={savedGeneral} onClick={saveGeneral} /></SaveBar>
-
-              {/* Territory linking */}
-              {allTerritories && allTerritories.length > 0 && (
-                <div className="mt-5 pt-5 border-t border-gray-100">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Service Territories
-                  </label>
-                  <p className="text-[11px] text-gray-400 mt-1 mb-3">
-                    {selectedTerritoryIds.length === 0
-                      ? "No restrictions — accepts bookings from any address."
-                      : `${selectedTerritoryIds.length} territor${selectedTerritoryIds.length !== 1 ? "ies" : "y"} linked — only these areas served.`}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {allTerritories.map((t: any) => {
-                      const isSelected = selectedTerritoryIds.includes(t.id);
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedTerritoryIds((prev) =>
-                              isSelected ? prev.filter((id: string) => id !== t.id) : [...prev, t.id]
-                            );
-                            setSavedTerritories(false);
-                          }}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                            isSelected
-                              ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-                              : "border-gray-200 text-gray-500 hover:border-gray-300"
-                          }`}
-                        >
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color ?? "#3B82F6" }} />
-                          {isSelected && <Check className="w-3 h-3" />}
-                          {t.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {selectedTerritoryIds.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedTerritoryIds([]); setSavedTerritories(false); }}
-                      className="text-[11px] text-gray-400 hover:text-gray-600 underline mt-2"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                  <div className="mt-3">
-                    <SavePill loading={updateTerritories.isPending} saved={savedTerritories} onClick={saveTerritories} />
-                  </div>
-                </div>
-              )}
             </Panel>
           )}
 

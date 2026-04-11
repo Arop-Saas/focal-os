@@ -40,10 +40,18 @@ export const orderFormRouter = router({
     .query(async ({ ctx, input }) => {
       const form = await ctx.prisma.orderForm.findFirst({
         where: { id: input.id, workspaceId: ctx.workspace.id },
-        include: { territories: { select: { id: true, name: true, color: true } } },
       });
       if (!form) throw new TRPCError({ code: "NOT_FOUND" });
-      return form;
+      // Load linked territories separately (safe if join table doesn't exist yet)
+      let territories: { id: string; name: string; color: string }[] = [];
+      try {
+        const withT = await ctx.prisma.orderForm.findFirst({
+          where: { id: input.id },
+          select: { territories: { select: { id: true, name: true, color: true } } },
+        });
+        territories = (withT?.territories as any) ?? [];
+      } catch { /* join table not created yet */ }
+      return { ...form, territories };
     }),
 
   // ─── Create ──────────────────────────────────────────────────────────────────
@@ -182,13 +190,22 @@ export const orderFormRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertOwns(ctx, input.id);
-      return ctx.prisma.orderForm.update({
+      const updated = await ctx.prisma.orderForm.update({
         where: { id: input.id },
         data: {
           territories: { set: input.territoryIds.map((id) => ({ id })) },
         },
-        include: { territories: { select: { id: true, name: true, color: true } } },
       });
+      // Fetch territories separately for the response
+      let territories: { id: string; name: string; color: string }[] = [];
+      try {
+        const withT = await ctx.prisma.orderForm.findFirst({
+          where: { id: input.id },
+          select: { territories: { select: { id: true, name: true, color: true } } },
+        });
+        territories = (withT?.territories as any) ?? [];
+      } catch { /* */ }
+      return { ...updated, territories };
     }),
 
   // ─── Delete ───────────────────────────────────────────────────────────────────
