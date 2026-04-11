@@ -57,7 +57,7 @@ export function AddressAutocomplete({
 
   // Fetch suggestions via Mapbox Search Box API
   const fetchPredictions = useCallback(async (query: string) => {
-    if (query.trim().length < 3) {
+    if (query.trim().length < 1) {
       setPredictions([]);
       setIsOpen(false);
       return;

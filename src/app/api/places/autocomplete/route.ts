@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("q");
-  if (!query || query.trim().length < 2) {
+  if (!query || query.trim().length < 1) {
     return NextResponse.json({ predictions: [] });
   }
 

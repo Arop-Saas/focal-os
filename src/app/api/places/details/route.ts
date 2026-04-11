@@ -53,10 +53,11 @@ export async function GET(req: NextRequest) {
   const props = feature.properties || {};
   const ctx = props.context || {};
 
-  // Build street address from Mapbox properties
-  const streetAddress = props.address
-    ? `${props.address} ${props.name || ""}`.trim()
-    : props.full_address?.split(",")[0] || props.name || "";
+  // Build street address from Mapbox Search Box properties
+  // props.address = full street line (e.g. "1751 Cunningham Drive SW")
+  // props.name = feature name (usually the street name only)
+  // props.full_address = complete formatted address with city/state
+  const streetAddress = props.address || props.full_address?.split(",")[0] || props.name || "";
 
   return NextResponse.json({
     streetAddress,
