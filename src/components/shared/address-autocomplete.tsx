@@ -9,7 +9,6 @@ interface Prediction {
   description: string;
   mainText: string;
   secondaryText: string;
-  center?: [number, number]; // [lng, lat] from Mapbox
 }
 
 interface AddressResult {
@@ -30,6 +29,15 @@ interface AddressAutocompleteProps {
   required?: boolean;
 }
 
+// Generate a stable session token per component instance (reduces Mapbox billing)
+function generateSessionToken() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function AddressAutocomplete({
   value,
   onChange,
@@ -45,8 +53,9 @@ export function AddressAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionRef = useRef(generateSessionToken());
 
-  // Fetch predictions with debounce (Mapbox Geocoding)
+  // Fetch suggestions via Mapbox Search Box API
   const fetchPredictions = useCallback(async (query: string) => {
     if (query.trim().length < 3) {
       setPredictions([]);
@@ -55,7 +64,11 @@ export function AddressAutocomplete({
     }
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(query)}`);
+      const params = new URLSearchParams({
+        q: query,
+        session: sessionRef.current,
+      });
+      const res = await fetch(`/api/places/autocomplete?${params}`);
       const data = await res.json();
       setPredictions(data.predictions ?? []);
       setIsOpen((data.predictions ?? []).length > 0);
@@ -75,24 +88,22 @@ export function AddressAutocomplete({
   }
 
   async function handleSelect(prediction: Prediction) {
-    // Fill input with full address
     onChange(prediction.mainText);
     setIsOpen(false);
     setPredictions([]);
 
-    // Fetch full address components via Mapbox details endpoint
+    // Retrieve full address details via Mapbox retrieve endpoint
     try {
-      const params = new URLSearchParams();
-      params.set("placeName", prediction.description);
-      if (prediction.center) {
-        params.set("lng", prediction.center[0].toString());
-        params.set("lat", prediction.center[1].toString());
-      }
+      const params = new URLSearchParams({
+        placeId: prediction.placeId,
+        session: sessionRef.current,
+      });
       const res = await fetch(`/api/places/details?${params}`);
       const data: AddressResult = await res.json();
       onSelect(data);
+      // New session token for next search
+      sessionRef.current = generateSessionToken();
     } catch {
-      // Fallback: try to parse from description
       onSelect({
         streetAddress: prediction.mainText,
         city: "",
@@ -169,7 +180,7 @@ export function AddressAutocomplete({
             <button
               key={p.placeId}
               type="button"
-              onMouseDown={(e) => e.preventDefault()} // prevent blur before click
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleSelect(p)}
               className={cn(
                 "flex items-start gap-3 w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0",
@@ -183,7 +194,6 @@ export function AddressAutocomplete({
               </div>
             </button>
           ))}
-          {/* Mapbox attribution (required by TOS) */}
           <div className="px-4 py-1.5 bg-gray-50 border-t border-gray-100">
             <span className="text-[10px] text-gray-300">Powered by Mapbox</span>
           </div>

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Address autocomplete via Mapbox Geocoding API (replaces Google Places).
- * Server-side proxy to keep the access token off the client.
+ * Address autocomplete via Mapbox Search Box API (suggest endpoint).
+ * Designed for real-time autocomplete — returns suggestions as user types.
  */
 export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("q");
@@ -15,43 +15,51 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Mapbox token not configured" }, { status: 500 });
   }
 
-  const url = new URL(
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`
-  );
+  // Use a stable session token per search session (reduces billing cost)
+  const sessionToken = req.nextUrl.searchParams.get("session") || crypto.randomUUID();
+
+  const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+  url.searchParams.set("q", query);
   url.searchParams.set("access_token", token);
-  url.searchParams.set("autocomplete", "true");
-  url.searchParams.set("types", "address");
-  url.searchParams.set("country", "us,ca");
-  url.searchParams.set("limit", "5");
+  url.searchParams.set("session_token", sessionToken);
   url.searchParams.set("language", "en");
+  url.searchParams.set("country", "US,CA");
+  url.searchParams.set("types", "address,street,place");
+  url.searchParams.set("limit", "5");
 
   const res = await fetch(url.toString());
+  if (!res.ok) {
+    console.warn("[places/autocomplete] Mapbox suggest error:", res.status);
+    return NextResponse.json({ predictions: [] });
+  }
+
   const data = await res.json();
 
-  const predictions = (data.features ?? []).map(
-    (f: {
-      id: string;
-      place_name: string;
-      text: string;
-      context?: Array<{ id: string; text: string; short_code?: string }>;
-      center: [number, number]; // [lng, lat]
+  const predictions = (data.suggestions ?? []).map(
+    (s: {
+      mapbox_id: string;
+      name: string;
+      full_address?: string;
+      address?: string;
+      place_formatted?: string;
+      context?: {
+        place?: { name: string };
+        region?: { name: string; region_code?: string };
+        postcode?: { name: string };
+        country?: { name: string; country_code?: string };
+      };
     }) => {
-      // mainText = street address portion, secondaryText = city/state
-      const mainText = f.text;
-      const contextParts = (f.context ?? [])
-        .filter((c) => c.id.startsWith("place") || c.id.startsWith("region"))
-        .map((c) => c.text);
-      const secondaryText = contextParts.join(", ") || f.place_name.replace(`${f.text}, `, "");
+      const mainText = s.full_address?.split(",")[0] || s.name;
+      const secondaryText = s.place_formatted || s.full_address?.replace(`${mainText}, `, "") || "";
 
       return {
-        placeId: f.id,
-        description: f.place_name,
-        mainText: f.place_name.split(",")[0] || mainText,
+        placeId: s.mapbox_id,
+        description: s.full_address || `${s.name}, ${s.place_formatted || ""}`,
+        mainText,
         secondaryText,
-        center: f.center, // pass through for detail fetch
       };
     }
   );
 
-  return NextResponse.json({ predictions });
+  return NextResponse.json({ predictions, sessionToken });
 }
