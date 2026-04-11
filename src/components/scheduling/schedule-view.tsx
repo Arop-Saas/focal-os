@@ -36,6 +36,18 @@ import {
   addMinutes,
 } from "date-fns";
 import { trpc } from "@/lib/trpc/client";
+import dynamic from "next/dynamic";
+
+import { WeatherStrip } from "./weather-strip";
+
+const JobsMapView = dynamic(() => import("./jobs-map-view").then(m => ({ default: m.JobsMapView })), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[600px] bg-white rounded-xl border">
+      <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+    </div>
+  ),
+});
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -73,6 +85,8 @@ type BaseJob = {
   propertyCity: string;
   propertyState: string;
   propertyType?: string;
+  propertyLat?: number | null;
+  propertyLng?: number | null;
   scheduledAt: Date;
   estimatedDurationMins: number;
   status: string;
@@ -149,17 +163,20 @@ function avatarInitials(name: string): string {
 // Sub-components
 // ---------------------------------------------------------------------------
 
+type ViewMode = "month" | "week" | "dispatch" | "list" | "map";
+
 function ViewToggle({
   view,
   setView,
 }: {
-  view: "month" | "week" | "dispatch" | "list";
-  setView: (v: "month" | "week" | "dispatch" | "list") => void;
+  view: ViewMode;
+  setView: (v: ViewMode) => void;
 }) {
-  const buttons: { label: string; value: "month" | "week" | "dispatch" | "list"; icon: React.ReactNode }[] = [
+  const buttons: { label: string; value: ViewMode; icon: React.ReactNode }[] = [
     { label: "Month",    value: "month",    icon: <CalendarDays className="h-3.5 w-3.5" /> },
     { label: "Week",     value: "week",     icon: <LayoutGrid className="h-3.5 w-3.5" /> },
     { label: "Dispatch", value: "dispatch", icon: <Layers className="h-3.5 w-3.5" /> },
+    { label: "Map",      value: "map",      icon: <MapPin className="h-3.5 w-3.5" /> },
     { label: "List",     value: "list",     icon: <List className="h-3.5 w-3.5" /> },
   ];
   return (
@@ -1051,7 +1068,7 @@ function MonthGridView({
 
 export function ScheduleView({ jobs }: ScheduleViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<"month" | "week" | "dispatch" | "list">("month");
+  const [view, setView] = useState<ViewMode>("month");
   const [selectedJob, setSelectedJob] = useState<BaseJob | DispatchJob | null>(null);
 
   // Week helpers
@@ -1079,6 +1096,12 @@ export function ScheduleView({ jobs }: ScheduleViewProps) {
   }
   function goToday() { setCurrentDate(new Date()); }
 
+  // Find a reference location for weather (first job with coordinates)
+  const weatherJob = useMemo(
+    () => jobs.find((j) => j.propertyLat && j.propertyLng),
+    [jobs]
+  );
+
   const dateLabel =
     view === "dispatch"
       ? format(currentDate, "EEEE, MMMM d, yyyy")
@@ -1099,6 +1122,15 @@ export function ScheduleView({ jobs }: ScheduleViewProps) {
           label={dateLabel}
         />
       </div>
+
+      {/* Weather forecast strip */}
+      {weatherJob?.propertyLat && weatherJob?.propertyLng && (
+        <WeatherStrip
+          lat={weatherJob.propertyLat}
+          lng={weatherJob.propertyLng}
+          className="bg-white rounded-xl border px-3 py-1"
+        />
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
@@ -1125,6 +1157,13 @@ export function ScheduleView({ jobs }: ScheduleViewProps) {
           <WeekGridView
             jobs={weekJobs}
             weekDays={weekDays}
+            onJobClick={(job) => setSelectedJob(job)}
+          />
+        )}
+
+        {view === "map" && (
+          <JobsMapView
+            jobs={jobs}
             onJobClick={(job) => setSelectedJob(job)}
           />
         )}

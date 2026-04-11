@@ -42,5 +42,6 @@ export const env = {
   appUrl:                   process.env.NEXT_PUBLIC_APP_URL!,
   portalTokenSecret:        process.env.PORTAL_TOKEN_SECRET ?? process.env.CRON_SECRET ?? "",
   cronSecret:               process.env.CRON_SECRET ?? "",
-  googleMapsApiKey:         process.env.GOOGLE_MAPS_API_KEY ?? "",
+  googleMapsApiKey:         process.env.GOOGLE_MAPS_API_KEY ?? "",   // Legacy — kept for Google Calendar OAuth
+  mapboxAccessToken:        process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "",
 } as const;

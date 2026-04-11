@@ -18,6 +18,7 @@ import { JobChecklist } from "@/components/jobs/job-checklist";
 import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-button";
 import { JobScheduleEditor } from "@/components/jobs/job-schedule-editor";
 import { JobPropertyMap } from "@/components/jobs/job-property-map";
+import { JobWeatherCard } from "@/components/jobs/job-weather-card";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,15 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                   address={`${job.propertyAddress}, ${job.propertyCity}, ${job.propertyState}`}
                 />
               </div>
+
+              {/* Weather forecast for job date */}
+              {job.propertyLat && job.propertyLng && job.scheduledAt && (
+                <JobWeatherCard
+                  lat={job.propertyLat}
+                  lng={job.propertyLng}
+                  scheduledDate={format(new Date(job.scheduledAt), "yyyy-MM-dd")}
+                />
+              )}
 
               {/* Schedule */}
               <div className="bg-white rounded-xl border p-5">

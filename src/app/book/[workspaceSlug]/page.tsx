@@ -1242,6 +1242,73 @@ function Step2Package({
     </div>
   );
 }
+// ─── Booking Weather Badge ────────────────────────────────────────────────────
+
+function BookingWeatherBadge({
+  lat,
+  lng,
+  date,
+  brandColor,
+}: {
+  lat: number;
+  lng: number;
+  date: string;
+  brandColor: string;
+}) {
+  const [weather, setWeather] = useState<{
+    icon: string;
+    label: string;
+    tempHighF: number;
+    tempLowF: number;
+    precipProbability: number;
+    windSpeedMph: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchWeather() {
+      try {
+        const res = await fetch(
+          `/api/trpc/weather.getForecast?input=${encodeURIComponent(JSON.stringify({ lat, lng }))}`
+        );
+        const json = await res.json();
+        const data = json?.result?.data;
+        if (!cancelled && data?.daily) {
+          const dayWeather = data.daily.find((d: { date: string }) => d.date === date);
+          setWeather(dayWeather ?? null);
+        }
+      } catch {
+        // Weather is non-critical
+      }
+    }
+    fetchWeather();
+    return () => { cancelled = true; };
+  }, [lat, lng, date]);
+
+  if (!weather) return null;
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-100">
+      <span className="text-2xl">{weather.icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-800">{weather.label}</span>
+          <span className="text-sm text-gray-600">{weather.tempHighF}° / {weather.tempLowF}°F</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          {weather.precipProbability > 0 && <span>💧 {weather.precipProbability}% rain</span>}
+          {weather.windSpeedMph > 0 && <span>💨 {weather.windSpeedMph} mph wind</span>}
+        </div>
+      </div>
+      {weather.precipProbability >= 50 && (
+        <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
+          Rain likely
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ─── Step 3: Date & Time + Photographer ───────────────────────────────────────
 
 function Step3DateTime({
@@ -1397,6 +1464,16 @@ function Step3DateTime({
           })}
         </div>
       </div>
+
+      {/* Weather for selected date */}
+      {form.scheduledDate && form.propertyLat && form.propertyLng && (
+        <BookingWeatherBadge
+          lat={form.propertyLat}
+          lng={form.propertyLng}
+          date={form.scheduledDate}
+          brandColor={brandColor}
+        />
+      )}
 
       {/* Photographer selection */}
       {showPhotographerSection && (

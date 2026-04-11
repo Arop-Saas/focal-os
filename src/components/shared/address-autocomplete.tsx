@@ -9,6 +9,7 @@ interface Prediction {
   description: string;
   mainText: string;
   secondaryText: string;
+  center?: [number, number]; // [lng, lat] from Mapbox
 }
 
 interface AddressResult {
@@ -45,7 +46,7 @@ export function AddressAutocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch predictions with debounce
+  // Fetch predictions with debounce (Mapbox Geocoding)
   const fetchPredictions = useCallback(async (query: string) => {
     if (query.trim().length < 3) {
       setPredictions([]);
@@ -74,14 +75,20 @@ export function AddressAutocomplete({
   }
 
   async function handleSelect(prediction: Prediction) {
-    // Fill input with street portion only
+    // Fill input with full address
     onChange(prediction.mainText);
     setIsOpen(false);
     setPredictions([]);
 
-    // Fetch full address components
+    // Fetch full address components via Mapbox details endpoint
     try {
-      const res = await fetch(`/api/places/details?placeId=${prediction.placeId}`);
+      const params = new URLSearchParams();
+      params.set("placeName", prediction.description);
+      if (prediction.center) {
+        params.set("lng", prediction.center[0].toString());
+        params.set("lat", prediction.center[1].toString());
+      }
+      const res = await fetch(`/api/places/details?${params}`);
       const data: AddressResult = await res.json();
       onSelect(data);
     } catch {
@@ -176,6 +183,10 @@ export function AddressAutocomplete({
               </div>
             </button>
           ))}
+          {/* Mapbox attribution (required by TOS) */}
+          <div className="px-4 py-1.5 bg-gray-50 border-t border-gray-100">
+            <span className="text-[10px] text-gray-300">Powered by Mapbox</span>
+          </div>
         </div>
       )}
     </div>
