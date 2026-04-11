@@ -6,6 +6,7 @@ import { api } from "@/lib/trpc/client";
 import {
   Loader2, Save, CheckCircle2, ExternalLink, ArrowLeft,
   Eye, EyeOff, Globe, Lock, Clock, Users, CreditCard, ClipboardList,
+  MapPin, Check, X,
 } from "lucide-react";
 import { DEFAULT_BOOKING_FORM_SETTINGS, type BookingFormSettings } from "@/lib/booking-form-types";
 
@@ -98,6 +99,10 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
   const updateFields    = api.orderForm.updateFields.useMutation();
   const updateScheduling = api.orderForm.updateScheduling.useMutation();
   const updatePayment   = api.orderForm.updatePayment.useMutation();
+  const updateTerritories = api.orderForm.updateTerritories.useMutation();
+
+  // Territory linking
+  const { data: allTerritories } = api.territories.list.useQuery();
 
   // ── Local state ────────────────────────────────────────────────────────────
   const [title, setTitle]             = useState("");
@@ -111,10 +116,13 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
   const [paymentMode, setPaymentMode] = useState<"NONE" | "FULL" | "PARTIAL">("NONE");
   const [deposit, setDeposit]         = useState(25);
 
+  const [selectedTerritoryIds, setSelectedTerritoryIds] = useState<string[]>([]);
+
   const [savedGeneral, setSavedGeneral]     = useState(false);
   const [savedFields, setSavedFields]       = useState(false);
   const [savedScheduling, setSavedScheduling] = useState(false);
   const [savedPayment, setSavedPayment]     = useState(false);
+  const [savedTerritories, setSavedTerritories] = useState(false);
 
   // ── Populate from DB ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -131,6 +139,9 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
 
     if (form.fieldSettings) {
       setFields({ ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...(form.fieldSettings as BookingFormSettings["fields"]) });
+    }
+    if ((form as any).territories) {
+      setSelectedTerritoryIds((form as any).territories.map((t: any) => t.id));
     }
   }, [form]);
 
@@ -211,6 +222,65 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
           </div>
         </div>
       </Section>
+
+      {/* ── 1b. Territories ───────────────────────────────────────────────── */}
+      {allTerritories && allTerritories.length > 0 && (
+        <Section icon={MapPin} title="Service Territories" desc="Restrict this form to specific territories — only allow bookings within these areas">
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              {selectedTerritoryIds.length === 0
+                ? "No territory restrictions — bookings accepted from any address."
+                : `${selectedTerritoryIds.length} territor${selectedTerritoryIds.length !== 1 ? "ies" : "y"} linked — bookings outside these areas will be blocked.`}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {allTerritories.map((t: any) => {
+                const isSelected = selectedTerritoryIds.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTerritoryIds((prev) =>
+                        isSelected ? prev.filter((id) => id !== t.id) : [...prev, t.id]
+                      );
+                      setSavedTerritories(false);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                      isSelected
+                        ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                        : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.color ?? "#3B82F6" }} />
+                    {isSelected && <Check className="w-3 h-3" />}
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedTerritoryIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setSelectedTerritoryIds([]); setSavedTerritories(false); }}
+                className="text-xs text-gray-400 hover:text-gray-600 underline"
+              >
+                Clear all (allow any address)
+              </button>
+            )}
+            <div className="flex justify-end pt-1">
+              <SaveButton
+                loading={updateTerritories.isPending}
+                saved={savedTerritories}
+                onClick={async () => {
+                  await updateTerritories.mutateAsync({ id: formId, territoryIds: selectedTerritoryIds });
+                  setSavedTerritories(true);
+                  setTimeout(() => setSavedTerritories(false), 3000);
+                }}
+              />
+            </div>
+          </div>
+        </Section>
+      )}
 
       {/* ── 2. Preview link ─────────────────────────────────────────────────── */}
       <Section icon={ExternalLink} title="Booking Link" desc="Share this URL with clients or embed it on your website">

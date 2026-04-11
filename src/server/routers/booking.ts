@@ -110,6 +110,7 @@ export const bookingRouter = router({
             paymentMode: true,
             depositPercent: true,
             customFields: true,
+            territories: { select: { id: true } },
           },
         });
       }

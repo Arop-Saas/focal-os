@@ -40,6 +40,7 @@ export const orderFormRouter = router({
     .query(async ({ ctx, input }) => {
       const form = await ctx.prisma.orderForm.findFirst({
         where: { id: input.id, workspaceId: ctx.workspace.id },
+        include: { territories: { select: { id: true, name: true, color: true } } },
       });
       if (!form) throw new TRPCError({ code: "NOT_FOUND" });
       return form;
@@ -170,6 +171,23 @@ export const orderFormRouter = router({
       return ctx.prisma.orderForm.update({
         where: { id: input.id },
         data: { customFields: input.customFields },
+      });
+    }),
+
+  // ─── Update linked territories ──────────────────────────────────────────────
+  updateTerritories: ownerProcedure
+    .input(z.object({
+      id: z.string(),
+      territoryIds: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOwns(ctx, input.id);
+      return ctx.prisma.orderForm.update({
+        where: { id: input.id },
+        data: {
+          territories: { set: input.territoryIds.map((id) => ({ id })) },
+        },
+        include: { territories: { select: { id: true, name: true, color: true } } },
       });
     }),
 
