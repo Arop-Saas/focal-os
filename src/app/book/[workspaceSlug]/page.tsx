@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
@@ -2117,7 +2117,7 @@ function OrderFormSelector({ workspaceSlug }: { workspaceSlug: string }) {
 
 // ─── Main Booking Page ───────────────────────────────────────────────────────
 
-export default function BookingPage() {
+function BookingPageInner() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2689,5 +2689,13 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         </p>
       </main>
     </div>
+  );
+}
+
+export default function BookingPage() {
+  return (
+    <Suspense>
+      <BookingPageInner />
+    </Suspense>
   );
 }
