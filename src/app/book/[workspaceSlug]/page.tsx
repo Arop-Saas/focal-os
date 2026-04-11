@@ -2154,6 +2154,12 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   // Territory detection for auto travel fee
   const [detectedTerritory, setDetectedTerritory] = useState<{ name: string; travelFee: number | null; color: string } | null>(null);
   const [outsideInfo, setOutsideInfo] = useState<{ allowed: boolean; fee: number | null; feeType: string; distanceKm: number } | null>(null);
+
+  const { data, isLoading, isError, refetch: refetchWorkspaceInfo } = trpc.booking.getWorkspaceInfo.useQuery(
+    { slug: workspaceSlug, formId },
+    { enabled: !!workspaceSlug }
+  );
+
   // Extract territory IDs from the order form (stored as JSON array)
   const formTerritoryIds = (data?.orderForm as any)?.territoryIds as string[] | undefined;
 
@@ -2231,11 +2237,6 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
-
-  const { data, isLoading, isError, refetch: refetchWorkspaceInfo } = trpc.booking.getWorkspaceInfo.useQuery(
-    { slug: workspaceSlug, formId },
-    { enabled: !!workspaceSlug }
-  );
 
   // Pre-fetch photographers for selected date (used in Step 5 review)
   const { data: reviewPhotographersData } = trpc.booking.getAvailablePhotographers.useQuery(
