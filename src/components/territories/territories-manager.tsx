@@ -19,7 +19,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { TerritoryMap } from "./territory-map";
 import { CityAutocomplete } from "@/components/shared/city-autocomplete";
-import { MapboxMap } from "@/components/shared/mapbox-map";
+import { TerritoryDrawMap } from "./territory-draw-map";
 
 const PRESET_COLORS = [
   "#3B82F6", // blue
@@ -80,6 +80,7 @@ function TerritoryForm({
     description: string;
     cities: string;
     travelFee?: number;
+    boundary?: BoundaryData;
   }) => void;
   onCancel: () => void;
   isPending: boolean;
@@ -91,6 +92,17 @@ function TerritoryForm({
   const [travelFee, setTravelFee] = useState(
     initial?.travelFee != null ? String(initial.travelFee) : ""
   );
+
+  // Boundary state
+  const [boundaryData, setBoundaryData] = useState<BoundaryData>(() => {
+    if (initial?.boundaryType === "polygon" && initial.polygonCoords) {
+      return { boundaryType: "polygon", polygonCoords: initial.polygonCoords };
+    }
+    if (initial?.boundaryType === "radius" && initial.centerLat != null && initial.centerLng != null) {
+      return { boundaryType: "radius", centerLat: initial.centerLat, centerLng: initial.centerLng, radiusKm: initial.radiusKm ?? 10 };
+    }
+    return { boundaryType: "none" };
+  });
 
   // Geocode cities for map preview
   const [cityMarkers, setCityMarkers] = useState<{ lat: number; lng: number; name: string }[]>([]);
@@ -181,21 +193,14 @@ function TerritoryForm({
         />
       </div>
 
-      {/* Map preview of selected cities */}
+      {/* Map preview with boundary drawing */}
       {cityMarkers.length > 0 && (
-        <div className="rounded-xl overflow-hidden border border-gray-200">
-          <MapboxMap
-            markers={cityMarkers.map((m) => ({
-              lat: m.lat,
-              lng: m.lng,
-              color,
-              popupHtml: `<div style="font-size:13px;font-weight:600;color:${color}">${m.name}</div>`,
-            }))}
-            height={200}
-            showControls={false}
-            interactive={false}
-          />
-        </div>
+        <TerritoryDrawMap
+          color={color}
+          cityMarkers={cityMarkers}
+          initialBoundary={boundaryData}
+          onBoundaryChange={setBoundaryData}
+        />
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -241,6 +246,7 @@ function TerritoryForm({
               description,
               cities,
               travelFee: isNaN(fee) ? undefined : fee,
+              boundary: boundaryData.boundaryType !== "none" ? boundaryData : undefined,
             });
           }}
           disabled={!name.trim() || isPending}
@@ -597,7 +603,17 @@ export function TerritoriesManager({ initialTerritories, initialOutsideSettings 
       {/* Create form */}
       {showCreate && (
         <TerritoryForm
-          onSave={(data) => createMutation.mutate(data)}
+          onSave={(data) => {
+            const { boundary, ...rest } = data;
+            const boundaryInput = boundary
+              ? boundary.boundaryType === "polygon"
+                ? { boundaryType: "polygon" as const, polygonCoords: boundary.polygonCoords! }
+                : boundary.boundaryType === "radius"
+                ? { boundaryType: "radius" as const, centerLat: boundary.centerLat!, centerLng: boundary.centerLng!, radiusKm: boundary.radiusKm! }
+                : { boundaryType: "none" as const }
+              : undefined;
+            createMutation.mutate({ ...rest, ...(boundaryInput ? { boundary: boundaryInput } : {}) });
+          }}
           onCancel={() => setShowCreate(false)}
           isPending={createMutation.isPending}
         />
@@ -661,7 +677,17 @@ export function TerritoriesManager({ initialTerritories, initialOutsideSettings 
               <TerritoryForm
                 key={territory.id}
                 initial={territory}
-                onSave={(data) => updateMutation.mutate({ id: territory.id, ...data })}
+                onSave={(data) => {
+                  const { boundary, ...rest } = data;
+                  const boundaryInput = boundary
+                    ? boundary.boundaryType === "polygon"
+                      ? { boundaryType: "polygon" as const, polygonCoords: boundary.polygonCoords! }
+                      : boundary.boundaryType === "radius"
+                      ? { boundaryType: "radius" as const, centerLat: boundary.centerLat!, centerLng: boundary.centerLng!, radiusKm: boundary.radiusKm! }
+                      : { boundaryType: "none" as const }
+                    : undefined;
+                  updateMutation.mutate({ id: territory.id, ...rest, ...(boundaryInput ? { boundary: boundaryInput } : {}) });
+                }}
                 onCancel={() => setEditingId(null)}
                 isPending={updateMutation.isPending}
               />

@@ -76,7 +76,19 @@ export default async function AvailabilityPage() {
         <AvailabilityTabs
           initialHours={initialHours}
           initialBufferMins={initialBufferMins}
-          initialTerritories={territories}
+          initialTerritories={territories.map((t) => ({
+            id: t.id,
+            name: t.name,
+            color: t.color,
+            description: t.description,
+            cities: t.cities,
+            travelFee: t.travelFee,
+            boundaryType: t.boundaryType,
+            polygonCoords: t.polygonCoords as [number, number][] | null,
+            centerLat: t.centerLat,
+            centerLng: t.centerLng,
+            radiusKm: t.radiusKm,
+          }))}
           staffMembers={staffMembers}
         />
       </div>

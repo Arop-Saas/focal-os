@@ -47,7 +47,22 @@ export default async function TerritoriesPage() {
         description="Define the geographic areas your studio serves"
       />
       <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-        <TerritoriesManager initialTerritories={territories} initialOutsideSettings={outsideSettings} />
+        <TerritoriesManager
+          initialTerritories={territories.map((t) => ({
+            id: t.id,
+            name: t.name,
+            color: t.color,
+            description: t.description,
+            cities: t.cities,
+            travelFee: t.travelFee,
+            boundaryType: t.boundaryType,
+            polygonCoords: t.polygonCoords as [number, number][] | null,
+            centerLat: t.centerLat,
+            centerLng: t.centerLng,
+            radiusKm: t.radiusKm,
+          }))}
+          initialOutsideSettings={outsideSettings}
+        />
       </div>
     </div>
   );

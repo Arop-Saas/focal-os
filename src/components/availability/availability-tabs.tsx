@@ -20,6 +20,11 @@ interface Territory {
   description: string | null;
   cities: string | null;
   travelFee: number | null;
+  boundaryType: string;
+  polygonCoords: [number, number][] | null;
+  centerLat: number | null;
+  centerLng: number | null;
+  radiusKm: number | null;
 }
 
 interface StaffMember {
