@@ -3,7 +3,19 @@
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
-import { Plus, MapPin, Pencil, Trash2, X, Check, Loader2, DollarSign, List, Map } from "lucide-react";
+import {
+  Plus,
+  MapPin,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  Loader2,
+  DollarSign,
+  List,
+  Map,
+  Target,
+} from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { TerritoryMap } from "./territory-map";
 
@@ -25,6 +37,19 @@ interface Territory {
   description: string | null;
   cities: string | null;
   travelFee: number | null;
+  boundaryType: string;
+  polygonCoords: [number, number][] | null;
+  centerLat: number | null;
+  centerLng: number | null;
+  radiusKm: number | null;
+}
+
+interface BoundaryData {
+  boundaryType: "none" | "polygon" | "radius";
+  polygonCoords?: [number, number][];
+  centerLat?: number;
+  centerLng?: number;
+  radiusKm?: number;
 }
 
 interface Props {
@@ -38,7 +63,13 @@ function TerritoryForm({
   isPending,
 }: {
   initial?: Partial<Territory>;
-  onSave: (data: { name: string; color: string; description: string; cities: string; travelFee?: number }) => void;
+  onSave: (data: {
+    name: string;
+    color: string;
+    description: string;
+    cities: string;
+    travelFee?: number;
+  }) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
@@ -53,7 +84,6 @@ function TerritoryForm({
   return (
     <div className="bg-white rounded-xl border p-5 space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Name */}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Territory Name *</label>
           <input
@@ -64,8 +94,6 @@ function TerritoryForm({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-
-        {/* Color */}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Color</label>
           <div className="flex items-center gap-2 flex-wrap">
@@ -86,7 +114,6 @@ function TerritoryForm({
         </div>
       </div>
 
-      {/* Cities */}
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">Cities / Regions Served</label>
         <input
@@ -99,11 +126,11 @@ function TerritoryForm({
         <p className="text-xs text-gray-400 mt-1">Separate multiple cities with commas</p>
       </div>
 
-      {/* Travel fee + Description */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
-            <DollarSign className="inline w-3 h-3 mr-0.5" />Travel Fee (optional)
+            <DollarSign className="inline w-3 h-3 mr-0.5" />
+            Travel Fee (optional)
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
@@ -136,12 +163,22 @@ function TerritoryForm({
           type="button"
           onClick={() => {
             const fee = parseFloat(travelFee);
-            onSave({ name, color, description, cities, travelFee: isNaN(fee) ? undefined : fee });
+            onSave({
+              name,
+              color,
+              description,
+              cities,
+              travelFee: isNaN(fee) ? undefined : fee,
+            });
           }}
           disabled={!name.trim() || isPending}
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
         >
-          {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          {isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Check className="h-3.5 w-3.5" />
+          )}
           Save Territory
         </button>
         <button
@@ -163,10 +200,22 @@ export function TerritoriesManager({ initialTerritories }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [drawingTerritoryId, setDrawingTerritoryId] = useState<string | null>(null);
 
   const createMutation = api.territories.create.useMutation({
     onSuccess: (newT) => {
-      setTerritories((prev) => [...prev, { ...newT, travelFee: (newT as Territory).travelFee ?? null }]);
+      setTerritories((prev) => [
+        ...prev,
+        {
+          ...newT,
+          travelFee: (newT as Territory).travelFee ?? null,
+          boundaryType: (newT as any).boundaryType ?? "none",
+          polygonCoords: (newT as any).polygonCoords ?? null,
+          centerLat: (newT as any).centerLat ?? null,
+          centerLng: (newT as any).centerLng ?? null,
+          radiusKm: (newT as any).radiusKm ?? null,
+        },
+      ]);
       setShowCreate(false);
       router.refresh();
     },
@@ -174,8 +223,23 @@ export function TerritoriesManager({ initialTerritories }: Props) {
 
   const updateMutation = api.territories.update.useMutation({
     onSuccess: (updated) => {
-      setTerritories((prev) => prev.map((t) => (t.id === updated.id ? { ...updated, travelFee: (updated as Territory).travelFee ?? null } : t)));
+      setTerritories((prev) =>
+        prev.map((t) =>
+          t.id === updated.id
+            ? {
+                ...updated,
+                travelFee: (updated as Territory).travelFee ?? null,
+                boundaryType: (updated as any).boundaryType ?? "none",
+                polygonCoords: (updated as any).polygonCoords ?? null,
+                centerLat: (updated as any).centerLat ?? null,
+                centerLng: (updated as any).centerLng ?? null,
+                radiusKm: (updated as any).radiusKm ?? null,
+              }
+            : t
+        )
+      );
       setEditingId(null);
+      setDrawingTerritoryId(null);
       router.refresh();
     },
   });
@@ -188,9 +252,29 @@ export function TerritoriesManager({ initialTerritories }: Props) {
     },
   });
 
+  function handleBoundaryChange(territoryId: string, boundary: BoundaryData) {
+    // Build the boundary input for tRPC
+    const boundaryInput =
+      boundary.boundaryType === "polygon"
+        ? { boundaryType: "polygon" as const, polygonCoords: boundary.polygonCoords! }
+        : boundary.boundaryType === "radius"
+        ? {
+            boundaryType: "radius" as const,
+            centerLat: boundary.centerLat!,
+            centerLng: boundary.centerLng!,
+            radiusKm: boundary.radiusKm!,
+          }
+        : { boundaryType: "none" as const };
+
+    updateMutation.mutate({
+      id: territoryId,
+      boundary: boundaryInput,
+    });
+  }
+
   return (
     <div className="max-w-2xl space-y-4">
-      {/* Header card */}
+      {/* Header */}
       <div className="bg-white rounded-xl border p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -199,17 +283,18 @@ export function TerritoriesManager({ initialTerritories }: Props) {
           <div>
             <h2 className="text-sm font-semibold text-gray-900">Service Territories</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Define the areas your studio covers — set travel fees per territory.
+              Define the areas your studio covers — draw boundaries and set travel fees.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* List / Map toggle */}
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
-              onClick={() => setViewMode("list")}
+              onClick={() => { setViewMode("list"); setDrawingTerritoryId(null); }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                viewMode === "list" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                viewMode === "list"
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               <List className="w-3.5 h-3.5" /> List
@@ -217,7 +302,9 @@ export function TerritoriesManager({ initialTerritories }: Props) {
             <button
               onClick={() => setViewMode("map")}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                viewMode === "map" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                viewMode === "map"
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               <Map className="w-3.5 h-3.5" /> Map
@@ -246,8 +333,41 @@ export function TerritoriesManager({ initialTerritories }: Props) {
 
       {/* Map view */}
       {viewMode === "map" && (
-        <div className="bg-white rounded-xl border p-5">
-          <TerritoryMap territories={territories} />
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          {/* Territory selector for boundary drawing */}
+          {territories.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">Draw boundary:</span>
+              {territories.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() =>
+                    setDrawingTerritoryId(drawingTerritoryId === t.id ? null : t.id)
+                  }
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                    drawingTerritoryId === t.id
+                      ? "ring-2 ring-offset-1 ring-blue-400 border-blue-300 bg-blue-50"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  <Target className="w-3 h-3" style={{ color: t.color }} />
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <TerritoryMap
+            territories={territories}
+            editingTerritoryId={drawingTerritoryId}
+            onBoundaryChange={handleBoundaryChange}
+          />
+
+          {updateMutation.isPending && (
+            <div className="flex items-center gap-2 text-xs text-blue-600">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving boundary…
+            </div>
+          )}
         </div>
       )}
 
@@ -278,13 +398,11 @@ export function TerritoriesManager({ initialTerritories }: Props) {
                 key={territory.id}
                 className="bg-white rounded-xl border p-5 flex items-start gap-4"
               >
-                {/* Color dot */}
                 <div
                   className="h-10 w-10 rounded-full shrink-0 mt-0.5"
                   style={{ backgroundColor: territory.color }}
                 />
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-gray-900">{territory.name}</p>
@@ -292,6 +410,14 @@ export function TerritoriesManager({ initialTerritories }: Props) {
                       <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                         <DollarSign className="w-3 h-3" />
                         {formatCurrency(territory.travelFee)} travel fee
+                      </span>
+                    )}
+                    {territory.boundaryType !== "none" && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                        <Target className="w-3 h-3" />
+                        {territory.boundaryType === "polygon"
+                          ? "Polygon boundary"
+                          : `${territory.radiusKm?.toFixed(1)}km radius`}
                       </span>
                     )}
                   </div>
@@ -319,8 +445,17 @@ export function TerritoriesManager({ initialTerritories }: Props) {
                   )}
                 </div>
 
-                {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => {
+                      setViewMode("map");
+                      setDrawingTerritoryId(territory.id);
+                    }}
+                    title="Draw boundary on map"
+                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    <Target className="h-3.5 w-3.5" />
+                  </button>
                   <button
                     onClick={() => setEditingId(territory.id)}
                     className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"

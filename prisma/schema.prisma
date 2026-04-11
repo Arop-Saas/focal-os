@@ -297,6 +297,17 @@ model ServiceTerritory {
   cities      String?  // comma-separated list of cities/regions
   travelFee   Float?   // Optional flat travel fee charged for jobs in this territory
 
+  // Boundary definition — "none" (city pins only), "polygon", or "radius"
+  boundaryType  String   @default("none")  // "none" | "polygon" | "radius"
+
+  // Polygon boundary — stored as JSON array of [lng, lat] coordinate pairs
+  polygonCoords Json?    // [[lng, lat], [lng, lat], ...] — GeoJSON-style ring
+
+  // Radius boundary — center point + radius in kilometers
+  centerLat     Float?
+  centerLng     Float?
+  radiusKm      Float?
+
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())

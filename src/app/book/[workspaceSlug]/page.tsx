@@ -724,13 +724,15 @@ function DesignerImageOverlay({ onUpload }: { onUpload: (file: File) => Promise<
 // ── Order Cart Sidebar ───────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService, orderDetails, workspaceSlug, customerEmail, onCouponApplied }: {
+function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, brandColor, onRemovePkg, onRemoveAddOn, onRemoveService, orderDetails, workspaceSlug, customerEmail, onCouponApplied, travelFee, territoryName }: {
   selectedPkg: any | null; selectedAddOns: string[]; selectedServiceIds: string[]; services: any[]; brandColor: string;
   onRemovePkg: () => void; onRemoveAddOn: (id: string) => void; onRemoveService: (id: string) => void;
   orderDetails?: BookingFormSettings["orderDetails"];
   workspaceSlug: string;
   customerEmail?: string;
   onCouponApplied?: (coupon: { couponId: string; code: string; discountType: string; discountValue: number } | null) => void;
+  travelFee?: number | null;
+  territoryName?: string | null;
 }) {
   const od = { ...DEFAULT_BOOKING_FORM_SETTINGS.orderDetails, ...orderDetails };
   const addOnItems = services.filter((s: any) => selectedAddOns.includes(s.id));
@@ -780,8 +782,9 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
       : Math.min(appliedCoupon.discountValue, rawSubtotal)
     : 0;
   const subtotal = rawSubtotal - discountAmt;
+  const travelFeeAmt = travelFee && travelFee > 0 ? travelFee : 0;
   const taxAmt = (od.taxRate ?? 0) > 0 ? subtotal * ((od.taxRate ?? 0) / 100) : 0;
-  const total = subtotal + taxAmt;
+  const total = subtotal + taxAmt + travelFeeAmt;
   const hasItems = !!selectedPkg || serviceItems.length > 0;
   const itemCount = (selectedPkg ? 1 : 0) + addOnItems.length + (!selectedPkg ? serviceItems.length : 0);
 
@@ -910,6 +913,12 @@ function OrderCart({ selectedPkg, selectedAddOns, selectedServiceIds, services, 
               <span className="text-sm font-medium text-green-600">-${discountAmt.toFixed(2)}</span>
             </div>
           )}
+          {travelFeeAmt > 0 && (
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-gray-400">Travel fee{territoryName ? ` (${territoryName})` : ""}</span>
+              <span className="text-sm text-gray-600">+${travelFeeAmt.toFixed(2)}</span>
+            </div>
+          )}
           {taxAmt > 0 && (
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs text-gray-400">{od.taxLabel ?? "Tax"} ({od.taxRate}%)</span>
@@ -938,6 +947,8 @@ function Step2Package({
   onCouponApplied,
   isDesignerPreview = false,
   onImageUpdated,
+  travelFee,
+  territoryName,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -952,6 +963,8 @@ function Step2Package({
   onCouponApplied?: (coupon: { couponId: string; code: string; discountType: string; discountValue: number } | null) => void;
   isDesignerPreview?: boolean;
   onImageUpdated?: () => void;
+  travelFee?: number | null;
+  territoryName?: string | null;
 }) {
   const updateServiceMut = trpc.packages.updateService.useMutation();
   const updatePackageMut = trpc.packages.updatePackage.useMutation();
@@ -1197,6 +1210,8 @@ function Step2Package({
           workspaceSlug={workspaceSlug}
           customerEmail={form.email}
           onCouponApplied={onCouponApplied}
+          travelFee={travelFee}
+          territoryName={territoryName}
         />
       </div>
 
@@ -1206,8 +1221,9 @@ function Step2Package({
         const mSub = selectedPkg
           ? selectedPkg.price + services.filter((s: any) => selectedAddOns.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0)
           : services.filter((s: any) => form.selectedServiceIds.includes(s.id)).reduce((sum: number, s: any) => sum + s.basePrice, 0);
+        const mTravelFee = travelFee && travelFee > 0 ? travelFee : 0;
         const mTax = (mOd.taxRate ?? 0) > 0 ? mSub * ((mOd.taxRate ?? 0) / 100) : 0;
-        const mTotal = mSub + mTax;
+        const mTotal = mSub + mTax + mTravelFee;
         return (
           <div className="fixed bottom-0 left-0 right-0 md:hidden z-40 bg-white border-t border-gray-200 shadow-lg px-4 py-3">
             <div className="flex items-center justify-between max-w-2xl mx-auto">
@@ -1812,6 +1828,8 @@ function Step5Review({
   services,
   photographers,
   brandColor,
+  travelFee,
+  territoryName,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -1822,6 +1840,8 @@ function Step5Review({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   photographers: any[];
   brandColor: string;
+  travelFee?: number | null;
+  territoryName?: string | null;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pkg = packages.find((p: any) => p.id === form.packageId);
@@ -1846,7 +1866,8 @@ function Step5Review({
       const svc = services.find((s: any) => s.id === id);
       return sum + (svc?.basePrice ?? 0);
     }, 0);
-  const grandTotal = (pkg?.price ?? 0) + alaCarteTotal + addOnTotal;
+  const travelFeeAmt = travelFee && travelFee > 0 ? travelFee : 0;
+  const grandTotal = (pkg?.price ?? 0) + alaCarteTotal + addOnTotal + travelFeeAmt;
 
   // Build add-on display for review
   const addOnNames = form.selectedServiceIds
@@ -1869,6 +1890,9 @@ function Step5Review({
     },
     ...(addOnNames.length > 0
       ? [{ label: "Add-ons", value: `${addOnNames.map((s: any) => s.name).join(", ")} — $${addOnTotal.toLocaleString()}` }]
+      : []),
+    ...(travelFeeAmt > 0
+      ? [{ label: `Travel fee${territoryName ? ` (${territoryName})` : ""}`, value: `+$${travelFeeAmt.toFixed(2)}` }]
       : []),
     { label: "Appointment", value: scheduledDisplay },
     ...(photographer ? [{ label: "Photographer", value: photographer.name }] : []),
@@ -2090,6 +2114,21 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
   const [appliedCouponData, setAppliedCouponData] = useState<{ couponId: string; code: string; discountType: string; discountValue: number } | null>(null);
   const [isDesignerPreview, setIsDesignerPreview] = useState(false);
+
+  // Territory detection for auto travel fee
+  const [detectedTerritory, setDetectedTerritory] = useState<{ name: string; travelFee: number | null; color: string } | null>(null);
+  const detectTerritoryQuery = trpc.territories.detectTerritory.useQuery(
+    { workspaceSlug, lat: form.propertyLat!, lng: form.propertyLng! },
+    { enabled: !!form.propertyLat && !!form.propertyLng && !!workspaceSlug }
+  );
+
+  useEffect(() => {
+    if (detectTerritoryQuery.data?.territory) {
+      setDetectedTerritory(detectTerritoryQuery.data.territory);
+    } else if (detectTerritoryQuery.data && !detectTerritoryQuery.data.territory) {
+      setDetectedTerritory(null);
+    }
+  }, [detectTerritoryQuery.data]);
 
   // Detect if we're inside the form designer iframe
   useEffect(() => {
@@ -2469,7 +2508,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} travelFee={detectedTerritory?.travelFee} territoryName={detectedTerritory?.name} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
@@ -2522,7 +2561,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 5 && (
             <>
-              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} />
+              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} travelFee={detectedTerritory?.travelFee} territoryName={detectedTerritory?.name} />
               <CustomFieldsRenderer step={5} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
