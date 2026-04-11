@@ -18,14 +18,6 @@ const boundaryInput = z.discriminatedUnion("boundaryType", [
   }),
 ]);
 
-const outsideSettingsInput = z.object({
-  outsideBookingEnabled: z.boolean().optional(),
-  outsideFeeType: z.enum(["flat", "per_km"]).optional(),
-  outsideTerritoryFee: z.number().min(0).nullable().optional(),
-  outsidePerKmRate: z.number().min(0).nullable().optional(),
-  outsideFeeBaseKm: z.number().min(0).nullable().optional(),
-});
-
 export const territoriesRouter = router({
   list: workspaceProcedure.query(async ({ ctx }) => {
     return ctx.prisma.serviceTerritory.findMany({
@@ -48,10 +40,11 @@ export const territoriesRouter = router({
         outsideTerritoryFee: z.number().min(0).nullable().optional(),
         outsidePerKmRate: z.number().min(0).nullable().optional(),
         outsideFeeBaseKm: z.number().min(0).nullable().optional(),
+        outsideMaxKm: z.number().min(0).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, ...rest } = input;
+      const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, ...rest } = input;
       const boundaryData = getBoundaryData(boundary);
       return ctx.prisma.serviceTerritory.create({
         data: {
@@ -63,6 +56,7 @@ export const territoriesRouter = router({
           ...(outsideTerritoryFee !== undefined ? { outsideTerritoryFee } : {}),
           ...(outsidePerKmRate !== undefined ? { outsidePerKmRate } : {}),
           ...(outsideFeeBaseKm !== undefined ? { outsideFeeBaseKm } : {}),
+          ...(outsideMaxKm !== undefined ? { outsideMaxKm } : {}),
         } as any,
       });
     }),
@@ -82,6 +76,7 @@ export const territoriesRouter = router({
         outsideTerritoryFee: z.number().min(0).nullable().optional(),
         outsidePerKmRate: z.number().min(0).nullable().optional(),
         outsideFeeBaseKm: z.number().min(0).nullable().optional(),
+        outsideMaxKm: z.number().min(0).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -90,7 +85,7 @@ export const territoriesRouter = router({
       });
       if (!territory) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const { id, boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, ...rest } = input;
+      const { id, boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, ...rest } = input;
       const boundaryData = getBoundaryData(boundary);
       return ctx.prisma.serviceTerritory.update({
         where: { id },
@@ -102,6 +97,7 @@ export const territoriesRouter = router({
           ...(outsideTerritoryFee !== undefined ? { outsideTerritoryFee } : {}),
           ...(outsidePerKmRate !== undefined ? { outsidePerKmRate } : {}),
           ...(outsideFeeBaseKm !== undefined ? { outsideFeeBaseKm } : {}),
+          ...(outsideMaxKm !== undefined ? { outsideMaxKm } : {}),
         } as any,
       });
     }),
@@ -261,6 +257,12 @@ export const territoriesRouter = router({
       const feeType = nearestTerritory
         ? ((nearestTerritory as any).outsideFeeType as "flat" | "per_km") ?? (workspace.outsideFeeType as "flat" | "per_km")
         : (workspace.outsideFeeType as "flat" | "per_km");
+      const maxKm: number | null = nearestTerritory
+        ? (nearestTerritory as any).outsideMaxKm ?? null
+        : null;
+
+      // Enforce max km limit — if distance exceeds max, block the booking
+      const beyondMaxKm = maxKm != null && distKm > maxKm;
 
       let calculatedFee: number | null = null;
       if (feeType === "per_km") {
@@ -275,10 +277,11 @@ export const territoriesRouter = router({
       return {
         territory: null,
         outside: {
-          allowed: outsideEnabled,
+          allowed: outsideEnabled && !beyondMaxKm,
           feeType,
           fee: calculatedFee,
           distanceKm: distKm,
+          maxKm,
         },
       };
     }),

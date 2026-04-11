@@ -93,6 +93,7 @@ export default async function AvailabilityPage() {
             outsideTerritoryFee: (t as any).outsideTerritoryFee ?? null,
             outsidePerKmRate: (t as any).outsidePerKmRate ?? null,
             outsideFeeBaseKm: (t as any).outsideFeeBaseKm ?? null,
+            outsideMaxKm: (t as any).outsideMaxKm ?? null,
           }))}
           staffMembers={staffMembers}
         />

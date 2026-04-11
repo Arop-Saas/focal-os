@@ -320,6 +320,7 @@ model ServiceTerritory {
   outsideTerritoryFee   Float?
   outsidePerKmRate      Float?
   outsideFeeBaseKm      Float?
+  outsideMaxKm          Float?   // Max km outside boundary before booking is blocked (null = unlimited)
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 

@@ -49,6 +49,7 @@ interface Territory {
   outsideTerritoryFee: number | null;
   outsidePerKmRate: number | null;
   outsideFeeBaseKm: number | null;
+  outsideMaxKm: number | null;
 }
 
 interface BoundaryData {
@@ -71,6 +72,7 @@ interface TerritoryFormData {
   outsideTerritoryFee?: number | null;
   outsidePerKmRate?: number | null;
   outsideFeeBaseKm?: number | null;
+  outsideMaxKm?: number | null;
 }
 
 interface Props {
@@ -91,6 +93,8 @@ function OutsideSettingsSection({
   setPerKmRate,
   baseKm,
   setBaseKm,
+  maxKm,
+  setMaxKm,
 }: {
   enabled: boolean;
   setEnabled: (v: boolean) => void;
@@ -102,6 +106,8 @@ function OutsideSettingsSection({
   setPerKmRate: (v: string) => void;
   baseKm: string;
   setBaseKm: (v: string) => void;
+  maxKm: string;
+  setMaxKm: (v: string) => void;
 }) {
   return (
     <div className="space-y-3 p-3.5 bg-gray-50 rounded-lg border border-gray-200">
@@ -133,6 +139,28 @@ function OutsideSettingsSection({
 
       {enabled && (
         <div className="space-y-3">
+          {/* Max distance limit */}
+          <div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-1">Max distance outside boundary</label>
+            <div className="flex items-center gap-2">
+              <div className="relative w-24">
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={maxKm}
+                  onChange={(e) => setMaxKm(e.target.value)}
+                  placeholder="∞"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">km</span>
+              </div>
+              <span className="text-[11px] text-gray-400">
+                {maxKm ? `Block bookings beyond ${maxKm}km` : "No limit"}
+              </span>
+            </div>
+          </div>
+
           <div className="flex gap-2">
             <button
               type="button"
@@ -270,6 +298,9 @@ function TerritoryForm({
   const [outsideBaseKm, setOutsideBaseKm] = useState(
     initial?.outsideFeeBaseKm != null ? String(initial.outsideFeeBaseKm) : ""
   );
+  const [outsideMaxKm, setOutsideMaxKm] = useState(
+    initial?.outsideMaxKm != null ? String(initial.outsideMaxKm) : ""
+  );
 
   // Geocode cities for map preview
   const [cityMarkers, setCityMarkers] = useState<{ lat: number; lng: number; name: string }[]>([]);
@@ -322,6 +353,7 @@ function TerritoryForm({
     const flatFee = parseFloat(outsideFlatFee);
     const perKm = parseFloat(outsidePerKmRate);
     const baseKm = parseFloat(outsideBaseKm);
+    const maxKm = parseFloat(outsideMaxKm);
     onSave({
       name,
       color,
@@ -334,6 +366,7 @@ function TerritoryForm({
       outsideTerritoryFee: isNaN(flatFee) ? null : flatFee,
       outsidePerKmRate: isNaN(perKm) ? null : perKm,
       outsideFeeBaseKm: isNaN(baseKm) ? null : baseKm,
+      outsideMaxKm: isNaN(maxKm) ? null : maxKm,
     });
   }
 
@@ -434,6 +467,8 @@ function TerritoryForm({
         setPerKmRate={setOutsidePerKmRate}
         baseKm={outsideBaseKm}
         setBaseKm={setOutsideBaseKm}
+        maxKm={outsideMaxKm}
+        setMaxKm={setOutsideMaxKm}
       />
 
       <div className="flex items-center gap-2 pt-1">
@@ -473,7 +508,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [drawingTerritoryId, setDrawingTerritoryId] = useState<string | null>(null);
   function buildMutationData(data: TerritoryFormData) {
-    const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, ...rest } = data;
+    const { boundary, outsideBookingEnabled, outsideFeeType, outsideTerritoryFee, outsidePerKmRate, outsideFeeBaseKm, outsideMaxKm, ...rest } = data;
     const boundaryInput = boundary
       ? boundary.boundaryType === "polygon"
         ? { boundaryType: "polygon" as const, polygonCoords: boundary.polygonCoords! }
@@ -489,6 +524,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
       outsideTerritoryFee,
       outsidePerKmRate,
       outsideFeeBaseKm,
+      outsideMaxKm,
     };
   }
 
@@ -510,6 +546,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
       outsideTerritoryFee: t.outsideTerritoryFee ?? null,
       outsidePerKmRate: t.outsidePerKmRate ?? null,
       outsideFeeBaseKm: t.outsideFeeBaseKm ?? null,
+      outsideMaxKm: t.outsideMaxKm ?? null,
     };
   }
 
@@ -750,6 +787,7 @@ export function TerritoriesManager({ initialTerritories }: Props) {
                           : territory.outsideTerritoryFee
                           ? `${formatCurrency(territory.outsideTerritoryFee)} flat`
                           : "None"}
+                        {territory.outsideMaxKm ? ` · max ${territory.outsideMaxKm}km` : ""}
                       </p>
                     )}
 

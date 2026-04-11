@@ -30,6 +30,7 @@ interface Territory {
   outsideTerritoryFee: number | null;
   outsidePerKmRate: number | null;
   outsideFeeBaseKm: number | null;
+  outsideMaxKm: number | null;
 }
 
 interface StaffMember {

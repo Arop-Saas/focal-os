@@ -43,6 +43,7 @@ export default async function TerritoriesPage() {
             outsideTerritoryFee: (t as any).outsideTerritoryFee ?? null,
             outsidePerKmRate: (t as any).outsidePerKmRate ?? null,
             outsideFeeBaseKm: (t as any).outsideFeeBaseKm ?? null,
+            outsideMaxKm: (t as any).outsideMaxKm ?? null,
           }))}
         />
       </div>
