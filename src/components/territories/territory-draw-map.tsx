@@ -195,6 +195,17 @@ export function TerritoryDrawMap({
     try { renderOverlays(map); } catch { /* map not ready */ }
   }, [drawMode, polygonPoints, radiusCenter, radiusKm, color, renderOverlays, status]);
 
+  // Resize map when drawing mode changes (container height transitions)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || status !== "ready") return;
+    // Small delay to let the CSS transition start, then resize
+    const t = setTimeout(() => map.resize(), 50);
+    // Also resize after transition completes (300ms duration)
+    const t2 = setTimeout(() => map.resize(), 320);
+    return () => { clearTimeout(t); clearTimeout(t2); };
+  }, [isDrawing, status]);
+
   // ─── Map init ──────────────────────────────────────────
 
   useEffect(() => {
