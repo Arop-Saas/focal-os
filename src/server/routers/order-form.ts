@@ -28,19 +28,39 @@ export const orderFormRouter = router({
 
   // ─── List all order forms for workspace ─────────────────────────────────────
   list: workspaceProcedure.query(async ({ ctx }) => {
-    return ctx.prisma.orderForm.findMany({
-      where: { workspaceId: ctx.workspace.id },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    });
+    try {
+      return await ctx.prisma.orderForm.findMany({
+        where: { workspaceId: ctx.workspace.id },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      });
+    } catch {
+      // Fallback if territoryIds column doesn't exist yet
+      const rows: any[] = await ctx.prisma.$queryRawUnsafe(
+        `SELECT * FROM "OrderForm" WHERE "workspaceId" = $1 ORDER BY "sortOrder" ASC, "createdAt" ASC`,
+        ctx.workspace.id,
+      );
+      return rows;
+    }
   }),
 
   // ─── Get a single order form ─────────────────────────────────────────────────
   get: workspaceProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const form = await ctx.prisma.orderForm.findFirst({
-        where: { id: input.id, workspaceId: ctx.workspace.id },
-      });
+      let form: any;
+      try {
+        form = await ctx.prisma.orderForm.findFirst({
+          where: { id: input.id, workspaceId: ctx.workspace.id },
+        });
+      } catch {
+        // Fallback if territoryIds column doesn't exist yet
+        form = await ctx.prisma.$queryRawUnsafe(
+          `SELECT id, "workspaceId", title, description, "coverImage", "isPublic", "welcomeMessage", "fieldSettings", "confirmationMode", "assignmentStrategy", "allowCustomerChoice", "timeSlotInterval", "paymentMode", "depositPercent", "accentColor", "backgroundColor", "logoUrl", "fontFamily", "buttonStyle", "showLogo", "showStepNumbers", "customFields", "seoTitle", "seoDescription", "seoImage", "sortOrder", "createdAt", "updatedAt" FROM "OrderForm" WHERE id = $1 AND "workspaceId" = $2 LIMIT 1`,
+          input.id,
+          ctx.workspace.id,
+        ).then((rows: any) => rows[0] ?? null);
+        if (form) form.territoryIds = null;
+      }
       if (!form) throw new TRPCError({ code: "NOT_FOUND" });
       return form;
     }),
@@ -59,6 +79,7 @@ export const orderFormRouter = router({
           fieldSettings: DEFAULT_BOOKING_FORM_SETTINGS.fields,
           sortOrder: count,
         },
+        select: { id: true, title: true, sortOrder: true, createdAt: true },
       });
     }),
 
@@ -75,7 +96,7 @@ export const orderFormRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       await assertOwns(ctx, id);
-      return ctx.prisma.orderForm.update({ where: { id }, data });
+      return ctx.prisma.orderForm.update({ where: { id }, data, select: { id: true } });
     }),
 
   // ─── Update field visibility ──────────────────────────────────────────────────
@@ -86,6 +107,7 @@ export const orderFormRouter = router({
       return ctx.prisma.orderForm.update({
         where: { id: input.id },
         data: { fieldSettings: input.fieldSettings },
+        select: { id: true },
       });
     }),
 
@@ -101,7 +123,7 @@ export const orderFormRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       await assertOwns(ctx, id);
-      return ctx.prisma.orderForm.update({ where: { id }, data });
+      return ctx.prisma.orderForm.update({ where: { id }, data, select: { id: true } });
     }),
 
   // ─── Update payment settings ──────────────────────────────────────────────────
@@ -114,7 +136,7 @@ export const orderFormRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       await assertOwns(ctx, id);
-      return ctx.prisma.orderForm.update({ where: { id }, data });
+      return ctx.prisma.orderForm.update({ where: { id }, data, select: { id: true } });
     }),
 
   // ─── Update appearance (designer) ──────────────────────────────────────────────
@@ -132,7 +154,7 @@ export const orderFormRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       await assertOwns(ctx, id);
-      return ctx.prisma.orderForm.update({ where: { id }, data });
+      return ctx.prisma.orderForm.update({ where: { id }, data, select: { id: true } });
     }),
 
   // ─── Update SEO settings ──────────────────────────────────────────────────────
@@ -146,7 +168,7 @@ export const orderFormRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       await assertOwns(ctx, id);
-      return ctx.prisma.orderForm.update({ where: { id }, data });
+      return ctx.prisma.orderForm.update({ where: { id }, data, select: { id: true } });
     }),
 
   // ─── Update custom fields ──────────────────────────────────────────────────────
@@ -170,6 +192,7 @@ export const orderFormRouter = router({
       return ctx.prisma.orderForm.update({
         where: { id: input.id },
         data: { customFields: input.customFields },
+        select: { id: true },
       });
     }),
 
@@ -181,10 +204,21 @@ export const orderFormRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertOwns(ctx, input.id);
-      return ctx.prisma.orderForm.update({
-        where: { id: input.id },
-        data: { territoryIds: input.territoryIds },
-      });
+      try {
+        return await ctx.prisma.orderForm.update({
+          where: { id: input.id },
+          data: { territoryIds: input.territoryIds },
+          select: { id: true, territoryIds: true },
+        });
+      } catch {
+        // Column may not exist yet — use raw SQL fallback
+        await ctx.prisma.$executeRawUnsafe(
+          `UPDATE "OrderForm" SET "territoryIds" = $1::jsonb WHERE id = $2`,
+          JSON.stringify(input.territoryIds),
+          input.id,
+        );
+        return { id: input.id, territoryIds: input.territoryIds };
+      }
     }),
 
   // ─── Delete ───────────────────────────────────────────────────────────────────
@@ -192,7 +226,7 @@ export const orderFormRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertOwns(ctx, input.id);
-      await ctx.prisma.orderForm.delete({ where: { id: input.id } });
+      await ctx.prisma.orderForm.delete({ where: { id: input.id }, select: { id: true } });
       return { ok: true };
     }),
 });

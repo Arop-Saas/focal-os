@@ -96,23 +96,45 @@ export const bookingRouter = router({
       // If a specific order form was requested, load its settings
       let orderForm: any = null;
       if (input.formId) {
-        orderForm = await ctx.prisma.orderForm.findFirst({
-          where: { id: input.formId, workspaceId: workspace.id },
-          select: {
-            id: true,
-            title: true,
-            welcomeMessage: true,
-            fieldSettings: true,
-            confirmationMode: true,
-            assignmentStrategy: true,
-            allowCustomerChoice: true,
-            timeSlotInterval: true,
-            paymentMode: true,
-            depositPercent: true,
-            customFields: true,
-            territoryIds: true,
-          },
-        });
+        try {
+          // Try with territoryIds first (works once prisma db push has been run)
+          orderForm = await ctx.prisma.orderForm.findFirst({
+            where: { id: input.formId, workspaceId: workspace.id },
+            select: {
+              id: true,
+              title: true,
+              welcomeMessage: true,
+              fieldSettings: true,
+              confirmationMode: true,
+              assignmentStrategy: true,
+              allowCustomerChoice: true,
+              timeSlotInterval: true,
+              paymentMode: true,
+              depositPercent: true,
+              customFields: true,
+              territoryIds: true,
+            },
+          });
+        } catch {
+          // Fallback: column doesn't exist yet — load without territoryIds
+          orderForm = await ctx.prisma.orderForm.findFirst({
+            where: { id: input.formId, workspaceId: workspace.id },
+            select: {
+              id: true,
+              title: true,
+              welcomeMessage: true,
+              fieldSettings: true,
+              confirmationMode: true,
+              assignmentStrategy: true,
+              allowCustomerChoice: true,
+              timeSlotInterval: true,
+              paymentMode: true,
+              depositPercent: true,
+              customFields: true,
+            },
+          });
+          if (orderForm) orderForm.territoryIds = [];
+        }
       }
 
       const packages = await ctx.prisma.package.findMany({
