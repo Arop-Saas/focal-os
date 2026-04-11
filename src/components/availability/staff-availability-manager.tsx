@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Loader2, CheckCircle, User, ChevronDown } from "lucide-react";
 
@@ -17,14 +17,14 @@ function StaffAvailabilityEditor({ staffId, staffName }: { staffId: string; staf
   const [saved, setSaved] = useState(false);
   const [schedule, setSchedule] = useState<DaySchedule[] | null>(null);
 
-  const { isLoading } = trpc.staff.getAvailability.useQuery(
-    { staffId },
-    {
-      onSuccess: (data) => {
-        if (!schedule) setSchedule(data);
-      },
+  const { data, isLoading } = trpc.staff.getAvailability.useQuery({ staffId });
+
+  // Populate local state when data loads (React Query v5 removed onSuccess)
+  useEffect(() => {
+    if (data && !schedule) {
+      setSchedule(data);
     }
-  );
+  }, [data, schedule]);
 
   const saveMutation = trpc.staff.saveAvailability.useMutation({
     onSuccess: () => {
