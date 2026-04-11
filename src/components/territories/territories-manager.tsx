@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { TerritoryMap } from "./territory-map";
+import { CityAutocomplete } from "@/components/shared/city-autocomplete";
 
 const PRESET_COLORS = [
   "#3B82F6", // blue
@@ -125,14 +126,12 @@ function TerritoryForm({
 
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">Cities / Regions Served</label>
-        <input
-          type="text"
+        <CityAutocomplete
           value={cities}
-          onChange={(e) => setCities(e.target.value)}
-          placeholder="e.g. Edmonton, St. Albert, Leduc, Spruce Grove"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onChange={setCities}
+          chipColor={color}
+          placeholder="Search for a city..."
         />
-        <p className="text-xs text-gray-400 mt-1">Separate multiple cities with commas</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
