@@ -31,6 +31,7 @@ interface StaffMember {
 
 interface Props {
   initialHours: DayHours[];
+  initialBufferMins?: number;
   initialTerritories: Territory[];
   staffMembers: StaffMember[];
 }
@@ -41,7 +42,7 @@ const TABS = [
   { key: "territories", label: "Territories", icon: MapPin },
 ];
 
-export function AvailabilityTabs({ initialHours, initialTerritories, staffMembers }: Props) {
+export function AvailabilityTabs({ initialHours, initialBufferMins, initialTerritories, staffMembers }: Props) {
   const [activeTab, setActiveTab] = useState<"hours" | "team" | "territories">("hours");
 
   return (
@@ -69,7 +70,7 @@ export function AvailabilityTabs({ initialHours, initialTerritories, staffMember
 
       {/* Tab content */}
       {activeTab === "hours" ? (
-        <AvailabilityEditor initialHours={initialHours} />
+        <AvailabilityEditor initialHours={initialHours} initialBufferMins={initialBufferMins} />
       ) : activeTab === "team" ? (
         <StaffAvailabilityManager staff={staffMembers} />
       ) : (

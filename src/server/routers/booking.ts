@@ -206,9 +206,9 @@ export const bookingRouter = router({
     .query(async ({ ctx, input }) => {
       const workspace = await ctx.prisma.workspace.findUnique({
         where: { slug: input.slug },
-        select: { id: true, timezone: true },
+        select: { id: true, timezone: true, jobBufferMins: true },
       });
-      if (!workspace) return { bookedSlots: [] };
+      if (!workspace) return { bookedSlots: [], bufferMins: 15 };
 
       const dayStart = new Date(`${input.date}T00:00:00`);
       const dayEnd = new Date(`${input.date}T23:59:59`);
@@ -230,6 +230,7 @@ export const bookingRouter = router({
           scheduledAt: j.scheduledAt,
           durationMins: j.estimatedDurationMins,
         })),
+        bufferMins: workspace.jobBufferMins,
       };
     }),
 
@@ -308,11 +309,11 @@ export const bookingRouter = router({
       }
 
       // Validate à la carte services if provided
-      let alaCarteServices: { id: string; name: string; basePrice: number }[] = [];
+      let alaCarteServices: { id: string; name: string; basePrice: number; durationMins: number }[] = [];
       if (!input.packageId && input.serviceIds && input.serviceIds.length > 0) {
         alaCarteServices = await ctx.prisma.service.findMany({
           where: { id: { in: input.serviceIds }, workspaceId: workspace.id, isActive: true },
-          select: { id: true, name: true, basePrice: true },
+          select: { id: true, name: true, basePrice: true, durationMins: true },
         });
         if (alaCarteServices.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid services selected." });
@@ -356,6 +357,28 @@ export const bookingRouter = router({
         // Determine financials from package or à la carte services
         const subtotal = pkg?.price ?? alaCarteServices.reduce((sum, s) => sum + s.basePrice, 0);
 
+        // Auto-calculate estimated duration from service durations
+        let estimatedDurationMins = 60; // default fallback
+        if (pkg && input.packageId) {
+          const pkgForDuration = await tx.package.findUnique({
+            where: { id: input.packageId },
+            include: { items: { include: { service: { select: { durationMins: true } } } } },
+          });
+          if (pkgForDuration?.items?.length) {
+            const totalServiceMins = pkgForDuration.items.reduce(
+              (sum, item) => sum + (item.service.durationMins * item.quantity),
+              0
+            );
+            if (totalServiceMins > 0) estimatedDurationMins = totalServiceMins;
+          }
+        } else if (alaCarteServices.length > 0) {
+          const totalServiceMins = alaCarteServices.reduce(
+            (sum, s) => sum + s.durationMins,
+            0
+          );
+          if (totalServiceMins > 0) estimatedDurationMins = totalServiceMins;
+        }
+
         // Create job
         const job = await tx.job.create({
           data: {
@@ -376,6 +399,7 @@ export const bookingRouter = router({
             propertyLat: input.propertyLat,
             propertyLng: input.propertyLng,
             scheduledAt,
+            estimatedDurationMins,
             clientNotes: input.clientNotes,
             status: confirmationMode === "IMMEDIATE" ? "CONFIRMED" : "PENDING",
             subtotal,

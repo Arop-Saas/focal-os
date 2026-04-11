@@ -1301,14 +1301,21 @@ function Step3DateTime({
     { enabled: !!form.scheduledDate }
   );
 
-  // Build set of blocked times
+  // Build set of blocked times — block all 30-min slots within job duration + buffer
   const blockedTimes = new Set<string>();
+  const bufferMins = slotsData?.bufferMins ?? 15;
   slotsData?.bookedSlots?.forEach((slot) => {
     if (slot.scheduledAt) {
-      const d = new Date(slot.scheduledAt);
-      blockedTimes.add(
-        `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`
-      );
+      const startD = new Date(slot.scheduledAt);
+      const startMins = startD.getHours() * 60 + startD.getMinutes();
+      const totalBlockMins = (slot.durationMins ?? 60) + bufferMins;
+      // Block every 30-min slot from the job start through (duration + buffer)
+      for (let offset = 0; offset < totalBlockMins; offset += 30) {
+        const blockedMins = startMins + offset;
+        const bh = Math.floor(blockedMins / 60);
+        const bm = blockedMins % 60;
+        blockedTimes.add(`${bh.toString().padStart(2, "0")}:${bm.toString().padStart(2, "0")}`);
+      }
     }
   });
 

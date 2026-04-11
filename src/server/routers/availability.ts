@@ -63,4 +63,24 @@ export const availabilityRouter = router({
       );
       return { ok: true };
     }),
+
+  // Get workspace buffer time between jobs
+  getBufferMins: workspaceProcedure.query(async ({ ctx }) => {
+    const ws = await ctx.prisma.workspace.findUnique({
+      where: { id: ctx.workspace.id },
+      select: { jobBufferMins: true },
+    });
+    return { bufferMins: ws?.jobBufferMins ?? 15 };
+  }),
+
+  // Save workspace buffer time between jobs
+  saveBufferMins: workspaceProcedure
+    .input(z.object({ bufferMins: z.number().int().min(0).max(120) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.workspace.update({
+        where: { id: ctx.workspace.id },
+        data: { jobBufferMins: input.bufferMins },
+      });
+      return { ok: true };
+    }),
 });

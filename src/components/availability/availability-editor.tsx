@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
-import { Clock, CheckCircle2, Loader2 } from "lucide-react";
+import { Clock, CheckCircle2, Loader2, Car } from "lucide-react";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -32,18 +32,41 @@ interface DayHours {
   closeTime: string;
 }
 
+const BUFFER_OPTIONS = [
+  { value: 0, label: "No buffer" },
+  { value: 5, label: "5 minutes" },
+  { value: 10, label: "10 minutes" },
+  { value: 15, label: "15 minutes" },
+  { value: 20, label: "20 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 45, label: "45 minutes" },
+  { value: 60, label: "60 minutes" },
+  { value: 90, label: "90 minutes" },
+  { value: 120, label: "120 minutes" },
+];
+
 interface Props {
   initialHours: DayHours[];
+  initialBufferMins?: number;
 }
 
-export function AvailabilityEditor({ initialHours }: Props) {
+export function AvailabilityEditor({ initialHours, initialBufferMins = 15 }: Props) {
   const [hours, setHours] = useState<DayHours[]>(initialHours);
   const [saved, setSaved] = useState(false);
+  const [bufferMins, setBufferMins] = useState(initialBufferMins);
+  const [bufferSaved, setBufferSaved] = useState(false);
 
   const saveMutation = api.availability.save.useMutation({
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+    },
+  });
+
+  const bufferMutation = api.availability.saveBufferMins.useMutation({
+    onSuccess: () => {
+      setBufferSaved(true);
+      setTimeout(() => setBufferSaved(false), 3000);
     },
   });
 
@@ -165,6 +188,55 @@ export function AvailabilityEditor({ initialHours }: Props) {
           Failed to save hours. Please try again.
         </p>
       )}
+
+      {/* Buffer time card */}
+      <div className="bg-white rounded-xl border p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+              <Car className="h-4.5 w-4.5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Buffer Time Between Jobs</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Travel / prep time automatically added after each job when blocking calendar slots.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 mt-4">
+          <select
+            value={bufferMins}
+            onChange={(e) => setBufferMins(Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            {BUFFER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => bufferMutation.mutate({ bufferMins })}
+            disabled={bufferMutation.isPending}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-60"
+          >
+            {bufferMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : bufferSaved ? (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            ) : null}
+            {bufferSaved ? "Saved!" : "Save"}
+          </button>
+        </div>
+
+        {bufferMutation.isError && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mt-3">
+            Failed to save buffer time. Please try again.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

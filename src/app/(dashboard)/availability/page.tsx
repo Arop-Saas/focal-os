@@ -39,6 +39,13 @@ export default async function AvailabilityPage() {
     };
   });
 
+  // Load buffer mins
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { jobBufferMins: true },
+  });
+  const initialBufferMins = workspace?.jobBufferMins ?? 15;
+
   // Load territories
   const [territories, staffProfiles] = await Promise.all([
     prisma.serviceTerritory.findMany({
@@ -68,6 +75,7 @@ export default async function AvailabilityPage() {
       <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
         <AvailabilityTabs
           initialHours={initialHours}
+          initialBufferMins={initialBufferMins}
           initialTerritories={territories}
           staffMembers={staffMembers}
         />

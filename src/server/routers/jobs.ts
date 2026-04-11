@@ -212,8 +212,9 @@ export const jobsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { services, assignedStaffIds, ...jobData } = input;
 
-      // Calculate totals
+      // Calculate totals and auto-calculate duration from services
       let subtotal = 0;
+      let calculatedDurationMins = 0;
       const serviceItems = await Promise.all(
         services.map(async (s) => {
           const service = await ctx.prisma.service.findFirst({
@@ -222,6 +223,7 @@ export const jobsRouter = router({
           if (!service) throw new TRPCError({ code: "NOT_FOUND", message: `Service ${s.serviceId} not found` });
           const totalPrice = s.unitPrice * s.quantity;
           subtotal += totalPrice;
+          calculatedDurationMins += (service.durationMins ?? 0) * s.quantity;
           return { ...s, totalPrice };
         })
       );
@@ -273,7 +275,9 @@ export const jobsRouter = router({
             listingUrl: jobData.listingUrl || null,
             accessNotes: jobData.accessNotes,
             scheduledAt: jobData.scheduledAt,
-            estimatedDurationMins: jobData.estimatedDurationMins,
+            estimatedDurationMins: calculatedDurationMins > 0
+              ? calculatedDurationMins
+              : jobData.estimatedDurationMins,
             internalNotes: jobData.internalNotes,
             clientNotes: jobData.clientNotes,
             priority: jobData.priority,
