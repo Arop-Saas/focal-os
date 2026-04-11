@@ -128,7 +128,7 @@ function FeatureCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#080808] text-white font-sans antialiased">
+    <div className="min-h-screen bg-[#080808] text-white font-sans antialiased" style={{ "--border": "217.2 32.6% 17.5%" } as React.CSSProperties}>
 
       {/* ── Nav ────────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/[0.06] backdrop-blur-xl bg-[#080808]/80">
