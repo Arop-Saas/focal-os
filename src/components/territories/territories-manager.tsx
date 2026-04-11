@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { TerritoryMap } from "./territory-map";
 import { CityAutocomplete } from "@/components/shared/city-autocomplete";
+import { MapboxMap } from "@/components/shared/mapbox-map";
 
 const PRESET_COLORS = [
   "#3B82F6", // blue
@@ -91,6 +92,52 @@ function TerritoryForm({
     initial?.travelFee != null ? String(initial.travelFee) : ""
   );
 
+  // Geocode cities for map preview
+  const [cityMarkers, setCityMarkers] = useState<{ lat: number; lng: number; name: string }[]>([]);
+  const geocodeCacheRef = useRef<Record<string, { lat: number; lng: number } | null>>({});
+
+  useEffect(() => {
+    const cityList = cities.split(",").map((c) => c.trim()).filter(Boolean);
+    if (cityList.length === 0) {
+      setCityMarkers([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function geocodeAll() {
+      const results: { lat: number; lng: number; name: string }[] = [];
+      for (const city of cityList) {
+        const key = city.toLowerCase();
+        if (geocodeCacheRef.current[key] !== undefined) {
+          const cached = geocodeCacheRef.current[key];
+          if (cached) results.push({ ...cached, name: city });
+          continue;
+        }
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          const data = await res.json();
+          if (data?.[0]) {
+            const geo = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+            geocodeCacheRef.current[key] = geo;
+            results.push({ ...geo, name: city });
+          } else {
+            geocodeCacheRef.current[key] = null;
+          }
+        } catch {
+          geocodeCacheRef.current[key] = null;
+        }
+      }
+      if (!cancelled) setCityMarkers(results);
+    }
+
+    geocodeAll();
+    return () => { cancelled = true; };
+  }, [cities]);
+
   return (
     <div className="bg-white rounded-xl border p-5 space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -133,6 +180,23 @@ function TerritoryForm({
           placeholder="Search for a city..."
         />
       </div>
+
+      {/* Map preview of selected cities */}
+      {cityMarkers.length > 0 && (
+        <div className="rounded-xl overflow-hidden border border-gray-200">
+          <MapboxMap
+            markers={cityMarkers.map((m) => ({
+              lat: m.lat,
+              lng: m.lng,
+              color,
+              popupHtml: `<div style="font-size:13px;font-weight:600;color:${color}">${m.name}</div>`,
+            }))}
+            height={200}
+            showControls={false}
+            interactive={false}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
