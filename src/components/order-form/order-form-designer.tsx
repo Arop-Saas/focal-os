@@ -9,6 +9,7 @@ import {
   Palette, Type, Search, ChevronDown, Smartphone, Tablet, Monitor,
   Settings2, Eye, MapPin, ShoppingBag, CalendarClock, UserCircle,
   CheckSquare, Zap, LayoutDashboard, Upload, X, Plus, Trash2, Image as ImageIcon,
+  Check, ChevronRight,
 } from "lucide-react";
 import { DEFAULT_BOOKING_FORM_SETTINGS, DEFAULT_PORTAL_SETTINGS, type BookingFormSettings, type CustomField, type PortalSettings } from "@/lib/booking-form-types";
 import { CustomFieldBuilder } from "./custom-field-builder";
@@ -287,8 +288,13 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const updateAppearance = api.orderForm.updateAppearance.useMutation();
   const updateSeo          = api.orderForm.updateSeo.useMutation();
   const updateCustomFields = api.orderForm.updateCustomFields.useMutation();
+  const updateTerritories  = api.orderForm.updateTerritories.useMutation();
   const savePortalSettings = api.workspace.savePortalSettings.useMutation();
   const { data: portalData } = api.workspace.getPortalSettings.useQuery();
+
+  // Order form list (for switcher) + territories (for linking)
+  const { data: allForms } = api.orderForm.list.useQuery();
+  const { data: allTerritories } = api.territories.list.useQuery();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const initialSection = (searchParams.get("section") as SidebarSection) || "general";
@@ -337,6 +343,26 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
   const [savedPayment, setSavedPayment]       = useState(false);
   const [savedAppearance, setSavedAppearance] = useState(false);
   const [savedSeo, setSavedSeo]               = useState(false);
+  const [savedTerritories, setSavedTerritories] = useState(false);
+
+  // Territory linking
+  const [selectedTerritoryIds, setSelectedTerritoryIds] = useState<string[]>([]);
+
+  // Form switcher dropdown
+  const [showFormSwitcher, setShowFormSwitcher] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
+
+  // Close switcher when clicking outside
+  useEffect(() => {
+    if (!showFormSwitcher) return;
+    function handleClick(e: MouseEvent) {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setShowFormSwitcher(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showFormSwitcher]);
   const [savedCustom, setSavedCustom]         = useState(false);
 
   // Grid columns (Step 2)
@@ -393,6 +419,9 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setSeoDesc((form as any).seoDescription ?? "");
     setSeoImage((form as any).seoImage ?? "");
     setCustomFields(((form as any).customFields as CustomField[]) ?? []);
+    if ((form as any).territories) {
+      setSelectedTerritoryIds((form as any).territories.map((t: any) => t.id));
+    }
     setGridColumns((form.fieldSettings as any)?.gridColumns ?? DEFAULT_BOOKING_FORM_SETTINGS.gridColumns ?? 3);
     const od = (form.fieldSettings as any)?.orderDetails ?? DEFAULT_BOOKING_FORM_SETTINGS.orderDetails ?? {};
     setShowCouponField(od.showCouponField ?? false);
@@ -522,6 +551,11 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setSavedAppearance(true); refreshPreview();
     setTimeout(() => setSavedAppearance(false), 3000);
   }
+  async function saveTerritories() {
+    await updateTerritories.mutateAsync({ id: formId, territoryIds: selectedTerritoryIds });
+    setSavedTerritories(true);
+    setTimeout(() => setSavedTerritories(false), 3000);
+  }
   async function saveSeo() {
     await updateSeo.mutateAsync({ id: formId, seoTitle: seoTitle || null, seoDescription: seoDesc || null, seoImage: seoImage || null });
     setSavedSeo(true);
@@ -612,7 +646,36 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to forms
           </button>
-          <p className="text-white text-sm font-semibold truncate">{title || "Untitled Form"}</p>
+          <div className="relative" ref={switcherRef}>
+            <button
+              onClick={() => setShowFormSwitcher(!showFormSwitcher)}
+              className="flex items-center gap-1.5 text-white text-sm font-semibold truncate max-w-full hover:text-blue-300 transition-colors"
+            >
+              <span className="truncate">{title || "Untitled Form"}</span>
+              <ChevronDown className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+            </button>
+            {showFormSwitcher && allForms && (
+              <div className="absolute top-full left-0 mt-1.5 w-52 bg-[#1a1d27] border border-gray-700 rounded-lg shadow-xl z-50 py-1 max-h-60 overflow-y-auto">
+                {allForms.map((f: any) => (
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      setShowFormSwitcher(false);
+                      if (f.id !== formId) router.push(`/order-form/${f.id}`);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center gap-2 ${
+                      f.id === formId
+                        ? "bg-blue-600/20 text-blue-300"
+                        : "text-gray-300 hover:bg-gray-700/50 hover:text-white"
+                    }`}
+                  >
+                    {f.id === formId && <Check className="w-3 h-3 shrink-0" />}
+                    <span className="truncate">{f.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-gray-500 text-[10px] mt-0.5 uppercase tracking-wider font-medium">Form Designer</p>
         </div>
 
@@ -693,6 +756,58 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               <TextareaField label="Welcome Message" value={welcomeMsg} onChange={(v) => { setWelcomeMsg(v); setSavedGeneral(false); }} placeholder="Shown at the top of your booking page…" optional rows={3} />
               <ToggleRow label="Public" desc="Visible on your booking page" value={isPublic} onChange={(v) => { setIsPublic(v); setSavedGeneral(false); }} />
               <SaveBar><SavePill loading={updateGeneral.isPending} saved={savedGeneral} onClick={saveGeneral} /></SaveBar>
+
+              {/* Territory linking */}
+              {allTerritories && allTerritories.length > 0 && (
+                <div className="mt-5 pt-5 border-t border-gray-100">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" /> Service Territories
+                  </label>
+                  <p className="text-[11px] text-gray-400 mt-1 mb-3">
+                    {selectedTerritoryIds.length === 0
+                      ? "No restrictions — accepts bookings from any address."
+                      : `${selectedTerritoryIds.length} territor${selectedTerritoryIds.length !== 1 ? "ies" : "y"} linked — only these areas served.`}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {allTerritories.map((t: any) => {
+                      const isSelected = selectedTerritoryIds.includes(t.id);
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTerritoryIds((prev) =>
+                              isSelected ? prev.filter((id: string) => id !== t.id) : [...prev, t.id]
+                            );
+                            setSavedTerritories(false);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                            isSelected
+                              ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                              : "border-gray-200 text-gray-500 hover:border-gray-300"
+                          }`}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color ?? "#3B82F6" }} />
+                          {isSelected && <Check className="w-3 h-3" />}
+                          {t.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedTerritoryIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedTerritoryIds([]); setSavedTerritories(false); }}
+                      className="text-[11px] text-gray-400 hover:text-gray-600 underline mt-2"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                  <div className="mt-3">
+                    <SavePill loading={updateTerritories.isPending} saved={savedTerritories} onClick={saveTerritories} />
+                  </div>
+                </div>
+              )}
             </Panel>
           )}
 
