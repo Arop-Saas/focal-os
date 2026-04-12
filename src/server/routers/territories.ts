@@ -166,10 +166,10 @@ export const territoriesRouter = router({
     .input(
       z.object({
         workspaceSlug: z.string(),
-        lat: z.number(),
-        lng: z.number(),
+        lat: z.number().optional(), // optional — omit for city-only (manual address entry)
+        lng: z.number().optional(),
         territoryIds: z.array(z.string()).optional(), // restrict detection to these territories (from order form)
-        city: z.string().optional(), // city name from address autocomplete — used as fallback when no geo-boundary matches
+        city: z.string().optional(), // city name — used as fallback or primary when no coords
       })
     )
     .query(async ({ ctx, input }) => {
@@ -203,14 +203,19 @@ export const territoriesRouter = router({
       let nearestBoundaryDistKm = Infinity;
       let nearestTerritory: (typeof territories)[number] | null = null;
 
+      // Only run geo-boundary check when coordinates are available
+      const hasCoords = input.lat != null && input.lng != null;
+
       for (const t of territories) {
         let isInside = false;
 
-        if (t.boundaryType === "polygon" && t.polygonCoords) {
+        if (!hasCoords) {
+          // Skip geo-boundary check — city-only matching handled below
+        } else if (t.boundaryType === "polygon" && t.polygonCoords) {
           const coords = t.polygonCoords as [number, number][];
-          isInside = pointInPolygon(input.lng, input.lat, coords);
+          isInside = pointInPolygon(input.lng!, input.lat!, coords);
           if (!isInside) {
-            const dist = distanceToPolygonKm(input.lat, input.lng, coords);
+            const dist = distanceToPolygonKm(input.lat!, input.lng!, coords);
             if (dist < nearestBoundaryDistKm) {
               nearestBoundaryDistKm = dist;
               nearestTerritory = t;
@@ -222,7 +227,7 @@ export const territoriesRouter = router({
           t.centerLng != null &&
           t.radiusKm != null
         ) {
-          const dist = haversineKm(input.lat, input.lng, t.centerLat, t.centerLng);
+          const dist = haversineKm(input.lat!, input.lng!, t.centerLat, t.centerLng);
           isInside = dist <= t.radiusKm;
           if (!isInside) {
             const beyondEdge = dist - t.radiusKm;
@@ -269,6 +274,11 @@ export const territoriesRouter = router({
         }
       }
 
+      // If no coordinates, we can't determine outside status — just return no match
+      if (!hasCoords) {
+        return { territory: null, outside: null };
+      }
+
       // Outside all territories
       const hasBoundaries = territories.some((t) => t.boundaryType !== "none");
       if (!hasBoundaries) {
@@ -284,9 +294,9 @@ export const territoriesRouter = router({
         let distFromT = Infinity;
         if (t.boundaryType === "polygon" && t.polygonCoords) {
           const coords = t.polygonCoords as [number, number][];
-          distFromT = distanceToPolygonKm(input.lat, input.lng, coords);
+          distFromT = distanceToPolygonKm(input.lat!, input.lng!, coords);
         } else if (t.boundaryType === "radius" && t.centerLat != null && t.centerLng != null && t.radiusKm != null) {
-          distFromT = Math.max(0, haversineKm(input.lat, input.lng, t.centerLat, t.centerLng) - t.radiusKm);
+          distFromT = Math.max(0, haversineKm(input.lat!, input.lng!, t.centerLat, t.centerLng) - t.radiusKm);
         }
         return distFromT > ((t as any).outsideMaxKm ?? Infinity);
       });

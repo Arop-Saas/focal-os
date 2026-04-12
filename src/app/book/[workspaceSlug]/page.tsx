@@ -2260,12 +2260,15 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const detectTerritoryQuery = trpc.territories.detectTerritory.useQuery(
     {
       workspaceSlug,
-      lat: form.propertyLat!,
-      lng: form.propertyLng!,
+      // Coords optional — omitted for manual address entry (city-only matching kicks in)
+      ...(form.propertyLat != null && form.propertyLng != null
+        ? { lat: form.propertyLat, lng: form.propertyLng }
+        : {}),
       ...(formTerritoryIds && formTerritoryIds.length > 0 ? { territoryIds: formTerritoryIds } : {}),
       ...(form.propertyCity ? { city: form.propertyCity } : {}),
     },
-    { enabled: !!form.propertyLat && !!form.propertyLng && !!workspaceSlug }
+    // Fire when we have coordinates OR a city name
+    { enabled: !!(form.propertyLat && form.propertyLng || form.propertyCity) && !!workspaceSlug }
   );
 
   useEffect(() => {
