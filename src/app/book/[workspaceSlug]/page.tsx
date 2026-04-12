@@ -1947,6 +1947,7 @@ function Step5Review({
   brandColor,
   travelFee,
   territoryName,
+  orderDetails,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -1959,6 +1960,7 @@ function Step5Review({
   brandColor: string;
   travelFee?: number | null;
   territoryName?: string | null;
+  orderDetails?: BookingFormSettings["orderDetails"];
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pkg = packages.find((p: any) => p.id === form.packageId);
@@ -1986,7 +1988,11 @@ function Step5Review({
         }, 0)
     : 0;
   const travelFeeAmt = travelFee && travelFee > 0 ? travelFee : 0;
-  const grandTotal = (pkg?.price ?? 0) + alaCarteTotal + addOnTotal + travelFeeAmt;
+  const subtotal = (pkg?.price ?? 0) + alaCarteTotal + addOnTotal + travelFeeAmt;
+  const taxRate = orderDetails?.taxRate ?? 0;
+  const taxLabel = orderDetails?.taxLabel || "Tax";
+  const taxAmt = taxRate > 0 ? Math.round(subtotal * (taxRate / 100) * 100) / 100 : 0;
+  const grandTotal = subtotal + taxAmt;
 
   // Build add-on display for review (only when a package is selected)
   const addOnNames = pkg
@@ -2015,12 +2021,15 @@ function Step5Review({
     ...(travelFeeAmt > 0
       ? [{ label: `Travel fee${territoryName ? ` (${territoryName})` : ""}`, value: `+$${travelFeeAmt.toFixed(2)}` }]
       : []),
+    ...(taxAmt > 0
+      ? [{ label: `${taxLabel} (${taxRate}%)`, value: `$${taxAmt.toFixed(2)}` }]
+      : []),
     { label: "Appointment", value: scheduledDisplay },
     ...(photographer ? [{ label: "Photographer", value: photographer.name }] : []),
     { label: "Name", value: `${form.firstName} ${form.lastName}` },
     { label: "Email", value: form.email },
     { label: "Phone", value: form.phone || "—" },
-    ...(grandTotal > 0 ? [{ label: "Total", value: `$${grandTotal.toLocaleString()}` }] : []),
+    ...(grandTotal > 0 ? [{ label: "Total", value: `$${grandTotal.toFixed(2)}` }] : []),
   ];
 
   return (
@@ -2730,7 +2739,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 5 && (
             <>
-              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} />
+              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} orderDetails={formSettings.orderDetails} />
               <CustomFieldsRenderer step={5} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
