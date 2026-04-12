@@ -1096,65 +1096,6 @@ function Step2Package({
           <p className="text-sm text-gray-500 mt-0.5">Please choose your items below.</p>
         </div>
 
-        {/* Territory / Service Area Selector */}
-        {territories.length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span className="text-sm font-semibold text-gray-700">Select your service area</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {territories.map((t) => {
-                const isSelected = form.selectedTerritoryId === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      const nextId = isSelected ? "" : t.id;
-                      setForm({ ...form, selectedTerritoryId: nextId });
-                      onTerritorySelect?.(nextId);
-                    }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                      isSelected
-                        ? "text-white border-transparent shadow-sm"
-                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                    }`}
-                    style={isSelected ? { backgroundColor: t.color || brandColor } : undefined}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : (t.color || brandColor) }}
-                    />
-                    {t.name}
-                    {t.travelFee != null && t.travelFee > 0 && (
-                      <span className={`text-xs ml-0.5 ${isSelected ? "text-white/80" : "text-gray-400"}`}>
-                        +${t.travelFee}
-                      </span>
-                    )}
-                    {isSelected && (
-                      <svg className="w-3.5 h-3.5 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            {form.selectedTerritoryId && (() => {
-              const t = territories.find((x) => x.id === form.selectedTerritoryId);
-              return t?.cities || t?.description ? (
-                <p className="mt-2.5 text-xs text-gray-500 leading-relaxed">
-                  {t.cities ? `📍 ${t.cities}` : t.description}
-                </p>
-              ) : null;
-            })()}
-          </div>
-        )}
-
         {/* Tabs: Packages / Services */}
         <div className="flex gap-1">
           <button type="button" onClick={() => setTab("packages")}
