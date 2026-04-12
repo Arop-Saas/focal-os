@@ -331,8 +331,9 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
     try {
       await deleteServiceMutation.mutateAsync({ id });
       await refetchServices();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete service:", error);
+      alert(error?.message ?? "Failed to delete service. Please try again.");
     }
   };
 
@@ -346,8 +347,9 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
     try {
       await deletePackageMutation.mutateAsync({ id });
       await refetchPackages();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete package:", error);
+      alert(error?.message ?? "Failed to delete package. Please try again.");
     }
   };
 

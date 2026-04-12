@@ -75,7 +75,13 @@ export const packagesRouter = router({
         where: { id: input.id, workspaceId: ctx.workspace.id },
       });
       if (!service) throw new TRPCError({ code: "NOT_FOUND" });
-      return ctx.prisma.service.delete({ where: { id: input.id } });
+      return ctx.prisma.$transaction(async (tx) => {
+        // Remove from job services (no cascade on this relation)
+        await tx.jobService.deleteMany({ where: { serviceId: input.id } });
+        // PackageItem rows cascade automatically, but delete explicitly for safety
+        await tx.packageItem.deleteMany({ where: { serviceId: input.id } });
+        return tx.service.delete({ where: { id: input.id } });
+      });
     }),
 
   listPackages: workspaceProcedure.query(async ({ ctx }) => {
@@ -188,6 +194,14 @@ export const packagesRouter = router({
         where: { id: input.id, workspaceId: ctx.workspace.id },
       });
       if (!pkg) throw new TRPCError({ code: "NOT_FOUND" });
-      return ctx.prisma.package.delete({ where: { id: input.id } });
+      return ctx.prisma.$transaction(async (tx) => {
+        // Nullify package reference on jobs (no cascade)
+        await tx.job.updateMany({ where: { packageId: input.id }, data: { packageId: null } });
+        // Nullify package reference on order items (no cascade)
+        await tx.orderItem.updateMany({ where: { packageId: input.id }, data: { packageId: null } });
+        // PackageItem rows cascade automatically, but delete explicitly for safety
+        await tx.packageItem.deleteMany({ where: { packageId: input.id } });
+        return tx.package.delete({ where: { id: input.id } });
+      });
     }),
 });
