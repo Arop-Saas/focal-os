@@ -205,7 +205,7 @@ function PackageBadge({ pkg }: { pkg: Pick<Package, "badgeLabel" | "badgeColor" 
 }
 
 /* ════════════════════════════════════════════════════════════════════ */
-export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
+export function PackagesView({ compact = false, filterTerritoryId }: { compact?: boolean; filterTerritoryId?: string } = {}) {
   const [activeTab, setActiveTab] = useState<"services" | "packages" | "brokerage">("services");
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -242,6 +242,20 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   const { data: services, isLoading: servicesLoading, refetch: refetchServices } = trpc.packages.listServices.useQuery({});
   const { data: packages, isLoading: packagesLoading, refetch: refetchPackages } = trpc.packages.listPackages.useQuery({});
   const { data: territories } = trpc.territories.list.useQuery();
+
+  /* ── Territory filter ── */
+  const filteredServices = filterTerritoryId
+    ? (services as Service[] | undefined)?.filter((s) => {
+        const ids = (s as any).territoryIds as string[] | null | undefined;
+        return !ids || ids.length === 0 || ids.includes(filterTerritoryId);
+      })
+    : (services as Service[] | undefined);
+  const filteredPackages = filterTerritoryId
+    ? (packages as Package[] | undefined)?.filter((p) => {
+        const ids = (p as any).territoryIds as string[] | null | undefined;
+        return !ids || ids.length === 0 || ids.includes(filterTerritoryId);
+      })
+    : (packages as Package[] | undefined);
 
   /* ── Mutations ── */
   const createServiceMutation = trpc.packages.createService.useMutation();
@@ -569,16 +583,16 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
             <div className="bg-white rounded-xl border p-8 text-center">
               <p className="text-gray-500">Loading services...</p>
             </div>
-          ) : !services || services.length === 0 ? (
-            <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-16 text-center">
-              <Camera className="h-10 w-10 text-gray-300 mb-3" />
-              <p className="text-base font-semibold text-gray-700">No services yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Create your first service to get started.</p>
+          ) : !filteredServices || filteredServices.length === 0 ? (
+            <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-10 text-center">
+              <Camera className="h-8 w-8 text-gray-300 mb-2" />
+              <p className="text-sm font-semibold text-gray-700">{filterTerritoryId ? "No services for this territory" : "No services yet"}</p>
+              <p className="text-xs text-muted-foreground mt-1">{filterTerritoryId ? "Add a territory to a service in its edit form." : "Create your first service to get started."}</p>
             </div>
           ) : compact ? (
             /* ── Compact list view for form designer ── */
             <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-              {(services as Service[]).map((service) => {
+              {(filteredServices as Service[]).map((service) => {
                 const meta = CATEGORY_META[service.category] ?? CATEGORY_META.OTHER;
                 const Icon = meta.icon;
                 return (
@@ -635,7 +649,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(services as Service[]).map((service) => {
+              {(filteredServices as Service[]).map((service) => {
                 const meta = CATEGORY_META[service.category] ?? CATEGORY_META.OTHER;
                 const Icon = meta.icon;
                 return (
@@ -736,16 +750,16 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
             <div className="bg-white rounded-xl border p-8 text-center">
               <p className="text-gray-500">Loading packages...</p>
             </div>
-          ) : !packages || packages.length === 0 ? (
-            <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-16 text-center">
-              <Boxes className="h-10 w-10 text-gray-300 mb-3" />
-              <p className="text-base font-semibold text-gray-700">No packages yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Create your first package to bundle services.</p>
+          ) : !filteredPackages || filteredPackages.length === 0 ? (
+            <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-10 text-center">
+              <Boxes className="h-8 w-8 text-gray-300 mb-2" />
+              <p className="text-sm font-semibold text-gray-700">{filterTerritoryId ? "No packages for this territory" : "No packages yet"}</p>
+              <p className="text-xs text-muted-foreground mt-1">{filterTerritoryId ? "Add a territory to a package in its edit form." : "Create your first package to bundle services."}</p>
             </div>
           ) : compact ? (
             /* ── Compact list view for form designer ── */
             <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-              {(packages as Package[]).map((pkg) => (
+              {(filteredPackages as Package[]).map((pkg) => (
                 <div key={pkg.id} className="px-3 py-2.5 bg-white hover:bg-gray-50 transition-colors group">
                   <div className="flex items-center gap-3">
                     <InlineImageUpload
@@ -801,7 +815,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(packages as Package[]).map((pkg) => (
+              {(filteredPackages as Package[]).map((pkg) => (
                 <div key={pkg.id} className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-blue-200 transition-all group">
                   {/* Cover image / video / stock fallback */}
                   {(() => {
@@ -1386,7 +1400,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                         <p className="text-xs text-gray-500 p-3">Create services first.</p>
                       ) : (
                         <div className="divide-y divide-gray-100 max-h-48 overflow-y-auto">
-                          {(services as Service[]).map((service) => {
+                          {(filteredServices as Service[]).map((service) => {
                             const m = CATEGORY_META[service.category] ?? CATEGORY_META.OTHER;
                             const I = m.icon;
                             const checked = packageServices.some((s) => s.serviceId === service.id);

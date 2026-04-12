@@ -347,6 +347,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
 
   // Territory linking
   const [selectedTerritoryIds, setSelectedTerritoryIds] = useState<string[]>([]);
+  // Step 2 territory filter (local UI only — filters the services/packages list)
+  const [step2FilterTerritoryId, setStep2FilterTerritoryId] = useState<string | null>(null);
 
   // Form switcher dropdown
   const [showFormSwitcher, setShowFormSwitcher] = useState(false);
@@ -955,62 +957,48 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
             <Panel title="Step 2 — Services" desc="Manage your services, packages, and pricing">
 
               {/* Territory / Service Area selector */}
+              {/* Territory filter */}
               {allTerritories && allTerritories.length > 0 && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                  <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5 mb-1">
-                    <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                    Service Territories
-                  </label>
-                  <p className="text-[11px] text-gray-400 mb-2.5">
-                    {selectedTerritoryIds.length === 0
-                      ? "No restrictions — show services for all areas."
-                      : `${selectedTerritoryIds.length} territor${selectedTerritoryIds.length !== 1 ? "ies" : "y"} linked — customers will pick their area on the booking form.`}
-                  </p>
+                <div className="mb-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <MapPin className="w-3 h-3 text-gray-400" />
+                    <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Filter by territory</span>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setStep2FilterTerritoryId(null)}
+                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                        !step2FilterTerritoryId
+                          ? "bg-gray-800 text-white border-gray-800"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      All
+                    </button>
                     {allTerritories.map((t: any) => {
-                      const isSelected = selectedTerritoryIds.includes(t.id);
+                      const isActive = step2FilterTerritoryId === t.id;
                       return (
                         <button
                           key={t.id}
                           type="button"
-                          onClick={() => {
-                            setSelectedTerritoryIds((prev: string[]) =>
-                              isSelected ? prev.filter((id: string) => id !== t.id) : [...prev, t.id]
-                            );
-                            setSavedTerritories(false);
-                          }}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                            isSelected
-                              ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-                              : "border-gray-200 text-gray-500 hover:border-gray-300 bg-white"
+                          onClick={() => setStep2FilterTerritoryId(isActive ? null : t.id)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                            isActive ? "text-white border-transparent" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
                           }`}
+                          style={isActive ? { backgroundColor: t.color ?? "#3B82F6" } : undefined}
                         >
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color ?? "#3B82F6" }} />
-                          {isSelected && <Check className="w-3 h-3" />}
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: isActive ? "rgba(255,255,255,0.7)" : (t.color ?? "#3B82F6") }} />
                           {t.name}
                         </button>
                       );
                     })}
                   </div>
-                  {selectedTerritoryIds.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedTerritoryIds([]); setSavedTerritories(false); }}
-                      className="text-[11px] text-gray-400 hover:text-gray-600 underline mt-2"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                  {!savedTerritories && (
-                    <div className="mt-2.5">
-                      <SavePill loading={updateTerritories.isPending} saved={savedTerritories} onClick={saveTerritories} />
-                    </div>
-                  )}
                 </div>
               )}
 
               {/* Full Products & Services management embedded */}
-              <PackagesView compact />
+              <PackagesView compact filterTerritoryId={step2FilterTerritoryId ?? undefined} />
 
               {/* Order Details settings */}
               <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3 mt-4">
