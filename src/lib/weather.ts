@@ -11,6 +11,8 @@
 
 export interface DayForecast {
   date: string;                // "2025-03-15"
+  tempHighC: number;           // Celsius
+  tempLowC: number;
   tempHighF: number;           // Fahrenheit
   tempLowF: number;
   weatherCode: number;         // WMO code
@@ -114,7 +116,7 @@ export async function getWeatherForecast(
     url.searchParams.set("temperature_unit", "celsius");
     url.searchParams.set("wind_speed_unit", "kmh");
     url.searchParams.set("timezone", "auto");
-    url.searchParams.set("forecast_days", "7");
+    url.searchParams.set("forecast_days", "16");
 
     const res = await fetch(url.toString(), { next: { revalidate: 3600 } });
     if (!res.ok) {
@@ -130,10 +132,14 @@ export async function getWeatherForecast(
 
     const daily: DayForecast[] = d.time.map((date: string, i: number) => {
       const wmo = decodeWMO(d.weather_code?.[i] ?? 0);
+      const highC = Math.round(d.temperature_2m_max?.[i] ?? 0);
+      const lowC = Math.round(d.temperature_2m_min?.[i] ?? 0);
       return {
         date,
-        tempHighF: celsiusToFahrenheit(d.temperature_2m_max?.[i] ?? 0),
-        tempLowF: celsiusToFahrenheit(d.temperature_2m_min?.[i] ?? 0),
+        tempHighC: highC,
+        tempLowC: lowC,
+        tempHighF: celsiusToFahrenheit(highC),
+        tempLowF: celsiusToFahrenheit(lowC),
         weatherCode: d.weather_code?.[i] ?? 0,
         icon: wmo.icon,
         label: wmo.label,

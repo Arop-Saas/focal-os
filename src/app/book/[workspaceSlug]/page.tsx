@@ -1369,7 +1369,7 @@ function BookingWeatherBadge({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-gray-800">{weather.label}</span>
-          <span className="text-sm text-gray-600">{weather.tempHighF}° / {weather.tempLowF}°F</span>
+          <span className="text-sm text-gray-600">{(weather as any).tempHighC ?? weather.tempHighF}° / {(weather as any).tempLowC ?? weather.tempLowF}°C</span>
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">
           {weather.precipProbability > 0 && <span>💧 {weather.precipProbability}% rain</span>}
@@ -1405,6 +1405,28 @@ function Step3DateTime({
 
   // Build a map of day-of-week → hours config for quick lookup
   const hoursByDay = Object.fromEntries(hours.map((h) => [h.dayOfWeek, h]));
+
+  // Fetch weather forecast for the property location
+  const { data: weatherForecast } = trpc.weather.getForecast.useQuery(
+    { lat: form.propertyLat!, lng: form.propertyLng! },
+    { enabled: !!form.propertyLat && !!form.propertyLng, staleTime: 1000 * 60 * 60 }
+  );
+  const weatherMap = Object.fromEntries(
+    (weatherForecast?.daily ?? []).map((d) => [d.date, d])
+  );
+
+  // Return a subtle background tint based on weather code
+  function weatherBg(code: number): string {
+    if (code === 0) return "rgba(254,249,195,0.55)";   // clear — warm yellow
+    if (code <= 2)  return "rgba(241,245,249,0.55)";   // mainly clear/partly cloudy
+    if (code === 3) return "rgba(226,232,240,0.55)";   // overcast
+    if (code <= 48) return "rgba(226,232,240,0.5)";    // fog
+    if (code <= 67) return "rgba(219,234,254,0.6)";    // rain/drizzle — blue
+    if (code <= 77) return "rgba(224,242,254,0.65)";   // snow — ice blue
+    if (code <= 82) return "rgba(219,234,254,0.6)";    // showers
+    if (code <= 86) return "rgba(224,242,254,0.65)";   // snow showers
+    return "rgba(203,213,225,0.6)";                    // thunderstorm — slate
+  }
 
   // Fetch available photographers when a date is chosen
   const { data: photographersData, isLoading: photographersLoading } =
@@ -1496,12 +1518,12 @@ function Step3DateTime({
         <p className="text-sm text-gray-500 mt-1">Choose when you'd like us to come out.</p>
       </div>
 
-      {/* Calendar grid */}
+      {/* Calendar grid — with weather overlay */}
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Select a date</p>
         <div className="grid grid-cols-7 gap-1">
           {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-            <div key={d} className="text-center text-xs text-gray-400 pb-1 font-medium">{d}</div>
+            <div key={d} className="text-center text-[11px] text-gray-400 pb-1 font-semibold">{d}</div>
           ))}
           {Array.from({ length: days[0].getDay() }).map((_, i) => (
             <div key={`empty-${i}`} />
@@ -1514,6 +1536,8 @@ function Step3DateTime({
             const dayConfig = hoursByDay[dow];
             const closed = dayConfig ? !dayConfig.isOpen : false;
             const disabled = past || closed;
+            const w = weatherMap[iso];
+            const hasWeather = !!w && !disabled;
             return (
               <button
                 key={iso}
@@ -1522,23 +1546,56 @@ function Step3DateTime({
                 onClick={() =>
                   setForm({ ...form, scheduledDate: iso, scheduledTime: "", photographerId: "" })
                 }
-                className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-medium transition-all ${
+                className={`relative flex flex-col items-center justify-center rounded-xl transition-all border ${
                   selected
-                    ? "text-white font-semibold"
+                    ? "text-white font-semibold border-transparent shadow-md"
                     : disabled
-                    ? "text-gray-200 cursor-not-allowed"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-                style={selected ? { backgroundColor: brandColor } : undefined}
+                    ? "text-gray-300 cursor-not-allowed border-transparent"
+                    : "text-gray-800 hover:shadow-sm border-transparent hover:border-gray-200"
+                } ${hasWeather ? "py-1.5 gap-0" : "aspect-square"}`}
+                style={
+                  selected
+                    ? { backgroundColor: brandColor }
+                    : hasWeather
+                    ? { backgroundColor: weatherBg(w.weatherCode) }
+                    : undefined
+                }
               >
-                <span>{day.getDate()}</span>
-                {isToday(day) && !selected && (
-                  <span className="w-1 h-1 rounded-full mt-0.5" style={{ backgroundColor: brandColor }} />
+                {/* Day number */}
+                <span className={`font-bold leading-none ${hasWeather ? "text-xs" : "text-sm"} ${isToday(day) && !selected ? "underline decoration-dotted" : ""}`}>
+                  {day.getDate()}
+                </span>
+
+                {/* Weather content */}
+                {hasWeather && (
+                  <>
+                    <span className="text-lg leading-tight">{w.icon}</span>
+                    <span className={`text-[10px] font-semibold leading-none ${selected ? "text-white/90" : "text-gray-600"}`}>
+                      {w.tempHighC}°
+                    </span>
+                    {/* Rain probability indicator */}
+                    {w.precipProbability >= 40 && !selected && (
+                      <span className={`text-[9px] leading-none mt-0.5 ${w.precipProbability >= 70 ? "text-blue-500" : "text-blue-400"}`}>
+                        {w.precipProbability}%
+                      </span>
+                    )}
+                  </>
                 )}
               </button>
             );
           })}
         </div>
+
+        {/* Legend */}
+        {Object.keys(weatherMap).length > 0 && (
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
+            <span className="text-[11px] text-gray-400 font-medium">Weather:</span>
+            <span className="text-[11px] text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: "rgba(254,249,195,0.8)" }}/>Clear</span>
+            <span className="text-[11px] text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: "rgba(219,234,254,0.8)" }}/>Rain</span>
+            <span className="text-[11px] text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: "rgba(224,242,254,0.9)" }}/>Snow</span>
+            <span className="text-[11px] text-gray-400 ml-auto">Temp in °C · % = rain chance</span>
+          </div>
+        )}
       </div>
 
       {/* Weather for selected date */}
