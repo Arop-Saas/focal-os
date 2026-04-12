@@ -1918,22 +1918,26 @@ function Step5Review({
         )
       : "—";
 
-  // Calculate total
+  // Add-ons only apply when a package is also selected; otherwise all services are a-la-carte
   const pkgServiceIds = new Set(pkg?.items?.map((item: any) => item.serviceId) ?? []);
-  const addOnTotal = form.selectedServiceIds
-    .filter((id) => !pkgServiceIds.has(id))
-    .reduce((sum, id) => {
-      const svc = services.find((s: any) => s.id === id);
-      return sum + (svc?.basePrice ?? 0);
-    }, 0);
+  const addOnTotal = pkg
+    ? form.selectedServiceIds
+        .filter((id) => !pkgServiceIds.has(id))
+        .reduce((sum, id) => {
+          const svc = services.find((s: any) => s.id === id);
+          return sum + (svc?.basePrice ?? 0);
+        }, 0)
+    : 0;
   const travelFeeAmt = travelFee && travelFee > 0 ? travelFee : 0;
   const grandTotal = (pkg?.price ?? 0) + alaCarteTotal + addOnTotal + travelFeeAmt;
 
-  // Build add-on display for review
-  const addOnNames = form.selectedServiceIds
-    .filter((id) => !pkgServiceIds.has(id))
-    .map((id) => services.find((s: any) => s.id === id))
-    .filter(Boolean);
+  // Build add-on display for review (only when a package is selected)
+  const addOnNames = pkg
+    ? form.selectedServiceIds
+        .filter((id) => !pkgServiceIds.has(id))
+        .map((id) => services.find((s: any) => s.id === id))
+        .filter(Boolean)
+    : [];
 
   const rows = [
     { label: "Property", value: `${form.propertyAddress}, ${form.propertyCity}, ${form.propertyState}` },
