@@ -222,6 +222,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   const [serviceDescription, setServiceDescription] = useState("");
   const [serviceCoverImage, setServiceCoverImage] = useState("");
   const [serviceImageUploading, setServiceImageUploading] = useState(false);
+  const [serviceTerritoryIds, setServiceTerritoryIds] = useState<string[]>([]);
 
   /* ── Package form ── */
   const [packageName, setPackageName] = useState("");
@@ -235,10 +236,12 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   const [packagePhotoCount, setPackagePhotoCount] = useState("");
   const [packageTurnaroundHours, setPackageTurnaroundHours] = useState("");
   const [packageServices, setPackageServices] = useState<Array<{ serviceId: string; quantity: number }>>([]);
+  const [packageTerritoryIds, setPackageTerritoryIds] = useState<string[]>([]);
 
   /* ── Queries ── */
   const { data: services, isLoading: servicesLoading, refetch: refetchServices } = trpc.packages.listServices.useQuery({});
   const { data: packages, isLoading: packagesLoading, refetch: refetchPackages } = trpc.packages.listPackages.useQuery({});
+  const { data: territories } = trpc.territories.list.useQuery();
 
   /* ── Mutations ── */
   const createServiceMutation = trpc.packages.createService.useMutation();
@@ -256,7 +259,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   const resetServiceForm = () => {
     setServiceName(""); setServicePrice(""); setServiceCategory("PHOTOGRAPHY");
     setServiceDuration("60"); setServiceTurnaroundHours(""); setServiceDescription("");
-    setServiceCoverImage(""); setEditingService(null); setShowServiceModal(false);
+    setServiceCoverImage(""); setServiceTerritoryIds([]); setEditingService(null); setShowServiceModal(false);
   };
 
   const handleOpenEditService = (service: Service) => {
@@ -268,6 +271,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
     setServiceTurnaroundHours(service.turnaroundHours ? String(service.turnaroundHours) : "");
     setServiceDescription(service.description ?? "");
     setServiceCoverImage(service.coverImage ?? "");
+    setServiceTerritoryIds(((service as any).territoryIds as string[]) ?? []);
     setShowServiceModal(true);
   };
 
@@ -286,6 +290,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
           turnaroundHours: serviceTurnaroundHours ? parseInt(serviceTurnaroundHours) : null,
           description: serviceDescription || undefined,
           coverImage: serviceCoverImage || null,
+          territoryIds: serviceTerritoryIds.length > 0 ? serviceTerritoryIds : null,
         });
       } else {
         await createServiceMutation.mutateAsync({
@@ -297,6 +302,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
           description: serviceDescription || undefined,
           coverImage: serviceCoverImage || null,
           isActive: true,
+          territoryIds: serviceTerritoryIds.length > 0 ? serviceTerritoryIds : undefined,
         });
       }
       resetServiceForm();
@@ -351,6 +357,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
     setPackagePhotoCount(pkg.photoCount ? String(pkg.photoCount) : "");
     setPackageTurnaroundHours(pkg.turnaroundHours ? String(pkg.turnaroundHours) : "");
     setPackageServices(pkg.items.map((item) => ({ serviceId: item.serviceId, quantity: item.quantity })));
+    setPackageTerritoryIds(((pkg as any).territoryIds as string[]) ?? []);
     setShowPackageModal(true);
   };
 
@@ -360,6 +367,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
     setPackageName(""); setPackagePrice(""); setPackageDescription(""); setPackageCoverImage("");
     setPackageIsPopular(false); setPackageBadgeLabel(""); setPackageBadgeColor("#f59e0b");
     setPackagePhotoCount(""); setPackageTurnaroundHours(""); setPackageServices([]);
+    setPackageTerritoryIds([]);
   };
 
   const handleCreatePackage = async (e: React.FormEvent) => {
@@ -379,6 +387,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
           badgeColor: packageBadgeLabel ? packageBadgeColor : null,
           photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : null,
           turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : null,
+          territoryIds: packageTerritoryIds.length > 0 ? packageTerritoryIds : null,
           items: packageServices,
         });
       } else {
@@ -393,6 +402,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
           badgeColor: packageBadgeLabel ? packageBadgeColor : undefined,
           photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : undefined,
           turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : undefined,
+          territoryIds: packageTerritoryIds.length > 0 ? packageTerritoryIds : undefined,
           items: packageServices,
         });
       }
@@ -988,6 +998,35 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                     />
                   </div>
 
+                  {/* Territory */}
+                  {territories && territories.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Location / Territory <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <p className="text-xs text-gray-400 mb-2">Select which territories offer this service. Leave blank to show for all.</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(territories as any[]).map((t) => {
+                          const isSelected = serviceTerritoryIds.includes(t.id);
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setServiceTerritoryIds((prev) => isSelected ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                                isSelected ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                              }`}
+                              style={isSelected ? { backgroundColor: t.color || "#3B82F6" } : undefined}
+                            >
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : (t.color || "#3B82F6") }} />
+                              {t.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Cover Image */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image <span className="text-gray-400 font-normal">(optional)</span></label>
@@ -1136,6 +1175,35 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
                     />
                   </div>
+
+                  {/* Territory */}
+                  {territories && territories.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Location / Territory <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <p className="text-xs text-gray-400 mb-2">Select which territories offer this package. Leave blank to show for all.</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(territories as any[]).map((t) => {
+                          const isSelected = packageTerritoryIds.includes(t.id);
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setPackageTerritoryIds((prev) => isSelected ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                                isSelected ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                              }`}
+                              style={isSelected ? { backgroundColor: t.color || "#3B82F6" } : undefined}
+                            >
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : (t.color || "#3B82F6") }} />
+                              {t.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Cover Image */}
                   <div>
