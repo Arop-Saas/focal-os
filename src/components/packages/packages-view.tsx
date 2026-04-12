@@ -322,26 +322,32 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
   };
 
   const handleDeleteService = async (id: string) => {
-    if (confirmDeleteServiceId !== id) { setConfirmDeleteServiceId(id); return; }
+    if (confirmDeleteServiceId !== id) {
+      setConfirmDeleteServiceId(id);
+      setTimeout(() => setConfirmDeleteServiceId((cur) => (cur === id ? null : cur)), 3000);
+      return;
+    }
+    setConfirmDeleteServiceId(null);
     try {
       await deleteServiceMutation.mutateAsync({ id });
       await refetchServices();
     } catch (error) {
       console.error("Failed to delete service:", error);
-    } finally {
-      setConfirmDeleteServiceId(null);
     }
   };
 
   const handleDeletePackage = async (id: string) => {
-    if (confirmDeletePackageId !== id) { setConfirmDeletePackageId(id); return; }
+    if (confirmDeletePackageId !== id) {
+      setConfirmDeletePackageId(id);
+      setTimeout(() => setConfirmDeletePackageId((cur) => (cur === id ? null : cur)), 3000);
+      return;
+    }
+    setConfirmDeletePackageId(null);
     try {
       await deletePackageMutation.mutateAsync({ id });
       await refetchPackages();
     } catch (error) {
       console.error("Failed to delete package:", error);
-    } finally {
-      setConfirmDeletePackageId(null);
     }
   };
 
@@ -611,7 +617,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                         {service.isActive ? <ToggleRight className="h-3.5 w-3.5 text-green-500" /> : <ToggleLeft className="h-3.5 w-3.5 text-gray-400" />}
                       </button>
                       {confirmDeleteServiceId === service.id ? (
-                        <button onClick={() => handleDeleteService(service.id)} className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded text-[10px] font-semibold transition-colors" title="Confirm delete" onBlur={() => setConfirmDeleteServiceId(null)}>
+                        <button onClick={() => handleDeleteService(service.id)} className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded text-[10px] font-semibold transition-colors" title="Confirm delete">
                           Delete?
                         </button>
                       ) : (
@@ -669,7 +675,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                               : <ToggleLeft className="h-4 w-4 text-gray-400" />}
                           </button>
                           {confirmDeleteServiceId === service.id ? (
-                            <button onClick={() => handleDeleteService(service.id)} className="flex items-center gap-0.5 px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded-md text-[10px] font-semibold transition-colors" onBlur={() => setConfirmDeleteServiceId(null)}>
+                            <button onClick={() => handleDeleteService(service.id)} className="flex items-center gap-0.5 px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded-md text-[10px] font-semibold transition-colors">
                               Delete?
                             </button>
                           ) : (
@@ -778,7 +784,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                         <Pencil className="h-3 w-3 text-gray-400" />
                       </button>
                       {confirmDeletePackageId === pkg.id ? (
-                        <button onClick={() => handleDeletePackage(pkg.id)} className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded text-[10px] font-semibold transition-colors" title="Confirm delete" onBlur={() => setConfirmDeletePackageId(null)}>
+                        <button onClick={() => handleDeletePackage(pkg.id)} className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded text-[10px] font-semibold transition-colors" title="Confirm delete">
                           Delete?
                         </button>
                       ) : (
@@ -823,7 +829,7 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                           <Pencil className="h-3.5 w-3.5 text-gray-400" />
                         </button>
                         {confirmDeletePackageId === pkg.id ? (
-                          <button onClick={() => handleDeletePackage(pkg.id)} className="flex items-center gap-0.5 px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded-md text-[10px] font-semibold transition-colors" onBlur={() => setConfirmDeletePackageId(null)}>
+                          <button onClick={() => handleDeletePackage(pkg.id)} className="flex items-center gap-0.5 px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded-md text-[10px] font-semibold transition-colors">
                             Delete?
                           </button>
                         ) : (
