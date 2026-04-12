@@ -137,7 +137,7 @@ export const bookingRouter = router({
         }
       }
 
-      const packages = await ctx.prisma.package.findMany({
+      const allPackages = await ctx.prisma.package.findMany({
         where: { workspaceId: workspace.id, isActive: true },
         include: {
           items: {
@@ -148,10 +148,21 @@ export const bookingRouter = router({
         orderBy: [{ isPopular: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
       });
 
-      const services = await ctx.prisma.service.findMany({
+      const allServices = await ctx.prisma.service.findMany({
         where: { workspaceId: workspace.id, isActive: true },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       });
+
+      // Filter by form: items with null/empty formIds show in all forms; others only in their linked forms
+      const filterByForm = <T extends { formIds?: unknown }>(items: T[]): T[] => {
+        if (!input.formId) return items;
+        return items.filter((item) => {
+          const ids = item.formIds as string[] | null | undefined;
+          return !ids || ids.length === 0 || ids.includes(input.formId!);
+        });
+      };
+      const packages = filterByForm(allPackages as any[]) as typeof allPackages;
+      const services = filterByForm(allServices as any[]) as typeof allServices;
 
       // Load territories relevant to this form (all workspace territories, or filtered by form's territoryIds)
       const formTerritoryIds = orderForm?.territoryIds as string[] | null | undefined;

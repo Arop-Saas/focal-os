@@ -998,7 +998,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               )}
 
               {/* Full Products & Services management embedded */}
-              <PackagesView compact filterTerritoryId={step2FilterTerritoryId ?? undefined} />
+              <PackagesView compact filterTerritoryId={step2FilterTerritoryId ?? undefined} formId={formId} />
 
               {/* Order Details settings */}
               <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3 mt-4">

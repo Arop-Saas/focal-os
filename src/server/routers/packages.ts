@@ -33,6 +33,7 @@ export const packagesRouter = router({
         turnaroundHours: z.number().int().positive().optional(),
         isActive: z.boolean().default(true),
         territoryIds: z.array(z.string()).optional(),
+        formIds: z.array(z.string()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -57,6 +58,7 @@ export const packagesRouter = router({
         isActive: z.boolean().optional(),
         sortOrder: z.number().optional(),
         territoryIds: z.array(z.string()).nullable().optional(),
+        formIds: z.array(z.string()).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -110,6 +112,7 @@ export const packagesRouter = router({
         turnaroundDays: z.number().int().positive().optional(),
         turnaroundHours: z.number().int().positive().optional(),
         territoryIds: z.array(z.string()).optional(),
+        formIds: z.array(z.string()).optional(),
         items: z.array(
           z.object({
             serviceId: z.string(),
@@ -152,6 +155,7 @@ export const packagesRouter = router({
         turnaroundDays: z.number().int().positive().nullable().optional(),
         turnaroundHours: z.number().int().positive().nullable().optional(),
         territoryIds: z.array(z.string()).nullable().optional(),
+        formIds: z.array(z.string()).nullable().optional(),
         items: z
           .array(
             z.object({

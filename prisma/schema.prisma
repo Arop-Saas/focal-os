@@ -529,6 +529,7 @@ model Service {
   isActive      Boolean  @default(true)
   sortOrder     Int      @default(0)
   territoryIds  Json?    // string[] — restrict this service to specific territories
+  formIds       Json?    // string[] — restrict this service to specific order forms (null = all forms)
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   packageItems  PackageItem[]
@@ -569,6 +570,7 @@ model Package {
   turnaroundHours Int?
   sortOrder     Int      @default(0)
   territoryIds  Json?    // string[] — restrict this package to specific territories
+  formIds       Json?    // string[] — restrict this package to specific order forms (null = all forms)
 
   workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   items         PackageItem[]

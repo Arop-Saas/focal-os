@@ -7,7 +7,7 @@ import {
   Plus, X, ToggleRight, ToggleLeft, Star, Pencil, Clock, Camera,
   Video, Plane, Boxes, FileText, Layers, Sunset, Share2, Zap,
   HelpCircle, Timer, CheckCircle2, ChevronDown, Tag, Building2,
-  Upload, Loader2, Image as ImageIcon, Play, Trash2, MapPin,
+  Upload, Loader2, Image as ImageIcon, Play, Trash2, MapPin, LayoutTemplate,
 } from "lucide-react";
 import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 import { Button } from "@/components/ui/button";
@@ -205,7 +205,7 @@ function PackageBadge({ pkg }: { pkg: Pick<Package, "badgeLabel" | "badgeColor" 
 }
 
 /* ════════════════════════════════════════════════════════════════════ */
-export function PackagesView({ compact = false, filterTerritoryId }: { compact?: boolean; filterTerritoryId?: string } = {}) {
+export function PackagesView({ compact = false, filterTerritoryId, formId }: { compact?: boolean; filterTerritoryId?: string; formId?: string } = {}) {
   const [activeTab, setActiveTab] = useState<"services" | "packages" | "brokerage">("services");
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -223,6 +223,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
   const [serviceCoverImage, setServiceCoverImage] = useState("");
   const [serviceImageUploading, setServiceImageUploading] = useState(false);
   const [serviceTerritoryIds, setServiceTerritoryIds] = useState<string[]>([]);
+  const [serviceFormIds, setServiceFormIds] = useState<string[]>([]);
 
   /* ── Package form ── */
   const [packageName, setPackageName] = useState("");
@@ -237,25 +238,37 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
   const [packageTurnaroundHours, setPackageTurnaroundHours] = useState("");
   const [packageServices, setPackageServices] = useState<Array<{ serviceId: string; quantity: number }>>([]);
   const [packageTerritoryIds, setPackageTerritoryIds] = useState<string[]>([]);
+  const [packageFormIds, setPackageFormIds] = useState<string[]>([]);
 
   /* ── Queries ── */
   const { data: services, isLoading: servicesLoading, refetch: refetchServices } = trpc.packages.listServices.useQuery({});
   const { data: packages, isLoading: packagesLoading, refetch: refetchPackages } = trpc.packages.listPackages.useQuery({});
   const { data: territories } = trpc.territories.list.useQuery();
+  const { data: orderForms } = trpc.orderForm.list.useQuery();
 
-  /* ── Territory filter ── */
-  const filteredServices = filterTerritoryId
-    ? (services as Service[] | undefined)?.filter((s) => {
-        const ids = (s as any).territoryIds as string[] | null | undefined;
-        return !ids || ids.length === 0 || ids.includes(filterTerritoryId);
-      })
-    : (services as Service[] | undefined);
-  const filteredPackages = filterTerritoryId
-    ? (packages as Package[] | undefined)?.filter((p) => {
-        const ids = (p as any).territoryIds as string[] | null | undefined;
-        return !ids || ids.length === 0 || ids.includes(filterTerritoryId);
-      })
-    : (packages as Package[] | undefined);
+  /* ── Territory + form filter ── */
+  const filteredServices = (services as Service[] | undefined)?.filter((s) => {
+    if (filterTerritoryId) {
+      const tIds = (s as any).territoryIds as string[] | null | undefined;
+      if (tIds && tIds.length > 0 && !tIds.includes(filterTerritoryId)) return false;
+    }
+    if (formId) {
+      const fIds = (s as any).formIds as string[] | null | undefined;
+      if (fIds && fIds.length > 0 && !fIds.includes(formId)) return false;
+    }
+    return true;
+  });
+  const filteredPackages = (packages as Package[] | undefined)?.filter((p) => {
+    if (filterTerritoryId) {
+      const tIds = (p as any).territoryIds as string[] | null | undefined;
+      if (tIds && tIds.length > 0 && !tIds.includes(filterTerritoryId)) return false;
+    }
+    if (formId) {
+      const fIds = (p as any).formIds as string[] | null | undefined;
+      if (fIds && fIds.length > 0 && !fIds.includes(formId)) return false;
+    }
+    return true;
+  });
 
   /* ── Mutations ── */
   const createServiceMutation = trpc.packages.createService.useMutation();
@@ -273,7 +286,8 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
   const resetServiceForm = () => {
     setServiceName(""); setServicePrice(""); setServiceCategory("PHOTOGRAPHY");
     setServiceDuration("60"); setServiceTurnaroundHours(""); setServiceDescription("");
-    setServiceCoverImage(""); setServiceTerritoryIds([]); setEditingService(null); setShowServiceModal(false);
+    setServiceCoverImage(""); setServiceTerritoryIds([]); setServiceFormIds(formId ? [formId] : []);
+    setEditingService(null); setShowServiceModal(false);
   };
 
   const handleOpenEditService = (service: Service) => {
@@ -286,6 +300,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
     setServiceDescription(service.description ?? "");
     setServiceCoverImage(service.coverImage ?? "");
     setServiceTerritoryIds(((service as any).territoryIds as string[]) ?? []);
+    setServiceFormIds(((service as any).formIds as string[]) ?? (formId ? [formId] : []));
     setShowServiceModal(true);
   };
 
@@ -305,6 +320,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
           description: serviceDescription || undefined,
           coverImage: serviceCoverImage || null,
           territoryIds: serviceTerritoryIds.length > 0 ? serviceTerritoryIds : null,
+          formIds: serviceFormIds.length > 0 ? serviceFormIds : null,
         });
       } else {
         await createServiceMutation.mutateAsync({
@@ -317,6 +333,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
           coverImage: serviceCoverImage || null,
           isActive: true,
           territoryIds: serviceTerritoryIds.length > 0 ? serviceTerritoryIds : undefined,
+          formIds: serviceFormIds.length > 0 ? serviceFormIds : undefined,
         });
       }
       resetServiceForm();
@@ -380,6 +397,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
     setPackageTurnaroundHours(pkg.turnaroundHours ? String(pkg.turnaroundHours) : "");
     setPackageServices(pkg.items.map((item) => ({ serviceId: item.serviceId, quantity: item.quantity })));
     setPackageTerritoryIds(((pkg as any).territoryIds as string[]) ?? []);
+    setPackageFormIds(((pkg as any).formIds as string[]) ?? (formId ? [formId] : []));
     setShowPackageModal(true);
   };
 
@@ -389,7 +407,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
     setPackageName(""); setPackagePrice(""); setPackageDescription(""); setPackageCoverImage("");
     setPackageIsPopular(false); setPackageBadgeLabel(""); setPackageBadgeColor("#f59e0b");
     setPackagePhotoCount(""); setPackageTurnaroundHours(""); setPackageServices([]);
-    setPackageTerritoryIds([]);
+    setPackageTerritoryIds([]); setPackageFormIds(formId ? [formId] : []);
   };
 
   const handleCreatePackage = async (e: React.FormEvent) => {
@@ -410,6 +428,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
           photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : null,
           turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : null,
           territoryIds: packageTerritoryIds.length > 0 ? packageTerritoryIds : null,
+          formIds: packageFormIds.length > 0 ? packageFormIds : null,
           items: packageServices,
         });
       } else {
@@ -425,6 +444,7 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
           photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : undefined,
           turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : undefined,
           territoryIds: packageTerritoryIds.length > 0 ? packageTerritoryIds : undefined,
+          formIds: packageFormIds.length > 0 ? packageFormIds : undefined,
           items: packageServices,
         });
       }
@@ -1072,6 +1092,64 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
                     </div>
                   )}
 
+                  {/* Form Availability */}
+                  {orderForms && orderForms.length > 1 && (
+                    <div className="rounded-xl border-2 border-purple-100 bg-purple-50 p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                          <LayoutTemplate className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">Order Form Availability</p>
+                          <p className="text-xs text-gray-500">Which booking forms should show this service?</p>
+                        </div>
+                        {serviceFormIds.length > 0 && (
+                          <span className="ml-auto text-[10px] font-bold bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                            {serviceFormIds.length} form{serviceFormIds.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {(orderForms as any[]).map((f) => {
+                          const isSelected = serviceFormIds.length === 0 || serviceFormIds.includes(f.id);
+                          const isCurrent = f.id === formId;
+                          return (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => setServiceFormIds((prev) => {
+                                if (prev.length === 0) {
+                                  // Was "all forms" — switch to all except this one
+                                  return (orderForms as any[]).map((x) => x.id).filter((id) => id !== f.id);
+                                }
+                                return prev.includes(f.id) ? prev.filter((id) => id !== f.id) : [...prev, f.id];
+                              })}
+                              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold border-2 transition-all shadow-sm ${
+                                isSelected
+                                  ? "bg-purple-600 text-white border-purple-600 shadow-md scale-105"
+                                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow"
+                              }`}
+                            >
+                              {isSelected && (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                              {f.title}
+                              {isCurrent && <span className="text-[10px] opacity-70">(this form)</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {serviceFormIds.length === 0 && (
+                        <p className="text-[11px] text-purple-400 mt-2.5 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                          Showing in all booking forms
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Cover Image */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image <span className="text-gray-400 font-normal">(optional)</span></label>
@@ -1268,6 +1346,63 @@ export function PackagesView({ compact = false, filterTerritoryId }: { compact?:
                         <p className="text-[11px] text-blue-400 mt-2.5 flex items-center gap-1">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
                           Leave unselected to show in all locations
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Form Availability */}
+                  {orderForms && orderForms.length > 1 && (
+                    <div className="rounded-xl border-2 border-purple-100 bg-purple-50 p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                          <LayoutTemplate className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">Order Form Availability</p>
+                          <p className="text-xs text-gray-500">Which booking forms should show this package?</p>
+                        </div>
+                        {packageFormIds.length > 0 && (
+                          <span className="ml-auto text-[10px] font-bold bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                            {packageFormIds.length} form{packageFormIds.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {(orderForms as any[]).map((f) => {
+                          const isSelected = packageFormIds.length === 0 || packageFormIds.includes(f.id);
+                          const isCurrent = f.id === formId;
+                          return (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => setPackageFormIds((prev) => {
+                                if (prev.length === 0) {
+                                  return (orderForms as any[]).map((x) => x.id).filter((id) => id !== f.id);
+                                }
+                                return prev.includes(f.id) ? prev.filter((id) => id !== f.id) : [...prev, f.id];
+                              })}
+                              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold border-2 transition-all shadow-sm ${
+                                isSelected
+                                  ? "bg-purple-600 text-white border-purple-600 shadow-md scale-105"
+                                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow"
+                              }`}
+                            >
+                              {isSelected && (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                              {f.title}
+                              {isCurrent && <span className="text-[10px] opacity-70">(this form)</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {packageFormIds.length === 0 && (
+                        <p className="text-[11px] text-purple-400 mt-2.5 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                          Showing in all booking forms
                         </p>
                       )}
                     </div>
