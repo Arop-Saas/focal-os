@@ -7,7 +7,7 @@ import {
   Plus, X, ToggleRight, ToggleLeft, Star, Pencil, Clock, Camera,
   Video, Plane, Boxes, FileText, Layers, Sunset, Share2, Zap,
   HelpCircle, Timer, CheckCircle2, ChevronDown, Tag, Building2,
-  Upload, Loader2, Image as ImageIcon, Play, Trash2,
+  Upload, Loader2, Image as ImageIcon, Play, Trash2, MapPin,
 } from "lucide-react";
 import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
 import { Button } from "@/components/ui/button";
@@ -1000,12 +1000,22 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
 
                   {/* Territory */}
                   {territories && territories.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Location / Territory <span className="text-gray-400 font-normal">(optional)</span>
-                      </label>
-                      <p className="text-xs text-gray-400 mb-2">Select which territories offer this service. Leave blank to show for all.</p>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="rounded-xl border-2 border-blue-100 bg-blue-50 p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                          <MapPin className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">Service Location</p>
+                          <p className="text-xs text-gray-500">Which territories offer this service?</p>
+                        </div>
+                        {serviceTerritoryIds.length > 0 && (
+                          <span className="ml-auto text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                            {serviceTerritoryIds.length} selected
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
                         {(territories as any[]).map((t) => {
                           const isSelected = serviceTerritoryIds.includes(t.id);
                           return (
@@ -1013,17 +1023,30 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                               key={t.id}
                               type="button"
                               onClick={() => setServiceTerritoryIds((prev) => isSelected ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                                isSelected ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold border-2 transition-all shadow-sm ${
+                                isSelected
+                                  ? "text-white border-transparent shadow-md scale-105"
+                                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow"
                               }`}
-                              style={isSelected ? { backgroundColor: t.color || "#3B82F6" } : undefined}
+                              style={isSelected ? { backgroundColor: t.color || "#3B82F6", borderColor: t.color || "#3B82F6" } : undefined}
                             >
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : (t.color || "#3B82F6") }} />
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.8)" : (t.color || "#3B82F6") }} />
                               {t.name}
+                              {isSelected && (
+                                <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
                             </button>
                           );
                         })}
                       </div>
+                      {serviceTerritoryIds.length === 0 && (
+                        <p className="text-[11px] text-blue-400 mt-2.5 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                          Leave unselected to show in all locations
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -1178,12 +1201,22 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
 
                   {/* Territory */}
                   {territories && territories.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Location / Territory <span className="text-gray-400 font-normal">(optional)</span>
-                      </label>
-                      <p className="text-xs text-gray-400 mb-2">Select which territories offer this package. Leave blank to show for all.</p>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="rounded-xl border-2 border-blue-100 bg-blue-50 p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                          <MapPin className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">Package Location</p>
+                          <p className="text-xs text-gray-500">Which territories offer this package?</p>
+                        </div>
+                        {packageTerritoryIds.length > 0 && (
+                          <span className="ml-auto text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                            {packageTerritoryIds.length} selected
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
                         {(territories as any[]).map((t) => {
                           const isSelected = packageTerritoryIds.includes(t.id);
                           return (
@@ -1191,17 +1224,30 @@ export function PackagesView({ compact = false }: { compact?: boolean } = {}) {
                               key={t.id}
                               type="button"
                               onClick={() => setPackageTerritoryIds((prev) => isSelected ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                                isSelected ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold border-2 transition-all shadow-sm ${
+                                isSelected
+                                  ? "text-white border-transparent shadow-md scale-105"
+                                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow"
                               }`}
-                              style={isSelected ? { backgroundColor: t.color || "#3B82F6" } : undefined}
+                              style={isSelected ? { backgroundColor: t.color || "#3B82F6", borderColor: t.color || "#3B82F6" } : undefined}
                             >
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : (t.color || "#3B82F6") }} />
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.8)" : (t.color || "#3B82F6") }} />
                               {t.name}
+                              {isSelected && (
+                                <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
                             </button>
                           );
                         })}
                       </div>
+                      {packageTerritoryIds.length === 0 && (
+                        <p className="text-[11px] text-blue-400 mt-2.5 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                          Leave unselected to show in all locations
+                        </p>
+                      )}
                     </div>
                   )}
 
