@@ -2193,6 +2193,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       lat: form.propertyLat!,
       lng: form.propertyLng!,
       ...(formTerritoryIds && formTerritoryIds.length > 0 ? { territoryIds: formTerritoryIds } : {}),
+      ...(form.propertyCity ? { city: form.propertyCity } : {}),
     },
     { enabled: !!form.propertyLat && !!form.propertyLng && !!workspaceSlug }
   );

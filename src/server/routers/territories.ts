@@ -169,6 +169,7 @@ export const territoriesRouter = router({
         lat: z.number(),
         lng: z.number(),
         territoryIds: z.array(z.string()).optional(), // restrict detection to these territories (from order form)
+        city: z.string().optional(), // city name from address autocomplete — used as fallback when no geo-boundary matches
       })
     )
     .query(async ({ ctx, input }) => {
@@ -246,6 +247,26 @@ export const territoriesRouter = router({
       if (matches.length > 0) {
         matches.sort((a, b) => (a.travelFee ?? 0) - (b.travelFee ?? 0));
         return { territory: matches[0], outside: null };
+      }
+
+      // No geo-boundary match — fall back to city name matching against territory's cities list
+      if (input.city) {
+        const cityLower = input.city.trim().toLowerCase();
+        for (const t of territories) {
+          const citiesList = (t.cities ?? "")
+            .split(",")
+            .map((c) => c.trim().toLowerCase())
+            .filter(Boolean);
+          const cityMatch = citiesList.some(
+            (c) => c.includes(cityLower) || cityLower.includes(c)
+          );
+          if (cityMatch) {
+            return {
+              territory: { id: t.id, name: t.name, travelFee: t.travelFee, color: t.color },
+              outside: null,
+            };
+          }
+        }
       }
 
       // Outside all territories
