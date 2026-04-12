@@ -989,6 +989,7 @@ function Step2Package({
   territoryName,
   territories = [],
   onTerritorySelect,
+  detectedTerritoryId,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -1007,6 +1008,7 @@ function Step2Package({
   territoryName?: string | null;
   territories?: { id: string; name: string; color: string; travelFee: number | null; description: string | null; cities: string | null }[];
   onTerritorySelect?: (territoryId: string) => void;
+  detectedTerritoryId?: string;
 }) {
   const updateServiceMut = trpc.packages.updateService.useMutation();
   const updatePackageMut = trpc.packages.updatePackage.useMutation();
@@ -1028,6 +1030,22 @@ function Step2Package({
   const [detailPkg, setDetailPkg] = useState<any | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const columns = gridColumns;
+
+  // Filter services/packages by detected territory — items with no territory tag show everywhere
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const visiblePackages = detectedTerritoryId
+    ? packages.filter((p: any) => {
+        const ids = p.territoryIds as string[] | null | undefined;
+        return !ids || ids.length === 0 || ids.includes(detectedTerritoryId);
+      })
+    : packages;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const visibleServices = detectedTerritoryId
+    ? services.filter((s: any) => {
+        const ids = s.territoryIds as string[] | null | undefined;
+        return !ids || ids.length === 0 || ids.includes(detectedTerritoryId);
+      })
+    : services;
 
   const selectPackage = (pkgId: string) => {
     if (form.packageId === pkgId) {
@@ -1116,10 +1134,10 @@ function Step2Package({
         {/* ═══ Packages Grid ═══ */}
         {tab === "packages" && (
           <div className={`grid ${gridClass} gap-4`}>
-            {packages.length === 0 ? (
+            {visiblePackages.length === 0 ? (
               <div className="col-span-full text-center py-10 text-gray-400 text-sm">No packages available.</div>
             ) : (
-              packages.map((pkg: any) => {
+              visiblePackages.map((pkg: any) => {
                 const selected = form.packageId === pkg.id;
                 return (
                   <div key={pkg.id} className={`relative rounded-xl overflow-hidden border bg-white transition-all group ${selected ? "" : "hover:shadow-lg"}`}
@@ -1191,10 +1209,10 @@ function Step2Package({
         {/* ═══ Services Grid ═══ */}
         {tab === "services" && (
           <div className={`grid ${gridClass} gap-3`}>
-            {services.length === 0 ? (
+            {visibleServices.length === 0 ? (
               <div className="col-span-full text-center py-10 text-gray-400 text-sm">No individual services available.</div>
             ) : (
-              services.map((svc: any) => {
+              visibleServices.map((svc: any) => {
                 const selected = form.selectedServiceIds.includes(svc.id) && !form.packageId;
                 return (
                   <div key={svc.id} className={`rounded-xl border bg-white overflow-hidden transition-all ${selected ? "" : "hover:shadow-sm"}`}
@@ -2158,7 +2176,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [isDesignerPreview, setIsDesignerPreview] = useState(false);
 
   // Territory detection for auto travel fee
-  const [detectedTerritory, setDetectedTerritory] = useState<{ name: string; travelFee: number | null; color: string } | null>(null);
+  const [detectedTerritory, setDetectedTerritory] = useState<{ id: string; name: string; travelFee: number | null; color: string } | null>(null);
   const [outsideInfo, setOutsideInfo] = useState<{ allowed: boolean; fee: number | null; feeType: string; distanceKm: number } | null>(null);
 
   const { data, isLoading, isError, refetch: refetchWorkspaceInfo } = trpc.booking.getWorkspaceInfo.useQuery(
@@ -2207,7 +2225,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
     }
     const t = territories.find((x) => x.id === territoryId);
     if (t) {
-      setDetectedTerritory({ name: t.name, travelFee: t.travelFee, color: t.color });
+      setDetectedTerritory({ id: t.id, name: t.name, travelFee: t.travelFee, color: t.color });
       setOutsideInfo(null);
     }
   };
@@ -2597,7 +2615,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} territories={territories} onTerritorySelect={handleTerritorySelect} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} territories={territories} onTerritorySelect={handleTerritorySelect} detectedTerritoryId={detectedTerritory?.id} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
