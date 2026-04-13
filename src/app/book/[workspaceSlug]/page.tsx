@@ -440,7 +440,7 @@ function Step1Property({
           )}
 
           {/* Outside territory blocked banner */}
-          {outsideBlocked && form.propertyLat && (
+          {outsideBlocked && (form.propertyLat || form.propertyCity) && (
             <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
               <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
@@ -448,7 +448,8 @@ function Step1Property({
               <div>
                 <p className="text-sm font-medium text-red-800">Outside our service area</p>
                 <p className="text-xs text-red-600 mt-0.5">
-                  Unfortunately, this address is outside our current service territories. Please try a different address or contact us for arrangements.
+                  Unfortunately, this address is beyond our maximum service distance. Please try a different address or contact us directly to make arrangements.
+                  {outsideInfo?.distanceKm ? ` (${outsideInfo.distanceKm.toFixed(1)}km from nearest service area)` : ""}
                 </p>
               </div>
             </div>
@@ -1031,19 +1032,32 @@ function Step2Package({
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const columns = gridColumns;
 
-  // Filter services/packages by detected territory — items with no territory tag show everywhere
+  // Filter services/packages by detected territory
+  // - No address entered → show everything
+  // - Address entered + territory matched → show untagged + territory-tagged items
+  // - Address entered + outside all territories → show ONLY untagged items
+  const addressEntered = !!(form.propertyCity?.trim() || (form.propertyLat && form.propertyLng));
+  const hasTerritoryTaggedItems =
+    packages.some((p: any) => { const ids = p.territoryIds as string[] | null; return ids && ids.length > 0; }) ||
+    services.some((s: any) => { const ids = s.territoryIds as string[] | null; return ids && ids.length > 0; });
+  const shouldFilterByTerritory = addressEntered && hasTerritoryTaggedItems;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const visiblePackages = detectedTerritoryId
+  const visiblePackages = shouldFilterByTerritory
     ? packages.filter((p: any) => {
         const ids = p.territoryIds as string[] | null | undefined;
-        return !ids || ids.length === 0 || ids.includes(detectedTerritoryId);
+        if (!ids || ids.length === 0) return true; // untagged — always visible
+        if (!detectedTerritoryId) return false;     // tagged but no territory matched → hide
+        return ids.includes(detectedTerritoryId);
       })
     : packages;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const visibleServices = detectedTerritoryId
+  const visibleServices = shouldFilterByTerritory
     ? services.filter((s: any) => {
         const ids = s.territoryIds as string[] | null | undefined;
-        return !ids || ids.length === 0 || ids.includes(detectedTerritoryId);
+        if (!ids || ids.length === 0) return true; // untagged — always visible
+        if (!detectedTerritoryId) return false;     // tagged but no territory matched → hide
+        return ids.includes(detectedTerritoryId);
       })
     : services;
 
@@ -2776,8 +2790,10 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
               <button
                 type="button"
                 onClick={handleNext}
-                style={{ backgroundColor: brandColor }}
-                className="px-6 py-2.5 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition-opacity"
+                disabled={!!(step === 1 && outsideBlocked)}
+                style={step === 1 && outsideBlocked ? { backgroundColor: "#d1d5db" } : { backgroundColor: brandColor }}
+                className="px-6 py-2.5 text-sm font-semibold text-white rounded-lg transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+                title={step === 1 && outsideBlocked ? "This address is outside our service area" : undefined}
               >
                 Continue →
               </button>
