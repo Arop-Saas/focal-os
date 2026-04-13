@@ -181,8 +181,14 @@ export const bookingRouter = router({
     }),
 
   // Get available photographers for a given date
+  // Optional territoryId: when provided, only photographers whose homeTerritory matches
+  // (or who have no homeTerritory set — meaning they're available everywhere) are returned.
   getAvailablePhotographers: publicProcedure
-    .input(z.object({ slug: z.string(), date: z.string() }))
+    .input(z.object({
+      slug: z.string(),
+      date: z.string(),
+      territoryId: z.string().optional(), // detected territory from the booking address
+    }))
     .query(async ({ ctx, input }) => {
       const workspace = await ctx.prisma.workspace.findUnique({
         where: { slug: input.slug },
@@ -225,6 +231,12 @@ export const bookingRouter = router({
       const available = members
         .filter((m) => {
           if (!m.staffProfile) return false;
+          // Territory filter: if a territoryId is provided, only show photographers
+          // whose homeTerritoryId matches OR who have no homeTerritory (global availability)
+          if (input.territoryId) {
+            const homeTerritory = (m.staffProfile as any).homeTerritoryId as string | null;
+            if (homeTerritory && homeTerritory !== input.territoryId) return false;
+          }
           const jobCount = m.staffProfile.jobAssignments.length;
           const max = m.staffProfile.maxJobsPerDay ?? 99;
           return jobCount < max;

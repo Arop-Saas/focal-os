@@ -83,7 +83,10 @@ export function AvailabilityTabs({ initialHours, initialBufferMins, initialTerri
       {activeTab === "hours" ? (
         <AvailabilityEditor initialHours={initialHours} initialBufferMins={initialBufferMins} />
       ) : activeTab === "team" ? (
-        <StaffAvailabilityManager staff={staffMembers} />
+        <StaffAvailabilityManager
+          staff={staffMembers}
+          territories={initialTerritories.map((t) => ({ id: t.id, name: t.name, color: t.color }))}
+        />
       ) : (
         <TerritoriesManager initialTerritories={initialTerritories} />
       )}

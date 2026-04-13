@@ -245,14 +245,19 @@ model StaffProfile {
   maxJobsPerDay   Int      @default(4)
   isActive        Boolean  @default(true)
 
+  // Homebase territory — only show this photographer for bookings in this territory
+  // null = available for all territories (no restriction)
+  homeTerritoryId String?
+
   // Compensation
   payType         PayType  @default(HOURLY)
   payRate         Float?
   commissionRate  Float?   // Percentage 0-100
   mileageRate     Float?   // Per-km/mile reimbursement rate
 
-  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  member          WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member          WorkspaceMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  homeTerritory   ServiceTerritory? @relation(fields: [homeTerritoryId], references: [id], onDelete: SetNull)
   jobAssignments  JobAssignment[]
   availability    StaffAvailability[]
 
@@ -325,7 +330,8 @@ model ServiceTerritory {
   outsideFeeBaseKm      Float?
   outsideMaxKm          Float?   // Max km outside boundary before booking is blocked (null = unlimited)
 
-  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staff       StaffProfile[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

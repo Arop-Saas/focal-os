@@ -152,6 +152,7 @@ export const staffRouter = router({
         serviceRegions: z.array(z.string()).optional(),
         maxJobsPerDay: z.number().min(1).max(20).optional(),
         isActive: z.boolean().optional(),
+        homeTerritoryId: z.string().nullable().optional(),
         payType: z.enum(["HOURLY", "SALARY", "PER_JOB", "COMMISSION"]).optional(),
         payRate: z.number().optional(),
         commissionRate: z.number().min(0).max(100).optional(),

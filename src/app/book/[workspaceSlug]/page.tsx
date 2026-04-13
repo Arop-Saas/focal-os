@@ -1443,9 +1443,14 @@ function Step3DateTime({
   }
 
   // Fetch available photographers when a date is chosen
+  // Pass detectedTerritory so only territory-matched (or unassigned) photographers show
   const { data: photographersData, isLoading: photographersLoading } =
     trpc.booking.getAvailablePhotographers.useQuery(
-      { slug: workspaceSlug, date: form.scheduledDate },
+      {
+        slug: workspaceSlug,
+        date: form.scheduledDate,
+        ...(detectedTerritory?.id ? { territoryId: detectedTerritory.id } : {}),
+      },
       { enabled: !!form.scheduledDate }
     );
   const photographers = photographersData?.photographers ?? [];
@@ -2375,7 +2380,11 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
 
   // Pre-fetch photographers for selected date (used in Step 5 review)
   const { data: reviewPhotographersData } = trpc.booking.getAvailablePhotographers.useQuery(
-    { slug: workspaceSlug, date: form.scheduledDate },
+    {
+      slug: workspaceSlug,
+      date: form.scheduledDate,
+      ...(detectedTerritory?.id ? { territoryId: detectedTerritory.id } : {}),
+    },
     { enabled: !!form.scheduledDate && step === 5 }
   );
   const reviewPhotographers = reviewPhotographersData?.photographers ?? [];
