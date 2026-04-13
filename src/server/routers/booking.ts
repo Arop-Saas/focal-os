@@ -491,7 +491,7 @@ export const bookingRouter = router({
           await tx.jobAssignment.create({
             data: {
               jobId: job.id,
-              staffProfileId: input.staffProfileId,
+              staffId: input.staffProfileId,
               role: "PHOTOGRAPHER",
               isPrimary: true,
             },
