@@ -3,12 +3,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
-import { Header } from "@/components/layout/header";
 import { format } from "date-fns";
 import { formatCurrency, JOB_STATUS_COLORS, JOB_STATUS_LABELS, cn } from "@/lib/utils";
 import {
   MapPin, Calendar, Package, User, Clock, FileText,
-  ArrowLeft, Receipt, Phone, Mail, Building2,
+  ArrowLeft, Receipt, Phone, Mail, Building2, Zap, Home,
+  BedDouble, Bath, Ruler, Hash,
 } from "lucide-react";
 import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
@@ -52,77 +52,127 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   const primaryStaffProfileId = primaryAssignment?.staff.id;
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <Header
-        title={job.propertyAddress}
-        description={`Job #${job.jobNumber}`}
-        actions={
-          <Link
-            href="/jobs"
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to jobs
-          </Link>
-        }
-      />
+    <div className="flex flex-col flex-1 overflow-hidden bg-gray-50">
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl space-y-5">
-
-          {/* Status bar */}
-          <div className="bg-white rounded-xl border p-5 flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <span className={cn(
-                "text-xs font-bold uppercase tracking-wide px-3 py-1.5 rounded-full border",
-                JOB_STATUS_COLORS[job.status]
-              )}>
-                {JOB_STATUS_LABELS[job.status] ?? job.status}
-              </span>
-              {job.isRush && (
-                <span className="text-xs font-bold uppercase tracking-wide px-3 py-1.5 rounded-full bg-red-100 text-red-700 border border-red-200">
-                  RUSH
-                </span>
-              )}
-              <span className="text-sm text-gray-500">Priority: <strong className="text-gray-700">{job.priority}</strong></span>
+      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href="/jobs"
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Jobs
+            </Link>
+            <span className="text-gray-300">/</span>
+            <div className="min-w-0">
+              <h1 className="text-sm font-semibold text-gray-900 truncate">{job.propertyAddress}</h1>
+              <p className="text-xs text-gray-400">Job #{job.jobNumber}</p>
             </div>
-            <JobStatusUpdater jobId={job.id} currentStatus={job.status} />
           </div>
 
+          <div className="flex items-center gap-3 shrink-0">
+            {job.isRush && (
+              <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700 border border-red-200">
+                <Zap className="w-3 h-3 fill-red-500" /> RUSH
+              </span>
+            )}
+            <span className={cn(
+              "text-xs font-bold uppercase tracking-wide px-3 py-1.5 rounded-full border",
+              JOB_STATUS_COLORS[job.status]
+            )}>
+              {JOB_STATUS_LABELS[job.status] ?? job.status}
+            </span>
+            <JobStatusUpdater jobId={job.id} currentStatus={job.status} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Body ────────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-6 py-6">
+
+          {/* Hero stats strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <p className="text-xs text-gray-400 mb-0.5">Scheduled</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {job.scheduledAt ? format(new Date(job.scheduledAt), "MMM d, yyyy") : <span className="text-gray-400 font-normal">Not set</span>}
+              </p>
+              {job.scheduledAt && (
+                <p className="text-xs text-gray-500">{format(new Date(job.scheduledAt), "h:mm a")}</p>
+              )}
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <p className="text-xs text-gray-400 mb-0.5">Photographer</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {primaryPhotographer?.fullName ?? <span className="text-gray-400 font-normal">Unassigned</span>}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <p className="text-xs text-gray-400 mb-0.5">Total</p>
+              <p className="text-sm font-bold text-gray-900">{formatCurrency(job.totalAmount)}</p>
+              {job.invoice?.amountDue != null && job.invoice.amountDue > 0 && (
+                <p className="text-xs text-amber-600">{formatCurrency(job.invoice.amountDue)} due</p>
+              )}
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <p className="text-xs text-gray-400 mb-0.5">Priority</p>
+              <p className="text-sm font-semibold text-gray-900">{job.priority}</p>
+              <p className="text-xs text-gray-400">Created {format(new Date(job.createdAt), "MMM d")}</p>
+            </div>
+          </div>
+
+          {/* Main grid */}
           <div className="grid grid-cols-3 gap-5">
-            {/* Left column */}
+
+            {/* ── Left / main column ───────────────────────────────────────── */}
             <div className="col-span-2 space-y-5">
 
               {/* Property */}
-              <div className="bg-white rounded-xl border p-5">
-                <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-gray-400" /> Property
-                </h2>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Address</p>
-                    <p className="font-medium text-gray-900">{job.propertyAddress}</p>
-                    <p className="text-gray-600">{job.propertyCity}, {job.propertyState} {job.propertyZip ?? ""}</p>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 pt-5 pb-4">
+                  <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Home className="w-4 h-4 text-gray-400" /> Property
+                  </h2>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">Address</p>
+                      <p className="font-medium text-gray-900 leading-snug">{job.propertyAddress}</p>
+                      <p className="text-gray-500 text-xs mt-0.5">{job.propertyCity}, {job.propertyState} {job.propertyZip ?? ""}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">Type</p>
+                      <p className="text-gray-700">{job.propertyType.replace(/_/g, " ")}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Type</p>
-                    <p className="text-gray-700">{job.propertyType.replace(/_/g, " ")}</p>
-                  </div>
-                  {(job.bedrooms || job.bathrooms || job.squareFootage) && (
-                    <div className="col-span-2 flex gap-5 pt-1 border-t mt-1">
-                      {job.squareFootage && <span className="text-gray-600">{job.squareFootage.toLocaleString()} sq ft</span>}
-                      {job.bedrooms && <span className="text-gray-600">{job.bedrooms} bed</span>}
-                      {job.bathrooms && <span className="text-gray-600">{job.bathrooms} bath</span>}
-                      {job.mlsNumber && <span className="text-gray-500">MLS #{job.mlsNumber}</span>}
+
+                  {(job.bedrooms || job.bathrooms || job.squareFootage || job.mlsNumber) && (
+                    <div className="flex flex-wrap gap-4 py-3 border-t border-gray-100 text-sm text-gray-600">
+                      {job.squareFootage && (
+                        <span className="flex items-center gap-1.5"><Ruler className="w-3.5 h-3.5 text-gray-400" />{job.squareFootage.toLocaleString()} sq ft</span>
+                      )}
+                      {job.bedrooms && (
+                        <span className="flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5 text-gray-400" />{job.bedrooms} bed</span>
+                      )}
+                      {job.bathrooms && (
+                        <span className="flex items-center gap-1.5"><Bath className="w-3.5 h-3.5 text-gray-400" />{job.bathrooms} bath</span>
+                      )}
+                      {job.mlsNumber && (
+                        <span className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5 text-gray-400" />MLS {job.mlsNumber}</span>
+                      )}
                     </div>
                   )}
+
                   {job.accessNotes && (
-                    <div className="col-span-2 bg-amber-50 border border-amber-100 rounded-lg p-3 mt-1">
+                    <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 mt-3">
                       <p className="text-xs font-semibold text-amber-700 mb-0.5">Access Notes</p>
                       <p className="text-sm text-amber-800">{job.accessNotes}</p>
                     </div>
                   )}
                 </div>
-                {/* Property location map */}
+
                 <JobPropertyMap
                   lat={job.propertyLat}
                   lng={job.propertyLng}
@@ -130,7 +180,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                 />
               </div>
 
-              {/* Weather forecast for job date */}
+              {/* Weather */}
               {job.propertyLat && job.propertyLng && job.scheduledAt && (
                 <JobWeatherCard
                   lat={job.propertyLat}
@@ -140,7 +190,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               )}
 
               {/* Schedule */}
-              <div className="bg-white rounded-xl border p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" /> Schedule
                 </h2>
@@ -149,74 +199,68 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                   scheduledAt={job.scheduledAt}
                   estimatedDurationMins={job.estimatedDurationMins ?? 90}
                 />
-                <div className="grid grid-cols-2 gap-3 text-sm mt-4 pt-4 border-t">
-                  <div>
-                    <p className="text-xs text-gray-400 mb-1.5">Photographer</p>
-                    <JobAssignmentPicker
-                      jobId={job.id}
-                      currentStaffProfileId={primaryStaffProfileId}
-                      currentAssigneeName={primaryPhotographer?.fullName}
-                      schedulingData={job.scheduledAt ? {
-                        propertyAddress: job.propertyAddress,
-                        propertyCity: job.propertyCity,
-                        propertyState: job.propertyState,
-                        propertyZip: job.propertyZip,
-                        scheduledAt: new Date(job.scheduledAt),
-                        estimatedDurationMins: job.estimatedDurationMins ?? 90,
-                      } : undefined}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Created</p>
-                    <p className="text-gray-600">{format(new Date(job.createdAt), "MMM d, yyyy")}</p>
-                  </div>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 mb-1.5">Photographer</p>
+                  <JobAssignmentPicker
+                    jobId={job.id}
+                    currentStaffProfileId={primaryStaffProfileId}
+                    currentAssigneeName={primaryPhotographer?.fullName}
+                    schedulingData={job.scheduledAt ? {
+                      propertyAddress: job.propertyAddress,
+                      propertyCity: job.propertyCity,
+                      propertyState: job.propertyState,
+                      propertyZip: job.propertyZip,
+                      scheduledAt: new Date(job.scheduledAt),
+                      estimatedDurationMins: job.estimatedDurationMins ?? 90,
+                    } : undefined}
+                  />
                 </div>
               </div>
 
               {/* Package / Services */}
-              <div className="bg-white rounded-xl border p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Package className="w-4 h-4 text-gray-400" /> Package & Services
                 </h2>
                 {job.package ? (
-                  <div>
-                    <p className="font-medium text-gray-900 mb-1">{job.package.name}</p>
-                    <p className="text-sm text-gray-500 mb-3">
+                  <div className="mb-3">
+                    <p className="font-semibold text-gray-900">{job.package.name}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">
                       Includes: {job.package.items.map((i) => i.service.name).join(", ")}
                     </p>
                   </div>
                 ) : job.services.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 mb-3">
                     {job.services.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between text-sm">
+                      <div key={s.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
                         <span className="text-gray-700">{s.service.name} × {s.quantity}</span>
                         <span className="text-gray-900 font-medium">{formatCurrency(s.totalPrice)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400 italic">No package or services added</p>
+                  <p className="text-sm text-gray-400 italic mb-3">No package or services added</p>
                 )}
 
-                <div className="border-t mt-4 pt-4 grid grid-cols-3 gap-3 text-sm">
+                <div className="bg-gray-50 rounded-lg p-3 grid grid-cols-3 gap-3 text-sm mt-2">
                   <div>
-                    <p className="text-xs text-gray-400">Subtotal</p>
-                    <p className="font-medium">{formatCurrency(job.subtotal)}</p>
+                    <p className="text-xs text-gray-400 mb-0.5">Subtotal</p>
+                    <p className="font-medium text-gray-900">{formatCurrency(job.subtotal)}</p>
                   </div>
                   {job.taxAmount > 0 && (
                     <div>
-                      <p className="text-xs text-gray-400">Tax</p>
-                      <p className="font-medium">{formatCurrency(job.taxAmount)}</p>
+                      <p className="text-xs text-gray-400 mb-0.5">Tax</p>
+                      <p className="font-medium text-gray-900">{formatCurrency(job.taxAmount)}</p>
                     </div>
                   )}
                   {job.rushFee > 0 && (
                     <div>
-                      <p className="text-xs text-gray-400">Rush Fee</p>
+                      <p className="text-xs text-gray-400 mb-0.5">Rush Fee</p>
                       <p className="font-medium text-red-600">{formatCurrency(job.rushFee)}</p>
                     </div>
                   )}
                   <div>
-                    <p className="text-xs text-gray-400">Total</p>
+                    <p className="text-xs text-gray-400 mb-0.5">Total</p>
                     <p className="text-base font-bold text-gray-900">{formatCurrency(job.totalAmount)}</p>
                   </div>
                 </div>
@@ -224,21 +268,21 @@ export default async function JobDetailPage({ params }: { params: { id: string }
 
               {/* Notes */}
               {(job.internalNotes || job.clientNotes) && (
-                <div className="bg-white rounded-xl border p-5">
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-gray-400" /> Notes
                   </h2>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     {job.internalNotes && (
                       <div>
-                        <p className="text-xs text-gray-400 mb-1">Internal</p>
-                        <p className="text-gray-700 whitespace-pre-wrap">{job.internalNotes}</p>
+                        <p className="text-xs text-gray-400 mb-1.5">Internal</p>
+                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{job.internalNotes}</p>
                       </div>
                     )}
                     {job.clientNotes && (
                       <div>
-                        <p className="text-xs text-gray-400 mb-1">Client-facing</p>
-                        <p className="text-gray-700 whitespace-pre-wrap">{job.clientNotes}</p>
+                        <p className="text-xs text-gray-400 mb-1.5">Client-facing</p>
+                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{job.clientNotes}</p>
                       </div>
                     )}
                   </div>
@@ -246,63 +290,71 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               )}
             </div>
 
-            {/* Right column */}
+            {/* ── Right sidebar ─────────────────────────────────────────────── */}
             <div className="space-y-5">
 
               {/* Client */}
-              <div className="bg-white rounded-xl border p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <User className="w-4 h-4 text-gray-400" /> Client
                 </h2>
-                <Link href={`/clients/${job.clientId}`} className="group block">
-                  <p className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                    {job.client.firstName} {job.client.lastName}
-                  </p>
-                  {job.client.company && (
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                      <Building2 className="w-3 h-3" /> {job.client.company}
-                    </p>
-                  )}
+                <Link href={`/clients/${job.clientId}`} className="group block mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
+                      {job.client.firstName?.[0]}{job.client.lastName?.[0]}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors leading-tight">
+                        {job.client.firstName} {job.client.lastName}
+                      </p>
+                      {job.client.company && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <Building2 className="w-3 h-3" /> {job.client.company}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </Link>
-                <div className="mt-3 space-y-1.5 text-xs text-gray-600">
-                  <a href={`mailto:${job.client.email}`} className="flex items-center gap-2 hover:text-blue-600">
-                    <Mail className="w-3.5 h-3.5 text-gray-400" /> {job.client.email}
+                <div className="space-y-2 text-xs text-gray-600 border-t border-gray-100 pt-3">
+                  <a href={`mailto:${job.client.email}`} className="flex items-center gap-2 hover:text-blue-600 transition-colors">
+                    <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span className="truncate">{job.client.email}</span>
                   </a>
                   {job.client.phone && (
-                    <a href={`tel:${job.client.phone}`} className="flex items-center gap-2 hover:text-blue-600">
-                      <Phone className="w-3.5 h-3.5 text-gray-400" /> {job.client.phone}
+                    <a href={`tel:${job.client.phone}`} className="flex items-center gap-2 hover:text-blue-600 transition-colors">
+                      <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" /> {job.client.phone}
                     </a>
                   )}
                 </div>
               </div>
 
               {/* Invoice */}
-              <div className="bg-white rounded-xl border p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <Receipt className="w-4 h-4 text-gray-400" /> Invoice
                 </h2>
                 {job.invoice ? (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-mono text-gray-600">#{job.invoice.invoiceNumber}</span>
+                      <span className="text-xs font-mono text-gray-500">#{job.invoice.invoiceNumber}</span>
                       <span className={cn(
                         "text-xs font-semibold px-2 py-0.5 rounded-full",
-                        job.invoice.status === "PAID" ? "bg-green-100 text-green-700" :
-                        job.invoice.status === "OVERDUE" ? "bg-red-100 text-red-700" :
+                        job.invoice.status === "PAID"    ? "bg-green-100 text-green-700" :
+                        job.invoice.status === "OVERDUE" ? "bg-red-100 text-red-700"    :
                         "bg-blue-100 text-blue-700"
                       )}>
                         {job.invoice.status}
                       </span>
                     </div>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(job.invoice.totalAmount)}</p>
+                    <p className="text-xl font-bold text-gray-900 mb-1">{formatCurrency(job.invoice.totalAmount)}</p>
                     {job.invoice.amountDue > 0 && (
-                      <p className="text-xs text-amber-600 mt-1">{formatCurrency(job.invoice.amountDue)} due</p>
+                      <p className="text-xs text-amber-600 mb-3">{formatCurrency(job.invoice.amountDue)} outstanding</p>
                     )}
                     <Link
                       href={`/invoices/${job.invoice.id}`}
-                      className="mt-3 block text-center text-xs font-semibold text-blue-600 hover:text-blue-700 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors"
+                      className="block text-center text-xs font-semibold text-blue-600 hover:text-blue-700 py-2 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors"
                     >
-                      View Invoice
+                      View Invoice →
                     </Link>
                   </div>
                 ) : (
@@ -327,20 +379,20 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               {/* Checklist */}
               <JobChecklist jobId={job.id} />
 
-              {/* Client messages */}
+              {/* Messages */}
               <JobMessageThread jobId={job.id} />
 
               {/* Status history */}
               {job.statusHistory.length > 0 && (
-                <div className="bg-white rounded-xl border p-5">
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                     <Clock className="w-4 h-4 text-gray-400" /> History
                   </h2>
                   <div className="space-y-2.5">
                     {job.statusHistory.map((h) => (
-                      <div key={h.id} className="flex items-start gap-2 text-xs">
+                      <div key={h.id} className="flex items-center gap-2 text-xs">
                         <span className={cn(
-                          "mt-0.5 px-1.5 py-0.5 rounded font-semibold shrink-0",
+                          "px-1.5 py-0.5 rounded font-semibold shrink-0",
                           JOB_STATUS_COLORS[h.status] ?? "bg-gray-100 text-gray-600"
                         )}>
                           {JOB_STATUS_LABELS[h.status] ?? h.status}
