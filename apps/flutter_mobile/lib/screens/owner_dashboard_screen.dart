@@ -307,9 +307,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     final client = job['client'];
     final clientName = client != null ? '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'.trim() : '';
     final scheduledAt = job['scheduledAt'];
-    final photographer = (job['assignments'] as List?)?.isNotEmpty == true
-        ? (job['assignments'][0]['staff'] as Map?)?['displayName'] ?? ''
-        : 'Unassigned';
+    final assignments = job['assignments'] as List? ?? [];
+    String photographer = 'Unassigned';
+    if (assignments.isNotEmpty) {
+      final staff = assignments[0]['staff'];
+      if (staff != null) photographer = staff['displayName'] ?? 'Unassigned';
+    }
     final amount = job['totalAmount'];
 
     String timeStr = '';

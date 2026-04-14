@@ -171,10 +171,14 @@ class _OwnerJobsScreenState extends State<OwnerJobsScreen> {
     final clientName = client != null ? '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'.trim() : '';
     final scheduledAt = job['scheduledAt'];
     final isRush = job['isRush'] == true;
-    final packageName = (job['package'] as Map?)?['name'] ?? '';
-    final photographer = (job['assignments'] as List?)?.isNotEmpty == true
-        ? (job['assignments'][0]['staff'] as Map?)?['displayName'] ?? ''
-        : '';
+    final pkg = job['package'];
+    final packageName = pkg != null ? (pkg['name'] ?? '') : '';
+    final assignmentsList = job['assignments'] as List? ?? [];
+    String photographer = '';
+    if (assignmentsList.isNotEmpty) {
+      final staff = assignmentsList[0]['staff'];
+      if (staff != null) photographer = staff['displayName'] ?? '';
+    }
     final amount = job['totalAmount'];
 
     String timeStr = '';
