@@ -479,8 +479,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   }
 
   String _formatCurrency(dynamic amount) {
-    final num = (amount is int) ? amount.toDouble() : (amount as num?)?.toDouble() ?? 0.0;
-    return NumberFormat.simpleCurrency().format(num);
+    final value = (amount is int) ? amount.toDouble() : (amount is num) ? amount.toDouble() : 0.0;
+    return NumberFormat.simpleCurrency().format(value);
   }
 
   _StatusConfig _getStatusConfig(String status) {
