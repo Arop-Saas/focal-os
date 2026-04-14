@@ -15,22 +15,34 @@ export { ROLE_HIERARCHY, hasRole };
 /**
  * Validate a Supabase JWT by calling the Auth REST API directly.
  * This avoids SSR cookie-client issues when mobile sends a Bearer token.
+ * Returns the user object { id, email, user_metadata, ... } or null.
  */
 async function getUserFromBearerToken(jwt: string) {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`,
-    {
+  try {
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`;
+    console.log(`[Bearer Auth] Validating token against ${url}`);
+    console.log(`[Bearer Auth] Token preview: ${jwt.substring(0, 20)}...`);
+
+    const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${jwt}`,
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       },
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`[Bearer Auth] Supabase returned ${res.status}: ${errorBody}`);
+      return null;
     }
-  );
-  if (!res.ok) {
-    console.error(`[Bearer Auth] Supabase returned ${res.status} for token validation`);
+
+    const user = await res.json(); // MUST await — res.json() returns a Promise
+    console.log(`[Bearer Auth] Validated user: ${user?.id} (${user?.email})`);
+    return user;
+  } catch (err) {
+    console.error(`[Bearer Auth] Fetch error:`, err);
     return null;
   }
-  return res.json();
 }
 
 interface CreateContextOptions {
@@ -44,10 +56,10 @@ export async function createTRPCContext(opts: CreateContextOptions) {
   const authHeader = opts.req?.headers.get("authorization") ?? "";
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
+  console.log(`[tRPC Context] Auth method: ${bearerToken ? "Bearer token" : "Cookie session"}`);
+
   if (bearerToken) {
     // For Bearer token auth (mobile), call Supabase Auth REST API directly.
-    // The SSR cookie-based client and browser client both have issues
-    // validating raw JWTs in a server-side context.
     supabaseUser = await getUserFromBearerToken(bearerToken);
   } else {
     const supabase = await createClient();
@@ -55,11 +67,14 @@ export async function createTRPCContext(opts: CreateContextOptions) {
     supabaseUser = data.user;
   }
 
+  console.log(`[tRPC Context] supabaseUser: ${supabaseUser ? supabaseUser.id : "null"}`);
+
   let user = null;
   let workspace = null;
   let memberRole: MemberRole | null = null;
 
   if (supabaseUser) {
+    console.log(`[tRPC Context] Looking up Prisma user with supabaseId: ${supabaseUser.id}`);
     user = await prisma.user.findUnique({
       where: { supabaseId: supabaseUser.id },
       include: {
@@ -70,6 +85,7 @@ export async function createTRPCContext(opts: CreateContextOptions) {
         },
       },
     });
+    console.log(`[tRPC Context] Prisma user found: ${user ? user.id : "null"}, workspaces: ${user?.workspaces?.length ?? 0}`);
 
     // Auto-create Prisma user on first tRPC request after Supabase signup
     if (!user && supabaseUser.email) {
