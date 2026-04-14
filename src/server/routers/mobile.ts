@@ -218,7 +218,7 @@ export const mobileRouter = router({
           },
         },
       },
-      orderBy: { member: { user: { fullName: "asc" } } },
+      orderBy: { createdAt: "asc" },
     });
 
     return staff.map((s) => {
@@ -585,7 +585,7 @@ export const mobileRouter = router({
           id: true,
           member: { select: { user: { select: { fullName: true } } } },
         },
-        orderBy: { member: { user: { fullName: "asc" } } },
+        orderBy: { createdAt: "asc" },
       }),
     ]);
     return { clients, packages, staff };
