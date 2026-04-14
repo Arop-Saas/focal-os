@@ -92,6 +92,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Exclude static assets AND /api/trpc routes (tRPC handles its own auth
+    // via Bearer tokens — middleware rewrites strip the Authorization header)
+    "/((?!_next/static|_next/image|favicon.ico|api/trpc|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
