@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import prisma from "@/lib/prisma";
 import type { MemberRole } from "@prisma/client";
 import { ROLE_HIERARCHY, hasRole } from "@/lib/roles";
@@ -10,40 +11,21 @@ import "@/lib/env"; // validates required env vars on startup
 
 export { ROLE_HIERARCHY, hasRole };
 
-// ─── Context ──────────────────────────────────────────────────────────────────
-
-/**
- * Validate a Supabase JWT by calling the Auth REST API directly.
- * This avoids SSR cookie-client issues when mobile sends a Bearer token.
- * Returns the user object { id, email, user_metadata, ... } or null.
- */
-async function getUserFromBearerToken(jwt: string) {
-  try {
-    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`;
-    console.log(`[Bearer Auth] Validating token against ${url}`);
-    console.log(`[Bearer Auth] Token preview: ${jwt.substring(0, 20)}...`);
-
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      },
-    });
-
-    if (!res.ok) {
-      const errorBody = await res.text();
-      console.error(`[Bearer Auth] Supabase returned ${res.status}: ${errorBody}`);
-      return null;
-    }
-
-    const user = await res.json(); // MUST await — res.json() returns a Promise
-    console.log(`[Bearer Auth] Validated user: ${user?.id} (${user?.email})`);
-    return user;
-  } catch (err) {
-    console.error(`[Bearer Auth] Fetch error:`, err);
-    return null;
+// ─── Supabase Admin client for Bearer token validation ──────────────────────
+// Uses the service_role key so it can validate any user's JWT server-side
+// without needing cookies, localStorage, or REST API calls.
+const supabaseAdmin = createSupabaseClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
   }
-}
+);
+
+// ─── Context ──────────────────────────────────────────────────────────────────
 
 interface CreateContextOptions {
   req?: NextRequest;
@@ -56,18 +38,19 @@ export async function createTRPCContext(opts: CreateContextOptions) {
   const authHeader = opts.req?.headers.get("authorization") ?? "";
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-  console.log(`[tRPC Context] Auth method: ${bearerToken ? "Bearer token" : "Cookie session"}`);
-
   if (bearerToken) {
-    // For Bearer token auth (mobile), call Supabase Auth REST API directly.
-    supabaseUser = await getUserFromBearerToken(bearerToken);
+    // Use the admin client to validate the Bearer token from mobile.
+    // This works server-side without cookies or localStorage.
+    const { data, error } = await supabaseAdmin.auth.getUser(bearerToken);
+    if (error) {
+      console.error(`[Bearer Auth] Token validation failed: ${error.message}`);
+    }
+    supabaseUser = data?.user ?? null;
   } else {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
     supabaseUser = data.user;
   }
-
-  console.log(`[tRPC Context] supabaseUser: ${supabaseUser ? supabaseUser.id : "null"}`);
 
   let user = null;
   let workspace = null;
