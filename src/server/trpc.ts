@@ -29,13 +29,15 @@ const supabaseAdmin = createSupabaseClient(
 
 interface CreateContextOptions {
   req?: NextRequest;
+  authHeader?: string | null;  // Passed explicitly from route handler
 }
 
 export async function createTRPCContext(opts: CreateContextOptions) {
   // Mobile clients send Authorization: Bearer <token> instead of cookies.
-  // Check the header first; fall back to cookie-based session.
+  // Use the explicitly passed authHeader first (route handler extracts it
+  // before tRPC/Next.js can strip it), then fall back to reading from req.
   let supabaseUser = null;
-  const authHeader = opts.req?.headers.get("authorization") ?? "";
+  const authHeader = opts.authHeader ?? opts.req?.headers.get("authorization") ?? "";
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (bearerToken) {
