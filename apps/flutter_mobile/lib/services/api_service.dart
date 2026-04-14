@@ -156,8 +156,26 @@ class ApiService {
     return await query('mobile.getProfile');
   }
 
-  Future<dynamic> debugAuth() async {
-    return await query('mobile.debugAuth');
+  // ─── Owner / Admin endpoints ────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getAdminOverview() async {
+    final data = await query('mobile.getAdminOverview');
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  Future<List<dynamic>> getAdminJobs() async {
+    final data = await query('mobile.getAdminJobs');
+    return (data as List?) ?? [];
+  }
+
+  Future<List<dynamic>> getAdminStaff() async {
+    final data = await query('mobile.getAdminStaff');
+    return (data as List?) ?? [];
+  }
+
+  Future<Map<String, dynamic>> getAdminProfile() async {
+    final data = await query('mobile.getAdminProfile');
+    return data is Map<String, dynamic> ? data : {};
   }
 
   Future<dynamic> getMonthOverview(int year, int month) async {

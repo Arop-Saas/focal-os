@@ -32,19 +32,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadAll() async {
-    // Run debug auth check first to diagnose 401 issues
-    try {
-      final api = context.read<ApiService>();
-      final debug = await api.debugAuth();
-      debugPrint('╔══════════════════════════════════════════════════');
-      debugPrint('║ DEBUG AUTH RESULT:');
-      debugPrint('║ $debug');
-      debugPrint('╚══════════════════════════════════════════════════');
-    } catch (e) {
-      debugPrint('╔══════════════════════════════════════════════════');
-      debugPrint('║ DEBUG AUTH FAILED: $e');
-      debugPrint('╚══════════════════════════════════════════════════');
-    }
     await Future.wait([_loadMonth(), _loadJobs()]);
   }
 
