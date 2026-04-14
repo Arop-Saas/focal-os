@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../services/api_service.dart';
 
 class OwnerStaffScreen extends StatefulWidget {
@@ -17,13 +19,14 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   String? _error;
   Timer? _refreshTimer;
   Timer? _tickTimer;
+  bool _showMap = true;
 
   @override
   void initState() {
     super.initState();
     _loadStaff();
     // Auto-refresh every 30 seconds for live tracking
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadStaff());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _silentRefresh());
     // Tick every minute to update elapsed times
     _tickTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (mounted) setState(() {});
@@ -38,15 +41,6 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   }
 
   Future<void> _loadStaff() async {
-    if (_isLoading == false) {
-      // Silent refresh — don't show loading spinner
-      try {
-        final api = context.read<ApiService>();
-        final data = await api.getAdminStaff();
-        if (mounted) setState(() => _staff = data);
-      } catch (_) {}
-      return;
-    }
     setState(() { _isLoading = true; _error = null; });
     try {
       final api = context.read<ApiService>();
@@ -57,8 +51,23 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     }
   }
 
+  Future<void> _silentRefresh() async {
+    try {
+      final api = context.read<ApiService>();
+      final data = await api.getAdminStaff();
+      if (mounted) setState(() => _staff = data);
+    } catch (_) {}
+  }
+
   List<dynamic> get _clockedIn => _staff.where((s) => s['clockedIn'] == true).toList();
   List<dynamic> get _notClockedIn => _staff.where((s) => s['clockedIn'] != true).toList();
+
+  // Workers with valid GPS coordinates
+  List<dynamic> get _locatedWorkers => _clockedIn.where((s) {
+    final lat = s['lastLatitude'];
+    final lng = s['lastLongitude'];
+    return lat != null && lng != null && lat is num && lng is num;
+  }).toList();
 
   String _elapsedSince(String? isoString) {
     if (isoString == null) return '';
@@ -75,6 +84,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   Widget build(BuildContext context) {
     final clockedIn = _clockedIn;
     final others = _notClockedIn;
+    final located = _locatedWorkers;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -84,10 +94,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
             : _error != null
                 ? _buildError()
                 : RefreshIndicator(
-                    onRefresh: () async {
-                      setState(() => _isLoading = true);
-                      await _loadStaff();
-                    },
+                    onRefresh: _loadStaff,
                     color: const Color(0xFF0F172A),
                     child: CustomScrollView(
                       slivers: [
@@ -126,12 +133,89 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                            child: Text(
-                              '${_staff.length} active members',
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                            ),
+                            child: Text('${_staff.length} active members', style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
                           ),
                         ),
+
+                        // ─── Map View (when workers have location) ──────
+                        if (located.isNotEmpty && _showMap)
+                          SliverToBoxAdapter(
+                            child: Container(
+                              margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                              height: 220,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFF059669).withOpacity(0.3)),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Stack(
+                                children: [
+                                  _buildMap(located),
+                                  // Map toggle button
+                                  Positioned(
+                                    top: 8, right: 8,
+                                    child: GestureDetector(
+                                      onTap: () => setState(() => _showMap = false),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(8),
+                                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
+                                        ),
+                                        child: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF0F172A)),
+                                      ),
+                                    ),
+                                  ),
+                                  // Legend
+                                  Positioned(
+                                    bottom: 8, left: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.location_on, size: 14, color: Color(0xFF059669)),
+                                          const SizedBox(width: 4),
+                                          Text('${located.length} tracked', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF059669))),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        // Show map button if hidden
+                        if (located.isNotEmpty && !_showMap)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                              child: GestureDetector(
+                                onTap: () => setState(() => _showMap = true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF059669).withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.map_rounded, size: 16, color: Color(0xFF059669)),
+                                      SizedBox(width: 6),
+                                      Text('Show Map', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF059669))),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
 
                         // ─── Live Tracker Section ───────────────────────
                         if (clockedIn.isNotEmpty) ...[
@@ -140,18 +224,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                               padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                               child: Row(
                                 children: [
-                                  Container(
-                                    width: 8, height: 8,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Color(0xFF059669),
-                                    ),
-                                  ),
+                                  Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF059669))),
                                   const SizedBox(width: 8),
-                                  const Text(
-                                    'LIVE TRACKER',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669), letterSpacing: 1),
-                                  ),
+                                  const Text('LIVE TRACKER', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669), letterSpacing: 1)),
                                 ],
                               ),
                             ),
@@ -194,6 +269,68 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     );
   }
 
+  // ─── Map widget ─────────────────────────────────────────────────────────
+
+  Widget _buildMap(List<dynamic> workers) {
+    final markers = <Marker>[];
+    double sumLat = 0, sumLng = 0;
+
+    for (final w in workers) {
+      final lat = (w['lastLatitude'] as num).toDouble();
+      final lng = (w['lastLongitude'] as num).toDouble();
+      final name = w['displayName'] ?? '?';
+      sumLat += lat;
+      sumLng += lng;
+
+      markers.add(
+        Marker(
+          point: LatLng(lat, lng),
+          width: 120,
+          height: 50,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6)],
+                ),
+                child: Text(
+                  name.toString().split(' ').first,
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.location_on, color: Color(0xFF059669), size: 24),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final centerLat = sumLat / workers.length;
+    final centerLng = sumLng / workers.length;
+
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: LatLng(centerLat, centerLng),
+        initialZoom: workers.length == 1 ? 14.0 : 11.0,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.scalist_mobile',
+        ),
+        MarkerLayer(markers: markers),
+      ],
+    );
+  }
+
   // ─── Live tracker card (clocked-in workers) ───────────────────────────
 
   Widget _buildLiveCard(dynamic staff) {
@@ -206,11 +343,28 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     final actualStartAt = currentJob?['actualStartAt']?.toString();
     final elapsed = _elapsedSince(actualStartAt);
     final phone = staff['phone'] ?? '';
+    final hasLocation = staff['lastLatitude'] != null && staff['lastLongitude'] != null;
 
     String clockInTime = '';
     if (actualStartAt != null) {
       final dt = DateTime.tryParse(actualStartAt);
       if (dt != null) clockInTime = DateFormat('h:mm a').format(dt.toLocal());
+    }
+
+    String locationAge = '';
+    final lastLocAt = staff['lastLocationAt']?.toString();
+    if (lastLocAt != null) {
+      final dt = DateTime.tryParse(lastLocAt);
+      if (dt != null) {
+        final mins = DateTime.now().toUtc().difference(dt.toUtc()).inMinutes;
+        if (mins < 1) {
+          locationAge = 'just now';
+        } else if (mins < 60) {
+          locationAge = '${mins}m ago';
+        } else {
+          locationAge = '${mins ~/ 60}h ago';
+        }
+      }
     }
 
     return Container(
@@ -228,10 +382,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Name row with live badge and elapsed time
+            // Name row with elapsed time
             Row(
               children: [
-                // Avatar with green ring
                 Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(
@@ -262,7 +415,6 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     ],
                   ),
                 ),
-                // Elapsed time badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
@@ -274,10 +426,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     children: [
                       const Icon(Icons.timer_outlined, size: 14, color: Color(0xFF059669)),
                       const SizedBox(width: 4),
-                      Text(
-                        elapsed.isNotEmpty ? elapsed : '--',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
-                      ),
+                      Text(elapsed.isNotEmpty ? elapsed : '--', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF059669))),
                     ],
                   ),
                 ),
@@ -296,7 +445,6 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Address
                   if (address.isNotEmpty)
                     Row(
                       children: [
@@ -311,7 +459,6 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                         ),
                       ],
                     ),
-                  // Client + clock-in time
                   if (clientName.isNotEmpty || clockInTime.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -335,25 +482,36 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               ),
             ),
 
-            // Quick call button
-            if (phone.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Row(
-                  children: [
+            // GPS + phone row
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(
+                children: [
+                  if (hasLocation) ...[
+                    Icon(Icons.gps_fixed_rounded, size: 13, color: const Color(0xFF059669).withOpacity(0.7)),
+                    const SizedBox(width: 4),
+                    Text('GPS $locationAge', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF059669).withOpacity(0.7))),
+                  ] else ...[
+                    Icon(Icons.gps_off_rounded, size: 13, color: Colors.grey.shade400),
+                    const SizedBox(width: 4),
+                    Text('No GPS', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                  ],
+                  const Spacer(),
+                  if (phone.isNotEmpty) ...[
                     Icon(Icons.phone_outlined, size: 13, color: Colors.grey.shade400),
                     const SizedBox(width: 4),
                     Text(phone, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                   ],
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ─── Regular staff card (not clocked in) ──────────────────────────────
+  // ─── Regular staff card ───────────────────────────────────────────────
 
   Widget _buildStaffCard(dynamic staff) {
     final name = staff['displayName'] ?? 'Unknown';
@@ -379,15 +537,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               children: [
                 Container(
                   width: 44, height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(14)),
                   child: Center(
-                    child: Text(
-                      _getInitials(name),
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                    ),
+                    child: Text(_getInitials(name), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -399,12 +551,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          if (title.isNotEmpty)
-                            Text(title, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-                          if (title.isNotEmpty && role.isNotEmpty)
-                            Text(' · ', style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
-                          if (role.isNotEmpty)
-                            Text(_formatRole(role), style: TextStyle(fontSize: 12, color: Colors.grey.shade400, fontWeight: FontWeight.w500)),
+                          if (title.isNotEmpty) Text(title, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                          if (title.isNotEmpty && role.isNotEmpty) Text(' · ', style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
+                          if (role.isNotEmpty) Text(_formatRole(role), style: TextStyle(fontSize: 12, color: Colors.grey.shade400, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ],
@@ -412,26 +561,18 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
               child: Row(
                 children: [
                   Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey.shade400),
                   const SizedBox(width: 6),
-                  Text(
-                    '$todayJobCount job${todayJobCount != 1 ? 's' : ''} today',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey.shade600),
-                  ),
+                  Text('$todayJobCount job${todayJobCount != 1 ? 's' : ''} today', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey.shade600)),
                 ],
               ),
             ),
-
             if (phone.isNotEmpty || email.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -442,14 +583,11 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       const SizedBox(width: 4),
                       Text(phone, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                     ],
-                    if (phone.isNotEmpty && email.isNotEmpty)
-                      const SizedBox(width: 16),
+                    if (phone.isNotEmpty && email.isNotEmpty) const SizedBox(width: 16),
                     if (email.isNotEmpty) ...[
                       Icon(Icons.email_outlined, size: 13, color: Colors.grey.shade400),
                       const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(email, style: TextStyle(fontSize: 12, color: Colors.grey.shade500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ),
+                      Expanded(child: Text(email, style: TextStyle(fontSize: 12, color: Colors.grey.shade500), maxLines: 1, overflow: TextOverflow.ellipsis)),
                     ],
                   ],
                 ),
@@ -483,10 +621,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
           Text('Failed to load team', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red.shade700)),
           const SizedBox(height: 16),
           GestureDetector(
-            onTap: () {
-              setState(() => _isLoading = true);
-              _loadStaff();
-            },
+            onTap: _loadStaff,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(10)),
@@ -533,13 +668,8 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.4, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.4, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -555,10 +685,7 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
       builder: (context, child) {
         return Container(
           width: 8, height: 8,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: widget.color.withOpacity(_animation.value),
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: widget.color.withOpacity(_animation.value)),
         );
       },
     );

@@ -253,6 +253,11 @@ model StaffProfile {
   pushToken       String?
   pushPlatform    String?   // "ios" | "android"
 
+  // Live location tracking (updated while clocked in)
+  lastLatitude    Float?
+  lastLongitude   Float?
+  lastLocationAt  DateTime?
+
   // Compensation
   payType         PayType  @default(HOURLY)
   payRate         Float?

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
+import '../services/location_service.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -49,6 +50,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     try {
       final api = context.read<ApiService>();
       await api.clockIn(widget.jobId);
+      // Start GPS location tracking
+      try {
+        final location = LocationService.instance..init(api);
+        await location.startTracking();
+        debugPrint('[JobDetail] Location tracking started on clock-in');
+      } catch (e) {
+        debugPrint('[JobDetail] Location tracking failed to start: $e');
+      }
       await _loadJob();
       if (mounted) _showSnack('Clocked in!', const Color(0xFF059669));
     } catch (e) {
@@ -62,6 +71,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     try {
       final api = context.read<ApiService>();
       await api.clockOut(widget.jobId);
+      // Stop GPS location tracking
+      try {
+        LocationService.instance.stopTracking();
+        debugPrint('[JobDetail] Location tracking stopped on clock-out');
+      } catch (e) {
+        debugPrint('[JobDetail] Location tracking failed to stop: $e');
+      }
       await _loadJob();
       if (mounted) _showSnack('Clocked out!', const Color(0xFF059669));
     } catch (e) {

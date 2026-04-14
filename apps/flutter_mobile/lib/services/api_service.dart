@@ -212,6 +212,10 @@ class ApiService {
   Future<dynamic> completeJob(String jobId) async {
     return await mutate('mobile.completeJob', {'jobId': jobId});
   }
+
+  Future<void> updateLocation(double latitude, double longitude) async {
+    await mutate('mobile.updateLocation', {'latitude': latitude, 'longitude': longitude});
+  }
 }
 
 class ApiException implements Exception {

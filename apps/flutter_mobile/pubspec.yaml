@@ -36,6 +36,13 @@ dependencies:
   # URL launcher (for maps navigation)
   url_launcher: ^6.2.0
 
+  # GPS location tracking
+  geolocator: ^13.0.2
+
+  # Map display (OpenStreetMap — no API key needed)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

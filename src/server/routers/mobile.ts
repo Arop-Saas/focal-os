@@ -247,6 +247,9 @@ export const mobileRouter = router({
         phone: s.member.user.phone,
         avatarUrl: s.member.user.avatarUrl,
         role: s.member.role,
+        lastLatitude: s.lastLatitude,
+        lastLongitude: s.lastLongitude,
+        lastLocationAt: s.lastLocationAt,
         todayJobCount: todayAssignments.length,
         clockedIn,
         currentJob: currentJob
@@ -816,6 +819,24 @@ export const mobileRouter = router({
         }
       }
       return { days };
+    }),
+
+  // ── Update live location (called periodically while clocked in) ─────────────
+  updateLocation: mobileProcedure
+    .input(z.object({
+      latitude: z.number(),
+      longitude: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.staffProfile.update({
+        where: { id: ctx.staffProfile.id },
+        data: {
+          lastLatitude: input.latitude,
+          lastLongitude: input.longitude,
+          lastLocationAt: new Date(),
+        },
+      });
+      return { success: true };
     }),
 
   // ── Register push notification token ────────────────────────────────────────
