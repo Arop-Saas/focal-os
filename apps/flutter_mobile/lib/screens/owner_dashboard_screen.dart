@@ -314,7 +314,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     String photographer = 'Unassigned';
     if (assignments.isNotEmpty) {
       final staff = assignments[0]['staff'];
-      if (staff != null) photographer = staff['displayName'] ?? 'Unassigned';
+      if (staff != null) {
+        final member = staff['member'];
+        final user = member != null ? member['user'] : null;
+        photographer = user != null ? (user['fullName'] ?? 'Unassigned') : 'Unassigned';
+      }
     }
     final amount = job['totalAmount'];
 

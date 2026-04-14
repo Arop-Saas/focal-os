@@ -130,7 +130,7 @@ export const mobileRouter = router({
           id: true, status: true, propertyAddress: true, scheduledAt: true, totalAmount: true,
           client: { select: { firstName: true, lastName: true } },
           assignments: {
-            select: { staff: { select: { displayName: true, avatarUrl: true } } },
+            select: { staff: { select: { member: { select: { user: { select: { fullName: true, avatarUrl: true } } } } } } },
             take: 1,
           },
         },
@@ -189,7 +189,7 @@ export const mobileRouter = router({
         assignments: {
           select: {
             role: true,
-            staff: { select: { id: true, displayName: true, avatarUrl: true } },
+            staff: { select: { id: true, member: { select: { user: { select: { fullName: true, avatarUrl: true } } } } } },
           },
         },
       },
@@ -204,9 +204,9 @@ export const mobileRouter = router({
     const staff = await ctx.prisma.staffProfile.findMany({
       where: { member: { workspaceId: ctx.workspace.id }, isActive: true },
       select: {
-        id: true, displayName: true, title: true, avatarUrl: true, phone: true, email: true,
-        member: { select: { role: true } },
-        assignments: {
+        id: true, title: true,
+        member: { select: { role: true, user: { select: { fullName: true, email: true, phone: true, avatarUrl: true } } } },
+        jobAssignments: {
           where: { job: { scheduledAt: { gte: todayStart, lte: todayEnd } } },
           select: {
             job: {
@@ -218,16 +218,22 @@ export const mobileRouter = router({
           },
         },
       },
-      orderBy: { displayName: "asc" },
+      orderBy: { member: { user: { fullName: "asc" } } },
     });
 
     return staff.map((s) => {
-      const todayAssignments = s.assignments;
+      const todayAssignments = s.jobAssignments;
       const clockedIn = todayAssignments.some(
         (a) => a.job.actualStartAt && !a.job.actualEndAt
       );
       return {
-        ...s,
+        id: s.id,
+        displayName: s.member.user.fullName,
+        title: s.title,
+        email: s.member.user.email,
+        phone: s.member.user.phone,
+        avatarUrl: s.member.user.avatarUrl,
+        role: s.member.role,
         todayJobCount: todayAssignments.length,
         clockedIn,
         currentJob: todayAssignments.find((a) => a.job.actualStartAt && !a.job.actualEndAt)?.job ?? null,
@@ -262,7 +268,7 @@ export const mobileRouter = router({
         package: { select: { name: true } },
         assignments: {
           where: { role: "PHOTOGRAPHER" },
-          select: { staff: { select: { displayName: true } } },
+          select: { staff: { select: { member: { select: { user: { select: { fullName: true } } } } } } },
           take: 1,
         },
       },
