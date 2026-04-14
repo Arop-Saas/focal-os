@@ -27,9 +27,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     setState(() { _isLoading = true; _error = null; });
     try {
       final api = context.read<ApiService>();
+      debugPrint('[OwnerDashboard] Loading admin overview...');
       final data = await api.getAdminOverview();
+      debugPrint('[OwnerDashboard] Got data: ${data.keys.toList()}');
       if (mounted) setState(() { _overview = data; _isLoading = false; });
     } catch (e) {
+      debugPrint('[OwnerDashboard] ERROR: $e');
       if (mounted) setState(() { _error = e.toString(); _isLoading = false; });
     }
   }

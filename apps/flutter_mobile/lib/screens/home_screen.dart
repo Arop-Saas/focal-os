@@ -30,9 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final api = context.read<ApiService>();
       final result = await api.getMyRole();
       final role = result['role']?.toString() ?? 'unknown';
+      debugPrint('[HomeScreen] Role detected: $role (isOwner: ${role == "admin"})');
       if (mounted) setState(() { _role = role; _isLoadingRole = false; });
     } catch (e) {
-      // Default to staff if role detection fails
+      debugPrint('[HomeScreen] Role detection failed: $e — defaulting to staff');
       if (mounted) setState(() { _role = 'staff'; _isLoadingRole = false; });
     }
   }
