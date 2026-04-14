@@ -177,11 +177,7 @@ class _OwnerJobsScreenState extends State<OwnerJobsScreen> {
     String photographer = '';
     if (assignmentsList.isNotEmpty) {
       final staff = assignmentsList[0]['staff'];
-      if (staff != null) {
-        final member = staff['member'];
-        final user = member != null ? member['user'] : null;
-        photographer = user != null ? (user['fullName'] ?? '') : '';
-      }
+      if (staff != null) photographer = staff['displayName'] ?? '';
     }
     final amount = job['totalAmount'];
 

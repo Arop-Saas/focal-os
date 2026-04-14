@@ -126,11 +126,10 @@ export const mobileRouter = router({
     const [todayJobs, monthInvoices, activeStaff, upcomingJobs] = await Promise.all([
       ctx.prisma.job.findMany({
         where: { workspaceId: ctx.workspace.id, scheduledAt: { gte: todayStart, lte: todayEnd } },
-        select: {
-          id: true, status: true, propertyAddress: true, scheduledAt: true, totalAmount: true,
+        include: {
           client: { select: { firstName: true, lastName: true } },
           assignments: {
-            select: { staff: { select: { member: { select: { user: { select: { fullName: true, avatarUrl: true } } } } } } },
+            include: { staff: { include: { member: { include: { user: true } } } } },
             take: 1,
           },
         },
@@ -161,8 +160,17 @@ export const mobileRouter = router({
       statusCounts[job.status] = (statusCounts[job.status] ?? 0) + 1;
     }
 
+    const mappedJobs = todayJobs.map((j) => ({
+      id: j.id, status: j.status, propertyAddress: j.propertyAddress,
+      scheduledAt: j.scheduledAt, totalAmount: j.totalAmount,
+      client: j.client,
+      assignments: j.assignments.map((a) => ({
+        staff: { displayName: a.staff.member.user.fullName },
+      })),
+    }));
+
     return {
-      todayJobs,
+      todayJobs: mappedJobs,
       statusCounts,
       monthRevenue: monthInvoices._sum.amountPaid ?? 0,
       activeStaff,
@@ -174,26 +182,33 @@ export const mobileRouter = router({
   // All workspace jobs — today + next 14 days
   getAdminJobs: adminProcedure.query(async ({ ctx }) => {
     const now = new Date();
-    return ctx.prisma.job.findMany({
+    const jobs = await ctx.prisma.job.findMany({
       where: {
         workspaceId: ctx.workspace.id,
         scheduledAt: { gte: startOfDay(now), lte: endOfDay(addDays(now, 14)) },
         status: { notIn: ["COMPLETED", "CANCELLED"] },
       },
       orderBy: { scheduledAt: "asc" },
-      select: {
-        id: true, status: true, propertyAddress: true, propertyCity: true,
-        scheduledAt: true, isRush: true, totalAmount: true,
+      include: {
         client: { select: { firstName: true, lastName: true, phone: true } },
         package: { select: { name: true } },
         assignments: {
-          select: {
-            role: true,
-            staff: { select: { id: true, member: { select: { user: { select: { fullName: true, avatarUrl: true } } } } } },
+          include: {
+            staff: { include: { member: { include: { user: true } } } },
           },
         },
       },
     });
+    return jobs.map((j) => ({
+      id: j.id, status: j.status, propertyAddress: j.propertyAddress,
+      propertyCity: j.propertyCity, scheduledAt: j.scheduledAt,
+      isRush: j.isRush, totalAmount: j.totalAmount,
+      client: j.client, package: j.package,
+      assignments: j.assignments.map((a) => ({
+        role: a.role,
+        staff: { displayName: a.staff.member.user.fullName },
+      })),
+    }));
   }),
 
   // All active staff with today's job count and clock-in status
@@ -202,20 +217,12 @@ export const mobileRouter = router({
     const todayEnd = endOfDay(new Date());
 
     const staff = await ctx.prisma.staffProfile.findMany({
-      where: { member: { workspaceId: ctx.workspace.id }, isActive: true },
-      select: {
-        id: true, title: true,
-        member: { select: { role: true, user: { select: { fullName: true, email: true, phone: true, avatarUrl: true } } } },
+      where: { workspaceId: ctx.workspace.id, isActive: true },
+      include: {
+        member: { include: { user: true } },
         jobAssignments: {
           where: { job: { scheduledAt: { gte: todayStart, lte: todayEnd } } },
-          select: {
-            job: {
-              select: {
-                id: true, status: true, propertyAddress: true,
-                scheduledAt: true, actualStartAt: true, actualEndAt: true,
-              },
-            },
-          },
+          include: { job: true },
         },
       },
       orderBy: { createdAt: "asc" },
@@ -226,6 +233,7 @@ export const mobileRouter = router({
       const clockedIn = todayAssignments.some(
         (a) => a.job.actualStartAt && !a.job.actualEndAt
       );
+      const currentJob = todayAssignments.find((a) => a.job.actualStartAt && !a.job.actualEndAt)?.job ?? null;
       return {
         id: s.id,
         displayName: s.member.user.fullName,
@@ -236,7 +244,7 @@ export const mobileRouter = router({
         role: s.member.role,
         todayJobCount: todayAssignments.length,
         clockedIn,
-        currentJob: todayAssignments.find((a) => a.job.actualStartAt && !a.job.actualEndAt)?.job ?? null,
+        currentJob: currentJob ? { id: currentJob.id, propertyAddress: currentJob.propertyAddress, status: currentJob.status } : null,
       };
     });
   }),
