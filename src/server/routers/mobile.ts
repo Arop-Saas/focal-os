@@ -693,4 +693,83 @@ export const mobileRouter = router({
 
       return { id: job.id, jobNumber: job.jobNumber };
     }),
+
+  // ── Month overview for calendar (job counts per day) ────────────────────────
+  getMonthOverview: mobileProcedure
+    .input(z.object({ year: z.number(), month: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const monthStart = startOfMonth(new Date(input.year, input.month - 1));
+      const monthEnd = endOfMonth(new Date(input.year, input.month - 1));
+
+      const assignments = await ctx.prisma.jobAssignment.findMany({
+        where: {
+          staffId: ctx.staffProfile.id,
+          job: {
+            workspaceId: ctx.workspace.id,
+            scheduledAt: { gte: monthStart, lte: monthEnd },
+            status: { notIn: ["CANCELLED"] },
+          },
+        },
+        select: {
+          job: { select: { scheduledAt: true, status: true } },
+        },
+      });
+
+      const days: Record<number, { count: number; statuses: string[] }> = {};
+      for (const a of assignments) {
+        const day = a.job.scheduledAt?.getDate();
+        if (day) {
+          if (!days[day]) days[day] = { count: 0, statuses: [] };
+          days[day].count++;
+          days[day].statuses.push(a.job.status);
+        }
+      }
+      return { days };
+    }),
+
+  // ── Register push notification token ────────────────────────────────────────
+  registerPushToken: mobileProcedure
+    .input(z.object({
+      token: z.string(),
+      platform: z.enum(["ios", "android"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.staffProfile.update({
+        where: { id: ctx.staffProfile.id },
+        data: {
+          pushToken: input.token,
+          pushPlatform: input.platform,
+        },
+      });
+      return { success: true };
+    }),
+
+  // ── Unregister push notification token (on logout) ──────────────────────────
+  unregisterPushToken: mobileProcedure.mutation(async ({ ctx }) => {
+    await ctx.prisma.staffProfile.update({
+      where: { id: ctx.staffProfile.id },
+      data: { pushToken: null, pushPlatform: null },
+    });
+    return { success: true };
+  }),
+
+  // ── Get staff profile for profile screen ────────────────────────────────────
+  getProfile: mobileProcedure.query(async ({ ctx }) => {
+    const profile = await ctx.prisma.staffProfile.findUnique({
+      where: { id: ctx.staffProfile.id },
+      include: {
+        member: { select: { role: true } },
+        homeTerritory: { select: { name: true } },
+      },
+    });
+
+    return {
+      id: profile?.id,
+      title: profile?.title,
+      phone: profile?.phone,
+      avatarUrl: profile?.avatarUrl,
+      role: profile?.member?.role,
+      homeTerritoryName: profile?.homeTerritory?.name ?? null,
+    };
+  }),
 });

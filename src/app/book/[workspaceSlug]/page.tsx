@@ -169,7 +169,7 @@ const STATES_PROVINCES: { value: string; label: string; group: string }[] = [
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ current, total, brandColor, skipContact }: { current: Step; total: number; brandColor: string; skipContact?: boolean }) {
+function StepIndicator({ current, total, brandColor, skipContact, showStepNumbers }: { current: Step; total: number; brandColor: string; skipContact?: boolean; showStepNumbers?: boolean }) {
   const allLabels = ["Property", "Package", "Date & Time", "Your Info", "Review"];
   // Map internal step numbers to display — skip "Your Info" when signed in
   const entries = skipContact
@@ -202,7 +202,7 @@ function StepIndicator({ current, total, brandColor, skipContact }: { current: S
                     : undefined
                 }
               >
-                {done ? "✓" : entry.displayNum}
+                {done ? "✓" : (showStepNumbers !== false ? entry.displayNum : "")}
               </div>
               <span
                 className="text-xs hidden sm:block"
@@ -2260,6 +2260,15 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const [liveCustomFields, setLiveCustomFields] = useState<CustomField[] | null>(null);
   const [liveGridColumns, setLiveGridColumns] = useState<number | null>(null);
   const [liveOrderDetails, setLiveOrderDetails] = useState<BookingFormSettings["orderDetails"] | null>(null);
+  const [liveAppearance, setLiveAppearance] = useState<{
+    accentColor?: string;
+    backgroundColor?: string;
+    fontFamily?: string;
+    buttonStyle?: string;
+    showLogo?: boolean;
+    showStepNumbers?: boolean;
+    logoUrl?: string | null;
+  } | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | string[] | boolean>>({});
   const [appliedCouponData, setAppliedCouponData] = useState<{ couponId: string; code: string; discountType: string; discountValue: number } | null>(null);
   const [isDesignerPreview, setIsDesignerPreview] = useState(false);
@@ -2372,9 +2381,14 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         if (e.data.customFields) setLiveCustomFields(e.data.customFields);
         if (e.data.gridColumns != null) setLiveGridColumns(e.data.gridColumns);
         if (e.data.orderDetails) setLiveOrderDetails(e.data.orderDetails);
+        if (e.data.appearance) setLiveAppearance(e.data.appearance);
       }
     }
     window.addEventListener("message", handleMessage);
+    // Notify parent that the booking form is hydrated and ready to receive updates
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "BOOKING_FORM_READY" }, "*");
+    }
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
@@ -2552,7 +2566,29 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   }
 
   const { workspace, packages, services } = data;
-  const brandColor = workspace.brandColor ?? "#1B4F9E";
+  // Live appearance overrides from the designer postMessage
+  const brandColor = liveAppearance?.accentColor ?? workspace.brandColor ?? "#1B4F9E";
+  const bgColor = liveAppearance?.backgroundColor ?? "#f9fafb";
+  const fontFamily = liveAppearance?.fontFamily ?? "Inter";
+  const buttonStyle = liveAppearance?.buttonStyle ?? "rounded";
+  const showLogo = liveAppearance?.showLogo ?? true;
+  const showStepNumbers = liveAppearance?.showStepNumbers ?? true;
+  const effectiveLogoUrl = liveAppearance?.logoUrl !== undefined ? liveAppearance.logoUrl : workspace.logoUrl;
+
+  // Font family CSS mapping
+  const fontFamilyCSS: Record<string, string> = {
+    Inter: "'Inter', sans-serif",
+    System: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    Georgia: "Georgia, 'Times New Roman', serif",
+    Monospace: "'Courier New', Courier, monospace",
+  };
+
+  // Button style border-radius mapping
+  const btnRadius: Record<string, string> = {
+    rounded: "0.5rem",
+    pill: "9999px",
+    square: "0.125rem",
+  };
   // Prefer per-form field settings (when ?form= is set), fall back to workspace-level settings
   const rawSettings = data?.orderForm?.fieldSettings ?? workspace.bookingFormSettings;
   // DB stores field objects flat (e.g. { propertyType: {...}, sqft: {...}, gridColumns: 3 })
@@ -2609,7 +2645,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: bgColor, fontFamily: fontFamilyCSS[fontFamily] ?? fontFamilyCSS.Inter }}>
       {/* Add-on services popup modal */}
       {showAddOnModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -2673,8 +2709,8 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
               <button
                 type="button"
                 onClick={handleSkipAddOns}
-                style={{ backgroundColor: brandColor }}
-                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: brandColor, borderRadius: btnRadius[buttonStyle] ?? btnRadius.rounded }}
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
               >
                 Continue →
               </button>
@@ -2687,9 +2723,9 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       <div className="h-1 sticky top-0 z-20" style={{ backgroundColor: brandColor }} />
       <header className="bg-white border-b border-gray-100 py-4 px-6 sticky top-1 z-10 shadow-sm">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          {workspace.logoUrl ? (
+          {showLogo && (effectiveLogoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={workspace.logoUrl} alt={workspace.name} className="h-8 w-auto object-contain" />
+            <img src={effectiveLogoUrl} alt={workspace.name} className="h-8 w-auto object-contain" />
           ) : (
             <div
               className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
@@ -2697,7 +2733,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
             >
               {workspace.name?.[0]?.toUpperCase() ?? "?"}
             </div>
-          )}
+          ))}
           <div>
             <h1 className="font-semibold text-gray-900 text-sm sm:text-base leading-tight">{workspace.name}</h1>
             <p className="text-xs text-gray-400 leading-tight">Book a shoot</p>
@@ -2707,7 +2743,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
 
       {/* Content */}
       <main className={`mx-auto px-4 py-8 transition-all ${step === 2 ? "max-w-6xl" : "max-w-2xl"}`}>
-        <StepIndicator current={step} total={isSignedIn ? 4 : 5} brandColor={brandColor} skipContact={isSignedIn} />
+        <StepIndicator current={step} total={isSignedIn ? 4 : 5} brandColor={brandColor} skipContact={isSignedIn} showStepNumbers={showStepNumbers} />
 
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
@@ -2735,8 +2771,8 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
               <button
                 type="button"
                 onClick={handleNext}
-                style={{ backgroundColor: brandColor }}
-                className="px-6 py-2.5 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: brandColor, borderRadius: btnRadius[buttonStyle] ?? btnRadius.rounded }}
+                className="px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
               >
                 Continue →
               </button>
@@ -2800,8 +2836,8 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
                 type="button"
                 onClick={handleNext}
                 disabled={!!(step === 1 && outsideBlocked)}
-                style={step === 1 && outsideBlocked ? { backgroundColor: "#d1d5db" } : { backgroundColor: brandColor }}
-                className="px-6 py-2.5 text-sm font-semibold text-white rounded-lg transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+                style={step === 1 && outsideBlocked ? { backgroundColor: "#d1d5db", borderRadius: btnRadius[buttonStyle] ?? btnRadius.rounded } : { backgroundColor: brandColor, borderRadius: btnRadius[buttonStyle] ?? btnRadius.rounded }}
+                className="px-6 py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
                 title={step === 1 && outsideBlocked ? "This address is outside our service area" : undefined}
               >
                 Continue →
@@ -2811,8 +2847,8 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitMutation.isPending}
-                style={{ backgroundColor: brandColor }}
-                className="px-8 py-2.5 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-2"
+                style={{ backgroundColor: brandColor, borderRadius: btnRadius[buttonStyle] ?? btnRadius.rounded }}
+                className="px-8 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-2"
               >
                 {submitMutation.isPending ? (
                   <>

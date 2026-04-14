@@ -483,7 +483,7 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     if (stepNum) sendStepToPreview(stepNum);
   }
 
-  // ── Live sync: send state to iframe whenever fields/customFields change ───
+  // ── Live sync: send state to iframe whenever anything changes ───────────
   const sendLiveUpdate = useCallback(() => {
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
@@ -492,11 +492,24 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
         customFields,
         gridColumns,
         orderDetails: { showCouponField, showPriceBreakdown, showTotal, taxRate, taxLabel, showLineItemDetails },
+        appearance: { accentColor, backgroundColor, fontFamily, buttonStyle, showLogo, showStepNumbers, logoUrl: logoUrl || null },
       }, "*");
     }
-  }, [fields, customFields, gridColumns, showCouponField, showPriceBreakdown, showTotal, taxRate, taxLabel, showLineItemDetails]);
+  }, [fields, customFields, gridColumns, showCouponField, showPriceBreakdown, showTotal, taxRate, taxLabel, showLineItemDetails, accentColor, backgroundColor, fontFamily, buttonStyle, showLogo, showStepNumbers, logoUrl]);
 
   useEffect(() => { sendLiveUpdate(); }, [sendLiveUpdate]);
+
+  // Listen for "BOOKING_FORM_READY" from the iframe — fires after React hydration
+  // guarantees the message listener is attached before we send the first update
+  useEffect(() => {
+    function handleReady(e: MessageEvent) {
+      if (e.data?.type === "BOOKING_FORM_READY") {
+        sendLiveUpdate();
+      }
+    }
+    window.addEventListener("message", handleReady);
+    return () => window.removeEventListener("message", handleReady);
+  }, [sendLiveUpdate]);
 
   const refreshPreview = useCallback(() => {
     const iframe = iframeRef.current;
@@ -1252,7 +1265,8 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
               onLoad={() => {
                 const stepNum = STEP_MAP[activeSection];
                 if (stepNum) sendStepToPreview(stepNum);
-                sendLiveUpdate();
+                // Delay to allow React hydration inside iframe before posting
+                setTimeout(() => sendLiveUpdate(), 800);
               }}
             />
           </div>

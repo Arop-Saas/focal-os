@@ -249,6 +249,10 @@ model StaffProfile {
   // null = available for all territories (no restriction)
   homeTerritoryId String?
 
+  // Push notifications (mobile app)
+  pushToken       String?
+  pushPlatform    String?   // "ios" | "android"
+
   // Compensation
   payType         PayType  @default(HOURLY)
   payRate         Float?
