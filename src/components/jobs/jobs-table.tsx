@@ -108,13 +108,13 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
               <div className="flex items-start justify-between gap-3">
                 <div
                   className="pt-0.5 shrink-0"
-                  onClick={(e) => { e.stopPropagation(); toggleSelect(job.id); }}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleSelect(job.id); }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedIds.has(job.id)}
-                    onChange={() => toggleSelect(job.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    readOnly
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
                   />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -165,12 +165,12 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-gray-50">
-              <th className="w-10 px-4 py-3">
+              <th className="w-10 px-4 py-3 cursor-pointer" onClick={toggleAll}>
                 <input
                   type="checkbox"
                   checked={allSelected}
-                  onChange={toggleAll}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  readOnly
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
                 />
               </th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Job</th>
@@ -193,12 +193,15 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
                   )}
                   onClick={() => router.push(`/jobs/${job.id}`)}
                 >
-                  <td className="w-10 px-4 py-3.5" onClick={(e) => { e.stopPropagation(); toggleSelect(job.id); }}>
+                  <td
+                    className="w-10 px-4 py-3.5"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleSelect(job.id); }}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedIds.has(job.id)}
-                      onChange={() => toggleSelect(job.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      readOnly
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
                     />
                   </td>
                   <td className="px-4 py-3.5">
