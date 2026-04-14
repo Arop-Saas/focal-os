@@ -472,18 +472,6 @@ export const mobileRouter = router({
       });
     }),
 
-  // Get my profile
-  getProfile: mobileProcedure.query(async ({ ctx }) => {
-    return {
-      fullName: ctx.user.fullName,
-      email: ctx.user.email,
-      avatarUrl: ctx.user.avatarUrl,
-      title: ctx.staffProfile.title,
-      workspaceName: ctx.workspace.name,
-      workspaceLogo: ctx.workspace.logoUrl,
-    };
-  }),
-
   // All assigned jobs (no date filter) — for Listings tab
   getAllMyJobs: mobileProcedure.query(async ({ ctx }) => {
     const assignments = await ctx.prisma.jobAssignment.findMany({
@@ -765,10 +753,14 @@ export const mobileRouter = router({
 
     return {
       id: profile?.id,
+      fullName: ctx.user.fullName,
+      email: ctx.user.email,
       title: profile?.title,
       phone: profile?.phone,
-      avatarUrl: profile?.avatarUrl,
+      avatarUrl: profile?.avatarUrl ?? ctx.user.avatarUrl,
       role: profile?.member?.role,
+      workspaceName: ctx.workspace.name,
+      workspaceLogo: ctx.workspace.logoUrl,
       homeTerritoryName: profile?.homeTerritory?.name ?? null,
     };
   }),
