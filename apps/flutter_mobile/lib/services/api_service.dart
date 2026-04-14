@@ -153,6 +153,10 @@ class ApiService {
     return await query('mobile.getProfile');
   }
 
+  Future<dynamic> debugAuth() async {
+    return await query('mobile.debugAuth');
+  }
+
   Future<dynamic> getMonthOverview(int year, int month) async {
     return await query('mobile.getMonthOverview', {'year': year, 'month': month});
   }
