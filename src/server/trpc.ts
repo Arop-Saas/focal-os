@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createBrowserClient } from "@supabase/supabase-js";
 import prisma from "@/lib/prisma";
 import type { MemberRole } from "@prisma/client";
 import { ROLE_HIERARCHY, hasRole } from "@/lib/roles";
@@ -17,8 +18,6 @@ interface CreateContextOptions {
 }
 
 export async function createTRPCContext(opts: CreateContextOptions) {
-  const supabase = await createClient();
-
   // Mobile clients send Authorization: Bearer <token> instead of cookies.
   // Check the header first; fall back to cookie-based session.
   let supabaseUser = null;
@@ -26,9 +25,16 @@ export async function createTRPCContext(opts: CreateContextOptions) {
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (bearerToken) {
+    // For Bearer token auth (mobile), use a plain Supabase client — the
+    // SSR cookie-based client doesn't handle raw JWTs properly.
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
     const { data } = await supabase.auth.getUser(bearerToken);
     supabaseUser = data.user;
   } else {
+    const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
     supabaseUser = data.user;
   }
