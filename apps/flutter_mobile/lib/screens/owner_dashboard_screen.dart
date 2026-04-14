@@ -308,7 +308,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     final clientName = client != null ? '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'.trim() : '';
     final scheduledAt = job['scheduledAt'];
     final photographer = (job['assignments'] as List?)?.isNotEmpty == true
-        ? job['assignments'][0]['staff']?['displayName'] ?? ''
+        ? (job['assignments'][0]['staff'] as Map?)?['displayName'] ?? ''
         : 'Unassigned';
     final amount = job['totalAmount'];
 
