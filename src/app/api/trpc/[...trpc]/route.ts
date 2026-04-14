@@ -11,10 +11,7 @@ const handler = (req: NextRequest) => {
   const authHeader = req.headers.get("authorization");
   const mobileToken = req.headers.get("x-mobile-token");
 
-  console.log(`[Route Handler] Authorization: ${authHeader ? "present" : "MISSING"}`);
-  console.log(`[Route Handler] x-mobile-token: ${mobileToken ? "present" : "MISSING"}`);
-
-  // Build the effective auth header — prefer Authorization, fall back to custom header
+  // Prefer Authorization header, fall back to custom x-mobile-token for mobile clients
   const effectiveAuth = authHeader ?? (mobileToken ? `Bearer ${mobileToken}` : null);
 
   return fetchRequestHandler({

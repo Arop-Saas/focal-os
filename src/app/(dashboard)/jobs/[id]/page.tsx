@@ -11,6 +11,7 @@ import {
   BedDouble, Bath, Ruler, Hash,
 } from "lucide-react";
 import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
+import { JobDeleteButton } from "@/components/jobs/job-delete-button";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
 import { JobAssignmentPicker } from "@/components/jobs/job-assignment-picker";
 import { JobMessageThread } from "@/components/messages/job-message-thread";
@@ -84,6 +85,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             )}>
               {JOB_STATUS_LABELS[job.status] ?? job.status}
             </span>
+            <JobDeleteButton jobId={job.id} jobNumber={job.jobNumber} />
             <JobStatusUpdater jobId={job.id} currentStatus={job.status} />
           </div>
         </div>

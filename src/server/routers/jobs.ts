@@ -764,4 +764,62 @@ export const jobsRouter = router({
 
       return cancelled;
     }),
+
+  // Hard delete — permanently removes a job and all related records
+  delete: workspaceProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspace.id },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+
+      // Delete in correct order to respect foreign keys
+      await ctx.prisma.$transaction(async (tx) => {
+        // Delete related records that may not have cascade
+        await tx.jobMessage.deleteMany({ where: { jobId: input.id } });
+        await tx.jobChecklistItem.deleteMany({ where: { jobId: input.id } });
+        await tx.notification.deleteMany({ where: { jobId: input.id } });
+
+        // Delete invoice if linked
+        await tx.invoice.deleteMany({ where: { jobId: input.id } });
+
+        // Delete order if linked
+        await tx.order.deleteMany({ where: { jobId: input.id } });
+
+        // Cascade-handled: assignments, services, gallery, statusHistory
+        // Delete the job itself (cascades take care of the rest)
+        await tx.job.delete({ where: { id: input.id } });
+      });
+
+      return { success: true, deletedJobNumber: job.jobNumber };
+    }),
+
+  // Bulk delete — permanently removes multiple jobs
+  bulkDelete: workspaceProcedure
+    .input(z.object({ ids: z.array(z.string()).min(1).max(50) }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify all jobs belong to this workspace
+      const jobs = await ctx.prisma.job.findMany({
+        where: { id: { in: input.ids }, workspaceId: ctx.workspace.id },
+        select: { id: true, jobNumber: true },
+      });
+
+      if (jobs.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No matching jobs found" });
+      }
+
+      const jobIds = jobs.map(j => j.id);
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.jobMessage.deleteMany({ where: { jobId: { in: jobIds } } });
+        await tx.jobChecklistItem.deleteMany({ where: { jobId: { in: jobIds } } });
+        await tx.notification.deleteMany({ where: { jobId: { in: jobIds } } });
+        await tx.invoice.deleteMany({ where: { jobId: { in: jobIds } } });
+        await tx.order.deleteMany({ where: { jobId: { in: jobIds } } });
+        await tx.job.deleteMany({ where: { id: { in: jobIds } } });
+      });
+
+      return { success: true, deletedCount: jobs.length };
+    }),
 });

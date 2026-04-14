@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { cn, formatDateTime, formatCurrency, JOB_STATUS_COLORS, JOB_STATUS_LABELS } from "@/lib/utils";
-import { MapPin, Calendar, User, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, Calendar, User, ChevronLeft, ChevronRight, Trash2, Loader2, AlertTriangle, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { trpc } from "@/lib/trpc/client";
 
 type Job = {
   id: string;
@@ -34,10 +36,41 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const totalPages = Math.ceil(total / limit);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+
+  const bulkDelete = trpc.jobs.bulkDelete.useMutation({
+    onSuccess: (data) => {
+      setSelectedIds(new Set());
+      setShowBulkConfirm(false);
+      router.refresh();
+    },
+  });
+
+  const allSelected = jobs.length > 0 && jobs.every((j) => selectedIds.has(j.id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(jobs.map((j) => j.id)));
+    }
+  }
 
   function changePage(newPage: number) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", String(newPage));
+    setSelectedIds(new Set());
     router.push(`?${params.toString()}`);
   }
 
@@ -73,6 +106,17 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
               onClick={() => router.push(`/jobs/${job.id}`)}
             >
               <div className="flex items-start justify-between gap-3">
+                <div
+                  className="pt-0.5 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); toggleSelect(job.id); }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(job.id)}
+                    onChange={() => toggleSelect(job.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {job.isRush && (
@@ -121,6 +165,14 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-gray-50">
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+              </th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Job</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Client</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Scheduled</th>
@@ -135,9 +187,20 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
               return (
                 <tr
                   key={job.id}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  className={cn(
+                    "hover:bg-gray-50 cursor-pointer transition-colors",
+                    selectedIds.has(job.id) && "bg-blue-50 hover:bg-blue-50/80"
+                  )}
                   onClick={() => router.push(`/jobs/${job.id}`)}
                 >
+                  <td className="w-10 px-4 py-3.5" onClick={(e) => { e.stopPropagation(); toggleSelect(job.id); }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(job.id)}
+                      onChange={() => toggleSelect(job.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-start gap-2">
                       {job.isRush && (
@@ -247,6 +310,68 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk action bar ──────────────────────────────────────────── */}
+      {someSelected && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-gray-900 text-white pl-4 pr-3 py-2.5 rounded-xl shadow-2xl">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <button
+            onClick={() => setShowBulkConfirm(true)}
+            className="flex items-center gap-1.5 text-sm font-medium bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="flex items-center justify-center h-7 w-7 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Bulk delete confirmation modal ────────────────────────────── */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Delete {selectedIds.size} Jobs</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              This will permanently delete {selectedIds.size} job{selectedIds.size > 1 ? "s" : ""} and all
+              associated data including invoices, galleries, messages, and assignments.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBulkConfirm(false)}
+                disabled={bulkDelete.isPending}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => bulkDelete.mutate({ ids: Array.from(selectedIds) })}
+                disabled={bulkDelete.isPending}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-60"
+              >
+                {bulkDelete.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Delete permanently
+              </button>
+            </div>
           </div>
         </div>
       )}

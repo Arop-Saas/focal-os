@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { router, protectedProcedure, publicProcedure } from "@/server/trpc";
+import { router, protectedProcedure } from "@/server/trpc";
 import { TRPCError } from "@trpc/server";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
 import { startOfDay, endOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { generateJobNumber } from "@/lib/utils";
 
@@ -766,95 +766,4 @@ export const mobileRouter = router({
     };
   }),
 
-  // ── DEBUG: Temporary endpoint to diagnose mobile auth ──────────────────
-  // DELETE THIS after debugging is complete
-  debugAuth: publicProcedure.query(async ({ ctx }) => {
-    const authHeader = ctx.req?.headers.get("authorization") ?? "NONE";
-    const hasBearerToken = authHeader.startsWith("Bearer ");
-    const tokenPreview = hasBearerToken ? authHeader.slice(7, 27) + "..." : "N/A";
-
-    // Step 1: Check if we can extract bearer token
-    const jwt = hasBearerToken ? authHeader.slice(7) : null;
-
-    // Step 2: Validate with Supabase admin client
-    let supabaseResult: any = { status: "skipped" };
-    if (jwt) {
-      try {
-        const adminClient = createSupabaseClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          { auth: { persistSession: false, autoRefreshToken: false } }
-        );
-        const { data, error } = await adminClient.auth.getUser(jwt);
-        supabaseResult = {
-          status: error ? "error" : "success",
-          error: error?.message ?? null,
-          userId: data?.user?.id ?? null,
-          email: data?.user?.email ?? null,
-        };
-      } catch (e: any) {
-        supabaseResult = { status: "exception", message: e.message };
-      }
-    }
-
-    // Step 3: If we got a supabase user, check Prisma
-    let prismaResult: any = { status: "skipped" };
-    if (supabaseResult.userId) {
-      const user = await ctx.prisma.user.findUnique({
-        where: { supabaseId: supabaseResult.userId },
-        include: {
-          workspaces: {
-            include: { workspace: { select: { id: true, name: true } } },
-          },
-        },
-      });
-      prismaResult = {
-        status: user ? "found" : "not_found",
-        userId: user?.id ?? null,
-        email: user?.email ?? null,
-        workspaces: user?.workspaces.map(w => ({
-          role: w.role,
-          workspaceId: w.workspace.id,
-          workspaceName: w.workspace.name,
-        })) ?? [],
-      };
-
-      // Step 4: Check staff profile
-      if (user) {
-        const staffProfile = await ctx.prisma.staffProfile.findFirst({
-          where: {
-            member: { userId: user.id },
-            isActive: true,
-          },
-          include: { member: { select: { role: true, workspaceId: true } } },
-        });
-        (prismaResult as any).staffProfile = staffProfile
-          ? { id: staffProfile.id, title: staffProfile.title, isActive: staffProfile.isActive, memberRole: staffProfile.member.role }
-          : "NOT_FOUND";
-      }
-    }
-
-    // Step 5: Also check what ctx already resolved
-    const ctxResult = {
-      hasSupabaseUser: !!ctx.supabaseUser,
-      supabaseUserId: ctx.supabaseUser?.id ?? null,
-      hasUser: !!ctx.user,
-      userId: ctx.user?.id ?? null,
-      hasWorkspace: !!ctx.workspace,
-      workspaceName: ctx.workspace?.name ?? null,
-    };
-
-    return {
-      authHeader: hasBearerToken ? "Bearer [present]" : authHeader,
-      tokenPreview,
-      supabaseValidation: supabaseResult,
-      prismaLookup: prismaResult,
-      tRPCContext: ctxResult,
-      envCheck: {
-        hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      },
-    };
-  }),
 });
