@@ -18,6 +18,7 @@ const publicRoutes = [
   "/mobile/login", // Photographer mobile app login
   "/invite",       // Staff invite acceptance pages
   "/api/staff/accept-invite", // Accept invite API
+  "/api/trpc",     // tRPC API (auth handled by tRPC context, not middleware)
   "/pay",          // Direct invoice payment page (public link from email)
 ];
 
