@@ -182,6 +182,25 @@ class ApiService {
     return await query('mobile.getMonthOverview', {'year': year, 'month': month});
   }
 
+  Future<dynamic> getAdminMonthOverview(int year, int month) async {
+    return await query('mobile.getAdminMonthOverview', {'year': year, 'month': month});
+  }
+
+  Future<List<dynamic>> getAdminJobsByDate(String date) async {
+    final data = await query('mobile.getAdminJobsByDate', {'date': date});
+    return (data as List?) ?? [];
+  }
+
+  Future<Map<String, dynamic>> getJobFormData() async {
+    final data = await query('mobile.getJobFormData');
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  Future<Map<String, dynamic>> createJob(Map<String, dynamic> input) async {
+    final data = await mutate('mobile.createJob', input);
+    return data is Map<String, dynamic> ? data : {};
+  }
+
   Future<dynamic> clockIn(String jobId) async {
     return await mutate('mobile.clockIn', {'jobId': jobId});
   }

@@ -66,13 +66,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '$greeting,',
+                                        '$greeting, $firstName',
                                         style: TextStyle(fontSize: 14, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        firstName,
-                                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                        _overview['workspaceName'] ?? 'Studio',
+                                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                                       ),
                                     ],
                                   ),
@@ -92,18 +92,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             ),
                           ),
                         ),
-
-                        // Workspace name
-                        if (_overview['workspaceName'] != null)
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                              child: Text(
-                                _overview['workspaceName'],
-                                style: TextStyle(fontSize: 14, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
-                              ),
-                            ),
-                          ),
 
                         // Stats cards
                         SliverToBoxAdapter(

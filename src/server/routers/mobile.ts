@@ -259,6 +259,77 @@ export const mobileRouter = router({
     };
   }),
 
+  // ── Admin: month overview for calendar (all workspace jobs per day) ──────
+  getAdminMonthOverview: adminProcedure
+    .input(z.object({ year: z.number(), month: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const monthStart = startOfMonth(new Date(input.year, input.month - 1));
+      const monthEnd = endOfMonth(new Date(input.year, input.month - 1));
+
+      const jobs = await ctx.prisma.job.findMany({
+        where: {
+          workspaceId: ctx.workspace.id,
+          scheduledAt: { gte: monthStart, lte: monthEnd },
+          status: { notIn: ["CANCELLED"] },
+        },
+        select: { scheduledAt: true, status: true },
+      });
+
+      const days: Record<number, { count: number; statuses: string[] }> = {};
+      for (const j of jobs) {
+        const day = j.scheduledAt?.getDate();
+        if (day) {
+          if (!days[day]) days[day] = { count: 0, statuses: [] };
+          days[day].count++;
+          days[day].statuses.push(j.status);
+        }
+      }
+      return { days };
+    }),
+
+  // ── Admin: jobs for a specific date ─────────────────────────────────────
+  getAdminJobsByDate: adminProcedure
+    .input(z.object({ date: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const date = new Date(input.date);
+      const dayStart = startOfDay(date);
+      const dayEnd = endOfDay(date);
+
+      const jobs = await ctx.prisma.job.findMany({
+        where: {
+          workspaceId: ctx.workspace.id,
+          scheduledAt: { gte: dayStart, lte: dayEnd },
+          status: { notIn: ["CANCELLED"] },
+        },
+        orderBy: { scheduledAt: "asc" },
+        include: {
+          client: { select: { firstName: true, lastName: true, phone: true } },
+          package: { select: { name: true } },
+          assignments: {
+            include: {
+              staff: { include: { member: { include: { user: true } } } },
+            },
+          },
+        },
+      });
+
+      return jobs.map((j) => ({
+        id: j.id,
+        status: j.status,
+        propertyAddress: j.propertyAddress,
+        propertyCity: j.propertyCity,
+        scheduledAt: j.scheduledAt,
+        isRush: j.isRush,
+        totalAmount: j.totalAmount,
+        client: j.client,
+        package: j.package,
+        assignments: j.assignments.map((a) => ({
+          role: a.role,
+          staff: { displayName: a.staff.member.user.fullName },
+        })),
+      }));
+    }),
+
   // ── Client portal endpoints ─────────────────────────────────────────────
 
   // Client's jobs (all, ordered newest first)
