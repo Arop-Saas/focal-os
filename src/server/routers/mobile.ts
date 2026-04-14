@@ -222,7 +222,11 @@ export const mobileRouter = router({
         member: { include: { user: true } },
         jobAssignments: {
           where: { job: { scheduledAt: { gte: todayStart, lte: todayEnd } } },
-          include: { job: true },
+          include: {
+            job: {
+              include: { client: { select: { firstName: true, lastName: true } } },
+            },
+          },
         },
       },
       orderBy: { createdAt: "asc" },
@@ -233,7 +237,8 @@ export const mobileRouter = router({
       const clockedIn = todayAssignments.some(
         (a) => a.job.actualStartAt && !a.job.actualEndAt
       );
-      const currentJob = todayAssignments.find((a) => a.job.actualStartAt && !a.job.actualEndAt)?.job ?? null;
+      const activeAssignment = todayAssignments.find((a) => a.job.actualStartAt && !a.job.actualEndAt);
+      const currentJob = activeAssignment?.job ?? null;
       return {
         id: s.id,
         displayName: s.member.user.fullName,
@@ -244,7 +249,19 @@ export const mobileRouter = router({
         role: s.member.role,
         todayJobCount: todayAssignments.length,
         clockedIn,
-        currentJob: currentJob ? { id: currentJob.id, propertyAddress: currentJob.propertyAddress, status: currentJob.status } : null,
+        currentJob: currentJob
+          ? {
+              id: currentJob.id,
+              propertyAddress: currentJob.propertyAddress,
+              propertyCity: currentJob.propertyCity,
+              status: currentJob.status,
+              actualStartAt: currentJob.actualStartAt,
+              scheduledAt: currentJob.scheduledAt,
+              clientName: currentJob.client
+                ? `${currentJob.client.firstName ?? ""} ${currentJob.client.lastName ?? ""}`.trim()
+                : null,
+            }
+          : null,
       };
     });
   }),

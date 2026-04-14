@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import 'dashboard_screen.dart';
 import 'owner_dashboard_screen.dart';
-import 'owner_calendar_screen.dart';
 import 'owner_jobs_screen.dart';
 import 'owner_staff_screen.dart';
 import 'profile_screen.dart';
@@ -45,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isOwner) {
       return const [
         OwnerDashboardScreen(),
-        OwnerCalendarScreen(),
         OwnerJobsScreen(),
         OwnerStaffScreen(),
         ProfileScreen(),
@@ -64,11 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icon(Icons.dashboard_outlined, color: Colors.grey.shade400),
           selectedIcon: const Icon(Icons.dashboard_rounded, color: Color(0xFF0F172A)),
           label: 'Dashboard',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.calendar_month_outlined, color: Colors.grey.shade400),
-          selectedIcon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF0F172A)),
-          label: 'Calendar',
         ),
         NavigationDestination(
           icon: Icon(Icons.work_outline_rounded, color: Colors.grey.shade400),
