@@ -3,7 +3,6 @@ import { type NextRequest } from "next/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createBrowserClient } from "@supabase/supabase-js";
 import prisma from "@/lib/prisma";
 import type { MemberRole } from "@prisma/client";
 import { ROLE_HIERARCHY, hasRole } from "@/lib/roles";
@@ -12,6 +11,27 @@ import "@/lib/env"; // validates required env vars on startup
 export { ROLE_HIERARCHY, hasRole };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
+
+/**
+ * Validate a Supabase JWT by calling the Auth REST API directly.
+ * This avoids SSR cookie-client issues when mobile sends a Bearer token.
+ */
+async function getUserFromBearerToken(jwt: string) {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`,
+    {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      },
+    }
+  );
+  if (!res.ok) {
+    console.error(`[Bearer Auth] Supabase returned ${res.status} for token validation`);
+    return null;
+  }
+  return res.json();
+}
 
 interface CreateContextOptions {
   req?: NextRequest;
@@ -25,14 +45,10 @@ export async function createTRPCContext(opts: CreateContextOptions) {
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (bearerToken) {
-    // For Bearer token auth (mobile), use a plain Supabase client — the
-    // SSR cookie-based client doesn't handle raw JWTs properly.
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
-    const { data } = await supabase.auth.getUser(bearerToken);
-    supabaseUser = data.user;
+    // For Bearer token auth (mobile), call Supabase Auth REST API directly.
+    // The SSR cookie-based client and browser client both have issues
+    // validating raw JWTs in a server-side context.
+    supabaseUser = await getUserFromBearerToken(bearerToken);
   } else {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
