@@ -11,8 +11,11 @@ class ApiService {
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
-        if (_auth.accessToken != null)
+        if (_auth.accessToken != null) ...{
           'Authorization': 'Bearer ${_auth.accessToken}',
+          // Send token via custom header too — Vercel/Next.js may strip Authorization
+          'x-mobile-token': _auth.accessToken!,
+        },
       };
 
   // ─── superjson helpers ─────────────────────────────────────────────────

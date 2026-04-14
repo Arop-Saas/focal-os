@@ -5,17 +5,23 @@ import { appRouter } from "@/server/routers/_app";
 import { createTRPCContext } from "@/server/trpc";
 
 const handler = (req: NextRequest) => {
-  // Extract the Authorization header BEFORE passing to fetchRequestHandler.
-  // Next.js / tRPC can strip headers during request processing, so we
-  // capture it here and pass it explicitly to the context.
+  // Extract auth headers BEFORE passing to fetchRequestHandler.
+  // Check both standard Authorization and custom x-mobile-token fallback,
+  // since some layers (Vercel edge, Next.js middleware) may strip Authorization.
   const authHeader = req.headers.get("authorization");
-  console.log(`[Route Handler] Authorization header: ${authHeader ? "present" : "missing"}`);
+  const mobileToken = req.headers.get("x-mobile-token");
+
+  console.log(`[Route Handler] Authorization: ${authHeader ? "present" : "MISSING"}`);
+  console.log(`[Route Handler] x-mobile-token: ${mobileToken ? "present" : "MISSING"}`);
+
+  // Build the effective auth header — prefer Authorization, fall back to custom header
+  const effectiveAuth = authHeader ?? (mobileToken ? `Bearer ${mobileToken}` : null);
 
   return fetchRequestHandler({
     endpoint: "/api/trpc",
     req,
     router: appRouter,
-    createContext: () => createTRPCContext({ req, authHeader }),
+    createContext: () => createTRPCContext({ req, authHeader: effectiveAuth }),
     onError:
       process.env.NODE_ENV === "development"
         ? ({ path, error }) => {
