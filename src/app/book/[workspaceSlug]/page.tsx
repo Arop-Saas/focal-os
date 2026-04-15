@@ -1417,12 +1417,14 @@ function Step3DateTime({
   workspaceSlug,
   brandColor,
   hours,
+  detectedTerritoryId,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
   workspaceSlug: string;
   brandColor: string;
   hours: { dayOfWeek: number; isOpen: boolean; openTime: string; closeTime: string }[];
+  detectedTerritoryId?: string;
 }) {
   const today = startOfDay(new Date());
   const days = Array.from({ length: 28 }, (_, i) => addDays(today, i + 1));
@@ -1459,7 +1461,7 @@ function Step3DateTime({
       {
         slug: workspaceSlug,
         date: form.scheduledDate,
-        ...(detectedTerritory?.id ? { territoryId: detectedTerritory.id } : {}),
+        ...(detectedTerritoryId ? { territoryId: detectedTerritoryId } : {}),
       },
       { enabled: !!form.scheduledDate }
     );
@@ -2496,19 +2498,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       const pkg = data.packages?.find((p: any) => p.id === form.packageId);
       const pkgServiceIds = new Set(pkg?.items?.map((item: any) => item.serviceId) ?? []);
       const alreadySelected = new Set(form.selectedServiceIds);
-      // Filter by territory before checking for available add-ons
-      const _addressEntered = !!(form.propertyCity?.trim() || (form.propertyLat && form.propertyLng));
-      const _hasTerritoryTags = (data.services ?? []).some((s: any) => { const ids = s.territoryIds as string[] | null; return ids && ids.length > 0; });
-      const _detTerritoryId = detectedTerritory?.id ?? null;
-      const _filteredSvcs = (_addressEntered && _hasTerritoryTags)
-        ? (data.services ?? []).filter((s: any) => {
-            const ids = s.territoryIds as string[] | null | undefined;
-            if (!ids || ids.length === 0) return true;
-            if (!_detTerritoryId) return false;
-            return ids.includes(_detTerritoryId);
-          })
-        : (data.services ?? []);
-      const available = _filteredSvcs.filter(
+      const available = (data.services ?? []).filter(
         (s: any) => !pkgServiceIds.has(s.id) && !alreadySelected.has(s.id)
       );
       if (available.length > 0) {
@@ -2654,19 +2644,18 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const selectedPkg = packages.find((p: any) => p.id === form.packageId);
   const modalPkgServiceIds = new Set(selectedPkg?.items?.map((item: any) => item.serviceId) ?? []);
   const modalAlreadySelected = new Set(form.selectedServiceIds);
-  const detectedTerritoryId = detectedTerritory?.id ?? null;
-  const addressEntered = !!(form.propertyCity?.trim() || (form.propertyLat && form.propertyLng));
-  const hasTerritoryTaggedServices = services.some((s: any) => { const ids = s.territoryIds as string[] | null; return ids && ids.length > 0; });
-  const shouldFilterByTerritory = addressEntered && hasTerritoryTaggedServices;
-  const territoryFilteredServices = shouldFilterByTerritory
-    ? services.filter((s: any) => {
+  const _modalTerritoryId = detectedTerritory?.id ?? null;
+  const _modalAddressEntered = !!(form.propertyCity?.trim() || (form.propertyLat && form.propertyLng));
+  const _modalHasTags = (services ?? []).some((s: any) => { const ids = s.territoryIds as string[] | null; return ids && ids.length > 0; });
+  const _modalFiltered = (_modalAddressEntered && _modalHasTags)
+    ? (services ?? []).filter((s: any) => {
         const ids = s.territoryIds as string[] | null | undefined;
         if (!ids || ids.length === 0) return true;
-        if (!detectedTerritoryId) return false;
-        return ids.includes(detectedTerritoryId);
+        if (!_modalTerritoryId) return false;
+        return ids.includes(_modalTerritoryId);
       })
-    : services;
-  const modalAddOnServices = (territoryFilteredServices ?? []).filter(
+    : (services ?? []);
+  const modalAddOnServices = _modalFiltered.filter(
     (s: any) => !modalPkgServiceIds.has(s.id) && !modalAlreadySelected.has(s.id)
   );
 
@@ -2823,7 +2812,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 3 && (
             <>
-              <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} />
+              <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} detectedTerritoryId={detectedTerritory?.id} />
               <CustomFieldsRenderer step={3} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
