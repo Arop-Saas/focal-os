@@ -1332,7 +1332,7 @@ function Step2Package({
         <PackageDetailModal
           pkg={detailPkg}
           brandColor={brandColor}
-          services={services}
+          services={visibleServices}
           selectedAddOns={selectedAddOns}
           toggleAddOn={toggleAddOn}
           onSelect={() => selectPackage(detailPkg.id)}
@@ -2642,7 +2642,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   const selectedPkg = packages.find((p: any) => p.id === form.packageId);
   const modalPkgServiceIds = new Set(selectedPkg?.items?.map((item: any) => item.serviceId) ?? []);
   const modalAlreadySelected = new Set(form.selectedServiceIds);
-  const modalAddOnServices = (services ?? []).filter(
+  const modalAddOnServices = (visibleServices ?? []).filter(
     (s: any) => !modalPkgServiceIds.has(s.id) && !modalAlreadySelected.has(s.id)
   );
 
