@@ -13,12 +13,18 @@ export default function GlobalError({
     console.error("[error boundary]", error);
   }, [error]);
 
+  // Detect if we're on a public page (booking, portal, pay, gallery, etc.)
+  // so "Go home" doesn't accidentally expose the admin dashboard to public visitors
+  const isPublicPage =
+    typeof window !== "undefined" &&
+    (/^\/(book|portal|pay|invite|g|feedback)\b/.test(window.location.pathname));
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 text-center">
       <div className="mb-6 text-7xl font-black text-gray-200 select-none">500</div>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
       <p className="text-gray-500 mb-8 max-w-sm">
-        An unexpected error occurred. Our team has been notified. Please try again.
+        An unexpected error occurred. Please try again.
       </p>
       <div className="flex items-center gap-3">
         <button
@@ -27,12 +33,14 @@ export default function GlobalError({
         >
           Try again
         </button>
-        <a
-          href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-100 transition-colors"
-        >
-          Go home
-        </a>
+        {!isPublicPage && (
+          <a
+            href="/"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-100 transition-colors"
+          >
+            Go home
+          </a>
+        )}
       </div>
       {error.digest && (
         <p className="mt-6 text-xs text-gray-300">Error ID: {error.digest}</p>
