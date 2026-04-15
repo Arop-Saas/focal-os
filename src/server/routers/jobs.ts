@@ -228,12 +228,16 @@ export const jobsRouter = router({
         })
       );
 
-      // If package selected, add package price
+      // If package selected, add package price and use package duration if set
+      let packageDurationMins: number | null = null;
       if (jobData.packageId) {
         const pkg = await ctx.prisma.package.findFirst({
           where: { id: jobData.packageId, workspaceId: ctx.workspace.id },
         });
-        if (pkg) subtotal = pkg.price;
+        if (pkg) {
+          subtotal = pkg.price;
+          if (pkg.durationMins && pkg.durationMins > 0) packageDurationMins = pkg.durationMins;
+        }
       }
 
       const taxAmount = (subtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
@@ -275,9 +279,8 @@ export const jobsRouter = router({
             listingUrl: jobData.listingUrl || null,
             accessNotes: jobData.accessNotes,
             scheduledAt: jobData.scheduledAt,
-            estimatedDurationMins: calculatedDurationMins > 0
-              ? calculatedDurationMins
-              : jobData.estimatedDurationMins,
+            estimatedDurationMins: packageDurationMins
+              ?? (calculatedDurationMins > 0 ? calculatedDurationMins : jobData.estimatedDurationMins),
             internalNotes: jobData.internalNotes,
             clientNotes: jobData.clientNotes,
             priority: jobData.priority,

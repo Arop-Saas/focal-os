@@ -236,6 +236,7 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
   const [packageBadgeColor, setPackageBadgeColor] = useState("#f59e0b");
   const [packagePhotoCount, setPackagePhotoCount] = useState("");
   const [packageTurnaroundHours, setPackageTurnaroundHours] = useState("");
+  const [packageDurationMins, setPackageDurationMins] = useState("");
   const [packageServices, setPackageServices] = useState<Array<{ serviceId: string; quantity: number }>>([]);
   const [packageTerritoryIds, setPackageTerritoryIds] = useState<string[]>([]);
   const [packageFormIds, setPackageFormIds] = useState<string[]>([]);
@@ -395,6 +396,7 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
     setPackageBadgeColor(pkg.badgeColor ?? "#f59e0b");
     setPackagePhotoCount(pkg.photoCount ? String(pkg.photoCount) : "");
     setPackageTurnaroundHours(pkg.turnaroundHours ? String(pkg.turnaroundHours) : "");
+    setPackageDurationMins((pkg as any).durationMins ? String((pkg as any).durationMins) : "");
     setPackageServices(pkg.items.map((item) => ({ serviceId: item.serviceId, quantity: item.quantity })));
     setPackageTerritoryIds(((pkg as any).territoryIds as string[]) ?? []);
     setPackageFormIds(((pkg as any).formIds as string[]) ?? (formId ? [formId] : []));
@@ -406,7 +408,7 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
     setShowPackageModal(false);
     setPackageName(""); setPackagePrice(""); setPackageDescription(""); setPackageCoverImage("");
     setPackageIsPopular(false); setPackageBadgeLabel(""); setPackageBadgeColor("#f59e0b");
-    setPackagePhotoCount(""); setPackageTurnaroundHours(""); setPackageServices([]);
+    setPackagePhotoCount(""); setPackageTurnaroundHours(""); setPackageDurationMins(""); setPackageServices([]);
     setPackageTerritoryIds([]); setPackageFormIds(formId ? [formId] : []);
   };
 
@@ -426,6 +428,7 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
           badgeLabel: packageBadgeLabel || null,
           badgeColor: packageBadgeLabel ? packageBadgeColor : null,
           photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : null,
+          durationMins: packageDurationMins ? parseInt(packageDurationMins) : null,
           turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : null,
           territoryIds: packageTerritoryIds.length > 0 ? packageTerritoryIds : null,
           formIds: packageFormIds.length > 0 ? packageFormIds : null,
@@ -442,6 +445,7 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
           badgeLabel: packageBadgeLabel || undefined,
           badgeColor: packageBadgeLabel ? packageBadgeColor : undefined,
           photoCount: packagePhotoCount ? parseInt(packagePhotoCount) : undefined,
+          durationMins: packageDurationMins ? parseInt(packageDurationMins) : undefined,
           turnaroundHours: packageTurnaroundHours ? parseInt(packageTurnaroundHours) : undefined,
           territoryIds: packageTerritoryIds.length > 0 ? packageTerritoryIds : undefined,
           formIds: packageFormIds.length > 0 ? packageFormIds : undefined,
@@ -547,6 +551,14 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
         <div className="pt-2 border-t flex items-center justify-between">
           <div>
             <span className="text-xl font-bold text-gray-900">{packagePrice ? formatCurrency(parseFloat(packagePrice)) : "$0.00"}</span>
+            {packageDurationMins && (
+              <p className="text-[10px] text-emerald-500 mt-0.5 flex items-center gap-1 font-medium">
+                <Timer className="h-3 w-3" />{parseInt(packageDurationMins) >= 60
+                  ? `${Math.floor(parseInt(packageDurationMins) / 60)}h${parseInt(packageDurationMins) % 60 > 0 ? ` ${parseInt(packageDurationMins) % 60}m` : ""}`
+                  : `${packageDurationMins}m`
+                } shoot
+              </p>
+            )}
             {packageTurnaroundHours && (
               <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
                 <Timer className="h-3 w-3" />{packageTurnaroundHours}h turnaround
@@ -897,6 +909,15 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
                     <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between">
                       <div>
                         <p className="text-xl font-bold text-gray-900">{formatCurrency(pkg.price)}</p>
+                        {(pkg as any).durationMins && (
+                          <p className="text-[10px] text-emerald-500 flex items-center gap-1 mt-0.5 font-medium">
+                            <Timer className="h-3 w-3" />
+                            {(pkg as any).durationMins >= 60
+                              ? `${Math.floor((pkg as any).durationMins / 60)}h${(pkg as any).durationMins % 60 > 0 ? ` ${(pkg as any).durationMins % 60}m` : ""}`
+                              : `${(pkg as any).durationMins}m`
+                            } shoot
+                          </p>
+                        )}
                         {(pkg.turnaroundHours || pkg.turnaroundDays) && (
                           <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
                             <Timer className="h-3 w-3" />
@@ -1297,6 +1318,47 @@ export function PackagesView({ compact = false, filterTerritoryId, formId }: { c
                       disabled={isSubmitting}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
                     />
+                  </div>
+
+                  {/* Duration — blocks calendar time for scheduling */}
+                  <div className="rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center shrink-0">
+                        <Timer className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Shoot Duration</p>
+                        <p className="text-xs text-gray-500">How long does this package take on-site?</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="15"
+                        step="15"
+                        value={packageDurationMins}
+                        onChange={(e) => setPackageDurationMins(e.target.value)}
+                        placeholder="e.g. 90"
+                        disabled={isSubmitting}
+                        className="h-10 bg-white flex-1"
+                      />
+                      <span className="text-sm text-gray-500 font-medium shrink-0">minutes</span>
+                    </div>
+                    {packageDurationMins && (
+                      <p className="text-[11px] text-emerald-600 mt-2 font-medium flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M5 13l4 4L19 7"/></svg>
+                        Calendar will block {parseInt(packageDurationMins) >= 60
+                          ? `${Math.floor(parseInt(packageDurationMins) / 60)}h${parseInt(packageDurationMins) % 60 > 0 ? ` ${parseInt(packageDurationMins) % 60}m` : ""}`
+                          : `${packageDurationMins}m`
+                        } for each booking
+                      </p>
+                    )}
+                    {!packageDurationMins && (
+                      <p className="text-[11px] text-emerald-400 mt-2 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                        Without duration, scheduling can&apos;t prevent overlapping bookings
+                      </p>
+                    )}
                   </div>
 
                   {/* Territory */}

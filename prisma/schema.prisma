@@ -581,6 +581,7 @@ model Package {
   badgeColor    String?
   coverImage    String?
   photoCount    Int?
+  durationMins  Int?     // Shoot duration in minutes — blocks calendar time for scheduling
   turnaroundDays Int?
   turnaroundHours Int?
   sortOrder     Int      @default(0)

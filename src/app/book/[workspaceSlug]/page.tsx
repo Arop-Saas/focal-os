@@ -1206,7 +1206,17 @@ function Step2Package({
                         View Details
                       </button>
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                        <span className="text-base font-bold text-gray-900">${pkg.price.toLocaleString()}</span>
+                        <div>
+                          <span className="text-base font-bold text-gray-900">${pkg.price.toLocaleString()}</span>
+                          {pkg.durationMins && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                              {pkg.durationMins >= 60
+                                ? `${Math.floor(pkg.durationMins / 60)}h${pkg.durationMins % 60 > 0 ? ` ${pkg.durationMins % 60}m` : ""}`
+                                : `${pkg.durationMins}m`
+                              } shoot
+                            </p>
+                          )}
+                        </div>
                         <button type="button" onClick={() => selectPackage(pkg.id)}
                           className={`px-3 py-1 text-xs font-semibold rounded border transition-colors ${selected ? "text-white border-transparent" : "text-gray-700 border-gray-300 hover:border-gray-400 bg-white"}`}
                           style={selected ? { backgroundColor: brandColor } : undefined}

@@ -416,14 +416,17 @@ export const bookingRouter = router({
         // Determine financials from package or à la carte services
         const subtotal = pkg?.price ?? alaCarteServices.reduce((sum, s) => sum + s.basePrice, 0);
 
-        // Auto-calculate estimated duration from service durations
+        // Auto-calculate estimated duration: prefer package.durationMins, fallback to sum of service durations
         let estimatedDurationMins = 60; // default fallback
         if (pkg && input.packageId) {
           const pkgForDuration = await tx.package.findUnique({
             where: { id: input.packageId },
             include: { items: { include: { service: { select: { durationMins: true } } } } },
           });
-          if (pkgForDuration?.items?.length) {
+          // Use package-level duration if set, otherwise sum individual service durations
+          if (pkgForDuration?.durationMins && pkgForDuration.durationMins > 0) {
+            estimatedDurationMins = pkgForDuration.durationMins;
+          } else if (pkgForDuration?.items?.length) {
             const totalServiceMins = pkgForDuration.items.reduce(
               (sum, item) => sum + (item.service.durationMins * item.quantity),
               0
