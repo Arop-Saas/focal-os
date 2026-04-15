@@ -2496,7 +2496,19 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       const pkg = data.packages?.find((p: any) => p.id === form.packageId);
       const pkgServiceIds = new Set(pkg?.items?.map((item: any) => item.serviceId) ?? []);
       const alreadySelected = new Set(form.selectedServiceIds);
-      const available = (data.services ?? []).filter(
+      // Filter by territory before checking for available add-ons
+      const _addressEntered = !!(form.propertyCity?.trim() || (form.propertyLat && form.propertyLng));
+      const _hasTerritoryTags = (data.services ?? []).some((s: any) => { const ids = s.territoryIds as string[] | null; return ids && ids.length > 0; });
+      const _detTerritoryId = detectedTerritory?.id ?? null;
+      const _filteredSvcs = (_addressEntered && _hasTerritoryTags)
+        ? (data.services ?? []).filter((s: any) => {
+            const ids = s.territoryIds as string[] | null | undefined;
+            if (!ids || ids.length === 0) return true;
+            if (!_detTerritoryId) return false;
+            return ids.includes(_detTerritoryId);
+          })
+        : (data.services ?? []);
+      const available = _filteredSvcs.filter(
         (s: any) => !pkgServiceIds.has(s.id) && !alreadySelected.has(s.id)
       );
       if (available.length > 0) {
@@ -2638,11 +2650,23 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
     ?? (rawSettings as any)?.gridColumns
     ?? 3;
 
-  // Add-on modal: services not in the selected package
+  // Add-on modal: services not in the selected package, filtered by territory
   const selectedPkg = packages.find((p: any) => p.id === form.packageId);
   const modalPkgServiceIds = new Set(selectedPkg?.items?.map((item: any) => item.serviceId) ?? []);
   const modalAlreadySelected = new Set(form.selectedServiceIds);
-  const modalAddOnServices = (visibleServices ?? []).filter(
+  const detectedTerritoryId = detectedTerritory?.id ?? null;
+  const addressEntered = !!(form.propertyCity?.trim() || (form.propertyLat && form.propertyLng));
+  const hasTerritoryTaggedServices = services.some((s: any) => { const ids = s.territoryIds as string[] | null; return ids && ids.length > 0; });
+  const shouldFilterByTerritory = addressEntered && hasTerritoryTaggedServices;
+  const territoryFilteredServices = shouldFilterByTerritory
+    ? services.filter((s: any) => {
+        const ids = s.territoryIds as string[] | null | undefined;
+        if (!ids || ids.length === 0) return true;
+        if (!detectedTerritoryId) return false;
+        return ids.includes(detectedTerritoryId);
+      })
+    : services;
+  const modalAddOnServices = (territoryFilteredServices ?? []).filter(
     (s: any) => !modalPkgServiceIds.has(s.id) && !modalAlreadySelected.has(s.id)
   );
 
