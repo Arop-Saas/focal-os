@@ -255,6 +255,11 @@ model StaffProfile {
   pushToken       String?
   pushPlatform    String?   // "ios" | "android"
 
+  // Home address — used for travel distance calculations
+  homeAddress     String?
+  homeLat         Float?
+  homeLng         Float?
+
   // Live location tracking (updated while clocked in)
   lastLatitude    Float?
   lastLongitude   Float?

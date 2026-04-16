@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { Loader2, CheckCircle, User, MapPin, Globe } from "lucide-react";
+import { Loader2, CheckCircle, User, MapPin, Globe, Home } from "lucide-react";
+import { StaffHomeLocation } from "./staff-home-location";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -135,7 +136,7 @@ function HomeTerritoryPicker({
   staffId: string;
   territories: Territory[];
 }) {
-  const { data: memberData, isLoading } = trpc.staff.getList.useQuery({});
+  const { data: memberData, isLoading } = trpc.staff.list.useQuery({});
   const updateMutation = trpc.staff.updateProfile.useMutation();
   const [saved, setSaved] = useState(false);
 
@@ -240,6 +241,39 @@ function HomeTerritoryPicker({
   );
 }
 
+// ─── Home location wrapper (fetches member data) ─────────────────────────────
+
+function StaffHomeLocationWrapper({ staffId }: { staffId: string }) {
+  const { data: memberData, isLoading } = trpc.staff.list.useQuery({});
+
+  const staffMember = memberData?.find((m: any) => m.staffProfile?.id === staffId);
+  const memberId = staffMember?.id;
+  const profile = staffMember?.staffProfile as any;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  if (!memberId) {
+    return <p className="text-xs text-gray-400">Staff member not found.</p>;
+  }
+
+  return (
+    <StaffHomeLocation
+      key={staffId}
+      staffId={staffId}
+      memberId={memberId}
+      initialAddress={profile?.homeAddress ?? null}
+      initialLat={profile?.homeLat ?? null}
+      initialLng={profile?.homeLng ?? null}
+    />
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface StaffMember {
@@ -258,7 +292,7 @@ export function StaffAvailabilityManager({ staff, territories }: Props) {
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(
     staff.length > 0 ? staff[0].id : null
   );
-  const [activeSection, setActiveSection] = useState<"schedule" | "homebase">("schedule");
+  const [activeSection, setActiveSection] = useState<"schedule" | "homebase" | "location">("schedule");
 
   if (staff.length === 0) {
     return (
@@ -322,13 +356,26 @@ export function StaffAvailabilityManager({ staff, territories }: Props) {
               <MapPin className="w-3.5 h-3.5" />
               Home Territory
             </button>
+            <button
+              onClick={() => setActiveSection("location")}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeSection === "location"
+                  ? "border-blue-600 text-blue-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              Home Location
+            </button>
           </div>
 
           <div className="p-4">
             {activeSection === "schedule" ? (
               <StaffAvailabilityEditor staffId={selectedStaffId} staffName={selected.name} />
-            ) : (
+            ) : activeSection === "homebase" ? (
               <HomeTerritoryPicker staffId={selectedStaffId} territories={territories} />
+            ) : (
+              <StaffHomeLocationWrapper staffId={selectedStaffId} />
             )}
           </div>
         </>
