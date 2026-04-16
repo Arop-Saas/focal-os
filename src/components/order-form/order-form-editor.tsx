@@ -113,6 +113,8 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
   const [assignStrat, setAssignStrat] = useState<"ROUND_ROBIN" | "CLOSEST" | "PRIORITY" | "AUTO">("ROUND_ROBIN");
   const [allowChoice, setAllowChoice] = useState(false);
   const [slotInterval, setSlotInterval] = useState(30);
+  const [minNoticeHours, setMinNoticeHours] = useState(0);
+  const [maxAdvanceDays, setMaxAdvanceDays] = useState(0);
   const [paymentMode, setPaymentMode] = useState<"NONE" | "FULL" | "PARTIAL">("NONE");
   const [deposit, setDeposit]         = useState(25);
 
@@ -134,6 +136,8 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
     setAssignStrat((form.assignmentStrategy as "ROUND_ROBIN" | "CLOSEST" | "PRIORITY" | "AUTO") ?? "ROUND_ROBIN");
     setAllowChoice(form.allowCustomerChoice);
     setSlotInterval(form.timeSlotInterval);
+    setMinNoticeHours((form as any).minBookingNoticeHours ?? 0);
+    setMaxAdvanceDays((form as any).maxAdvanceBookingDays ?? 0);
     setPaymentMode((form.paymentMode as "NONE" | "FULL" | "PARTIAL") ?? "NONE");
     setDeposit(form.depositPercent ?? 25);
 
@@ -421,6 +425,47 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
             </select>
           </div>
 
+          {/* Booking window */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Booking Window</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Minimum notice (hours)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={720}
+                  value={minNoticeHours}
+                  onChange={(e) => { setMinNoticeHours(Number(e.target.value)); setSavedScheduling(false); }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0 = no minimum"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {minNoticeHours > 0
+                    ? `Clients must book at least ${minNoticeHours}h in advance`
+                    : "No minimum notice required"}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Max advance booking (days)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={maxAdvanceDays}
+                  onChange={(e) => { setMaxAdvanceDays(Number(e.target.value)); setSavedScheduling(false); }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0 = no limit"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {maxAdvanceDays > 0
+                    ? `Clients can book up to ${maxAdvanceDays} days ahead`
+                    : "No limit on how far ahead clients can book"}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Staff assignment */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Staff Assignment Strategy</p>
@@ -456,7 +501,7 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
               loading={updateScheduling.isPending}
               saved={savedScheduling}
               onClick={async () => {
-                await updateScheduling.mutateAsync({ id: formId, confirmationMode: confirmMode, assignmentStrategy: assignStrat, allowCustomerChoice: allowChoice, timeSlotInterval: slotInterval });
+                await updateScheduling.mutateAsync({ id: formId, confirmationMode: confirmMode, assignmentStrategy: assignStrat, allowCustomerChoice: allowChoice, timeSlotInterval: slotInterval, minBookingNoticeHours: minNoticeHours, maxAdvanceBookingDays: maxAdvanceDays });
                 setSavedScheduling(true);
                 setTimeout(() => setSavedScheduling(false), 3000);
               }}

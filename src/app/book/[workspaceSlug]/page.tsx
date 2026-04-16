@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
-import { format, addDays, startOfDay, isToday, isBefore } from "date-fns";
+import { format, addDays, addHours, startOfDay, isToday, isBefore } from "date-fns";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
 import { MapboxMap } from "@/components/shared/mapbox-map";
 import { type BookingFormSettings, type CustomField, DEFAULT_BOOKING_FORM_SETTINGS } from "@/lib/booking-form-types";
@@ -1418,6 +1418,8 @@ function Step3DateTime({
   brandColor,
   hours,
   detectedTerritoryId,
+  minBookingNoticeHours = 0,
+  maxAdvanceBookingDays = 0,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -1425,9 +1427,12 @@ function Step3DateTime({
   brandColor: string;
   hours: { dayOfWeek: number; isOpen: boolean; openTime: string; closeTime: string }[];
   detectedTerritoryId?: string;
+  minBookingNoticeHours?: number;
+  maxAdvanceBookingDays?: number;
 }) {
   const today = startOfDay(new Date());
-  const days = Array.from({ length: 28 }, (_, i) => addDays(today, i + 1));
+  const calendarDayCount = maxAdvanceBookingDays > 0 ? Math.min(maxAdvanceBookingDays, 90) : 28;
+  const days = Array.from({ length: calendarDayCount }, (_, i) => addDays(today, i + 1));
 
   // Build a map of day-of-week → hours config for quick lookup
   const hoursByDay = Object.fromEntries(hours.map((h) => [h.dayOfWeek, h]));
@@ -1563,10 +1568,12 @@ function Step3DateTime({
             const iso = format(day, "yyyy-MM-dd");
             const selected = form.scheduledDate === iso;
             const past = isBefore(day, today);
+            // Enforce minimum booking notice: disable days within the notice window
+            const tooSoon = minBookingNoticeHours > 0 && isBefore(day, addHours(new Date(), minBookingNoticeHours));
             const dow = day.getDay();
             const dayConfig = hoursByDay[dow];
             const closed = dayConfig ? !dayConfig.isOpen : false;
-            const disabled = past || closed;
+            const disabled = past || closed || tooSoon;
             const w = weatherMap[iso];
             const hasWeather = !!w && !disabled;
             return (
@@ -2812,7 +2819,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 3 && (
             <>
-              <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} detectedTerritoryId={detectedTerritory?.id} />
+              <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} detectedTerritoryId={detectedTerritory?.id} minBookingNoticeHours={(data?.orderForm as any)?.minBookingNoticeHours ?? 0} maxAdvanceBookingDays={(data?.orderForm as any)?.maxAdvanceBookingDays ?? 0} />
               <CustomFieldsRenderer step={3} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}

@@ -121,7 +121,9 @@ model OrderForm {
   confirmationMode    String  @default("IMMEDIATE")   // IMMEDIATE | MANUAL
   assignmentStrategy  String  @default("ROUND_ROBIN") // ROUND_ROBIN | CLOSEST | PRIORITY | AUTO
   allowCustomerChoice Boolean @default(false)
-  timeSlotInterval    Int     @default(30)             // minutes
+  timeSlotInterval        Int     @default(30)             // minutes
+  minBookingNoticeHours   Int     @default(0)              // 0 = no minimum; e.g. 24 = must book 24h ahead
+  maxAdvanceBookingDays   Int     @default(0)              // 0 = no limit; e.g. 60 = can only book 60 days out
 
   // Payment
   paymentMode    String @default("NONE")  // NONE | FULL | PARTIAL

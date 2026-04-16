@@ -119,6 +119,8 @@ export const orderFormRouter = router({
       assignmentStrategy:  z.enum(["ROUND_ROBIN", "CLOSEST", "PRIORITY", "AUTO"]).optional(),
       allowCustomerChoice: z.boolean().optional(),
       timeSlotInterval:    z.number().int().min(15).max(120).optional(),
+      minBookingNoticeHours: z.number().int().min(0).max(720).optional(),
+      maxAdvanceBookingDays: z.number().int().min(0).max(365).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
