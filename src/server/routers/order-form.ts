@@ -133,7 +133,9 @@ export const orderFormRouter = router({
     .input(z.object({
       id:            z.string(),
       paymentMode:   z.enum(["NONE", "FULL", "PARTIAL"]),
+      depositType:   z.enum(["percent", "fixed"]).optional(),
       depositPercent: z.number().int().min(1).max(99).optional().nullable(),
+      depositFixed:   z.number().min(0.01).optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;

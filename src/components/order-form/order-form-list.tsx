@@ -134,7 +134,7 @@ export function OrderFormList() {
                 <p className="text-sm font-medium text-gray-900">{form.title}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {form.confirmationMode === "IMMEDIATE" ? "Auto-confirm" : "Requires approval"} ·{" "}
-                  {form.paymentMode === "NONE" ? "No upfront payment" : form.paymentMode === "FULL" ? "Full payment" : `${form.depositPercent ?? 25}% deposit`}
+                  {form.paymentMode === "NONE" ? "No upfront payment" : form.paymentMode === "FULL" ? "Full payment" : (form as any).depositType === "fixed" ? `$${(form as any).depositFixed ?? 100} deposit` : `${form.depositPercent ?? 25}% deposit`}
                 </p>
               </div>
 

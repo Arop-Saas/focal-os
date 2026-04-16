@@ -116,7 +116,9 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
   const [minNoticeHours, setMinNoticeHours] = useState(0);
   const [maxAdvanceDays, setMaxAdvanceDays] = useState(0);
   const [paymentMode, setPaymentMode] = useState<"NONE" | "FULL" | "PARTIAL">("NONE");
+  const [depositType, setDepositType] = useState<"percent" | "fixed">("percent");
   const [deposit, setDeposit]         = useState(25);
+  const [depositFixed, setDepositFixed] = useState<number>(100);
 
   const [selectedTerritoryIds, setSelectedTerritoryIds] = useState<string[]>([]);
 
@@ -139,7 +141,9 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
     setMinNoticeHours((form as any).minBookingNoticeHours ?? 0);
     setMaxAdvanceDays((form as any).maxAdvanceBookingDays ?? 0);
     setPaymentMode((form.paymentMode as "NONE" | "FULL" | "PARTIAL") ?? "NONE");
+    setDepositType(((form as any).depositType as "percent" | "fixed") ?? "percent");
     setDeposit(form.depositPercent ?? 25);
+    setDepositFixed((form as any).depositFixed ?? 100);
 
     if (form.fieldSettings) {
       setFields({ ...DEFAULT_BOOKING_FORM_SETTINGS.fields, ...(form.fieldSettings as BookingFormSettings["fields"]) });
@@ -524,16 +528,37 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
                 <p className="text-sm font-medium text-gray-800">{label}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                 {val === "PARTIAL" && paymentMode === "PARTIAL" && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={deposit}
-                      onChange={(e) => { setDeposit(Number(e.target.value)); setSavedPayment(false); }}
-                      className="w-20 px-2 py-1 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-500">% deposit required</span>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => { setDepositType("percent"); setSavedPayment(false); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${depositType === "percent" ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}
+                      >
+                        Percentage
+                      </button>
+                      <button type="button" onClick={() => { setDepositType("fixed"); setSavedPayment(false); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${depositType === "fixed" ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}
+                      >
+                        Fixed Amount
+                      </button>
+                    </div>
+                    {depositType === "percent" ? (
+                      <div className="flex items-center gap-2">
+                        <input type="number" min={1} max={99} value={deposit}
+                          onChange={(e) => { setDeposit(Number(e.target.value)); setSavedPayment(false); }}
+                          className="w-20 px-2 py-1 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-500">% deposit required</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-400">$</span>
+                        <input type="number" min={1} step={0.01} value={depositFixed}
+                          onChange={(e) => { setDepositFixed(Number(e.target.value)); setSavedPayment(false); }}
+                          className="w-24 px-2 py-1 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-500">fixed deposit</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -548,7 +573,9 @@ export function OrderFormEditor({ formId, workspaceSlug }: { formId: string; wor
                 await updatePayment.mutateAsync({
                   id: formId,
                   paymentMode,
-                  depositPercent: paymentMode === "PARTIAL" ? deposit : null,
+                  depositType: paymentMode === "PARTIAL" ? depositType : undefined,
+                  depositPercent: paymentMode === "PARTIAL" && depositType === "percent" ? deposit : null,
+                  depositFixed: paymentMode === "PARTIAL" && depositType === "fixed" ? depositFixed : null,
                 });
                 setSavedPayment(true);
                 setTimeout(() => setSavedPayment(false), 3000);

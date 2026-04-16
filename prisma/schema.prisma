@@ -127,7 +127,9 @@ model OrderForm {
 
   // Payment
   paymentMode    String @default("NONE")  // NONE | FULL | PARTIAL
+  depositType    String @default("percent")  // "percent" | "fixed"
   depositPercent Int?                     // e.g. 25 = 25% deposit
+  depositFixed   Float?                   // e.g. 100.00 = $100 flat deposit
 
   // ── Designer / Appearance ─────────────────────────────────────────────────
   accentColor     String  @default("#2563eb")  // Primary button & link color

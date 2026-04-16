@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { Loader2, CheckCircle, User, MapPin, Globe, Home } from "lucide-react";
+import { Loader2, CheckCircle, User, MapPin, Globe, Home, Map } from "lucide-react";
 import { StaffHomeLocation } from "./staff-home-location";
+import { TeamCoverageMap } from "./team-coverage-map";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -304,7 +305,7 @@ export function StaffAvailabilityManager({ staff, territories }: Props) {
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(
     staff.length > 0 ? staff[0].id : null
   );
-  const [activeSection, setActiveSection] = useState<"schedule" | "homebase" | "location">("schedule");
+  const [activeSection, setActiveSection] = useState<"schedule" | "homebase" | "location" | "coverage">("schedule");
 
   if (staff.length === 0) {
     return (
@@ -379,6 +380,17 @@ export function StaffAvailabilityManager({ staff, territories }: Props) {
               <Home className="w-3.5 h-3.5" />
               Home Location
             </button>
+            <button
+              onClick={() => setActiveSection("coverage")}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeSection === "coverage"
+                  ? "border-blue-600 text-blue-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Map className="w-3.5 h-3.5" />
+              Coverage Map
+            </button>
           </div>
 
           <div className="p-4">
@@ -386,8 +398,10 @@ export function StaffAvailabilityManager({ staff, territories }: Props) {
               <StaffAvailabilityEditor staffId={selectedStaffId} staffName={selected.name} />
             ) : activeSection === "homebase" ? (
               <HomeTerritoryPicker staffId={selectedStaffId} territories={territories} />
-            ) : (
+            ) : activeSection === "location" ? (
               <StaffHomeLocationWrapper staffId={selectedStaffId} />
+            ) : (
+              <TeamCoverageMap />
             )}
           </div>
         </>

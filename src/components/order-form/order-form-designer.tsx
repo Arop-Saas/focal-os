@@ -320,7 +320,9 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
 
   // Payment
   const [paymentMode, setPaymentMode] = useState<"NONE" | "FULL" | "PARTIAL">("NONE");
+  const [depositType, setDepositType] = useState<"percent" | "fixed">("percent");
   const [deposit, setDeposit]         = useState(25);
+  const [depositFixed, setDepositFixed] = useState<number>(100);
 
   // Appearance
   const [accentColor, setAccentColor]         = useState("#2563eb");
@@ -409,7 +411,9 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setAllowChoice(form.allowCustomerChoice);
     setSlotInterval(form.timeSlotInterval);
     setPaymentMode((form.paymentMode as any) ?? "NONE");
+    setDepositType(((form as any).depositType as "percent" | "fixed") ?? "percent");
     setDeposit(form.depositPercent ?? 25);
+    setDepositFixed((form as any).depositFixed ?? 100);
     setAccentColor((form as any).accentColor ?? "#2563eb");
     setBackgroundColor((form as any).backgroundColor ?? "#ffffff");
     setLogoUrl((form as any).logoUrl ?? "");
@@ -555,7 +559,13 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
     setTimeout(() => setSavedScheduling(false), 3000);
   }
   async function savePayment() {
-    await updatePayment.mutateAsync({ id: formId, paymentMode, depositPercent: paymentMode === "PARTIAL" ? deposit : null });
+    await updatePayment.mutateAsync({
+      id: formId,
+      paymentMode,
+      depositType: paymentMode === "PARTIAL" ? depositType : undefined,
+      depositPercent: paymentMode === "PARTIAL" && depositType === "percent" ? deposit : null,
+      depositFixed: paymentMode === "PARTIAL" && depositType === "fixed" ? depositFixed : null,
+    });
     setSavedPayment(true);
     setTimeout(() => setSavedPayment(false), 3000);
   }
@@ -1201,12 +1211,37 @@ export function OrderFormDesigner({ formId, workspaceSlug }: { formId: string; w
                     label={label} desc={desc}
                   />
                   {val === "PARTIAL" && paymentMode === "PARTIAL" && (
-                    <div className="ml-6 mb-2 flex items-center gap-2">
-                      <input type="number" min={1} max={99} value={deposit}
-                        onChange={(e) => { setDeposit(Number(e.target.value)); setSavedPayment(false); }}
-                        className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-xs text-gray-500">% deposit</span>
+                    <div className="ml-6 mb-2 space-y-2">
+                      <div className="flex gap-1.5">
+                        <button type="button" onClick={() => { setDepositType("percent"); setSavedPayment(false); }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${depositType === "percent" ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}
+                        >
+                          Percentage
+                        </button>
+                        <button type="button" onClick={() => { setDepositType("fixed"); setSavedPayment(false); }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${depositType === "fixed" ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}
+                        >
+                          Fixed Amount
+                        </button>
+                      </div>
+                      {depositType === "percent" ? (
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={1} max={99} value={deposit}
+                            onChange={(e) => { setDeposit(Number(e.target.value)); setSavedPayment(false); }}
+                            className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-xs text-gray-500">% deposit</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-400">$</span>
+                          <input type="number" min={1} step={0.01} value={depositFixed}
+                            onChange={(e) => { setDepositFixed(Number(e.target.value)); setSavedPayment(false); }}
+                            className="w-24 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-xs text-gray-500">fixed deposit</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
