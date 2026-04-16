@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { Loader2, CheckCircle, MapPin, Search, X, Home } from "lucide-react";
+import {
+  Loader2, CheckCircle, MapPin, Search, X, Home,
+  Pencil, Circle, Trash2, MousePointer, Undo2,
+} from "lucide-react";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 const MAPBOX_STYLE = "mapbox://styles/mapbox/streets-v12";
@@ -60,7 +63,47 @@ async function searchAddress(query: string): Promise<GeocodingResult[]> {
   }
 }
 
-// ─── Component ────────────────────────────────────────────
+// ─── Geometry helpers ────────────────────────────────────
+
+function createCircleGeoJSON(centerLng: number, centerLat: number, radiusKm: number) {
+  const points = 64;
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    const dx = radiusKm * Math.cos(angle);
+    const dy = radiusKm * Math.sin(angle);
+    const lat = centerLat + (dy / 6371) * (180 / Math.PI);
+    const lng = centerLng + (dx / (6371 * Math.cos((centerLat * Math.PI) / 180))) * (180 / Math.PI);
+    coords.push([lng, lat]);
+  }
+  return {
+    type: "Feature" as const,
+    geometry: { type: "Polygon" as const, coordinates: [coords] },
+    properties: {},
+  };
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─── Types ───────────────────────────────────────────────
+
+type DrawMode = "none" | "polygon" | "radius";
+
+interface CoverageBoundary {
+  boundaryType: "none" | "polygon" | "radius";
+  polygonCoords?: [number, number][];
+  centerLat?: number;
+  centerLng?: number;
+  radiusKm?: number;
+}
 
 interface Props {
   staffId: string;
@@ -68,7 +111,10 @@ interface Props {
   initialAddress?: string | null;
   initialLat?: number | null;
   initialLng?: number | null;
+  initialCoverage?: CoverageBoundary | null;
 }
+
+// ─── Component ────────────────────────────────────────────
 
 export function StaffHomeLocation({
   staffId,
@@ -76,13 +122,14 @@ export function StaffHomeLocation({
   initialAddress,
   initialLat,
   initialLng,
+  initialCoverage,
 }: Props) {
-  // Address state
+  // ── Address state ──────────────────────────────────────
   const [address, setAddress] = useState(initialAddress ?? "");
   const [lat, setLat] = useState<number | null>(initialLat ?? null);
   const [lng, setLng] = useState<number | null>(initialLng ?? null);
 
-  // Search
+  // ── Search ─────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodingResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -91,13 +138,37 @@ export function StaffHomeLocation({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  // Map
+  // ── Coverage boundary state ────────────────────────────
+  const [drawMode, setDrawMode] = useState<DrawMode>("none");
+  const [polygonPoints, setPolygonPoints] = useState<[number, number][]>(
+    initialCoverage?.boundaryType === "polygon" && initialCoverage.polygonCoords
+      ? initialCoverage.polygonCoords : []
+  );
+  const [radiusCenter, setRadiusCenter] = useState<[number, number] | null>(
+    initialCoverage?.boundaryType === "radius" && initialCoverage.centerLng != null && initialCoverage.centerLat != null
+      ? [initialCoverage.centerLng, initialCoverage.centerLat] : null
+  );
+  const [radiusKm, setRadiusKm] = useState<number>(initialCoverage?.radiusKm ?? 10);
+
+  const hasCoverage =
+    (polygonPoints.length >= 3 && drawMode === "none") ||
+    (radiusCenter !== null && drawMode === "none");
+
+  // Refs for event handlers (needed inside map click callbacks)
+  const drawModeRef = useRef(drawMode);
+  const polygonPointsRef = useRef(polygonPoints);
+  const radiusCenterRef = useRef(radiusCenter);
+  useEffect(() => { drawModeRef.current = drawMode; }, [drawMode]);
+  useEffect(() => { polygonPointsRef.current = polygonPoints; }, [polygonPoints]);
+  useEffect(() => { radiusCenterRef.current = radiusCenter; }, [radiusCenter]);
+
+  // ── Map refs ───────────────────────────────────────────
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const [mapStatus, setMapStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
-  // Save state
+  // ── Save state ─────────────────────────────────────────
   const [saved, setSaved] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -109,6 +180,8 @@ export function StaffHomeLocation({
     },
   });
 
+  const isDrawing = drawMode !== "none";
+
   // ─── Debounced search ──────────────────────────────────
 
   useEffect(() => {
@@ -116,7 +189,6 @@ export function StaffHomeLocation({
       setSuggestions([]);
       return;
     }
-
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(async () => {
       setIsSearching(true);
@@ -125,21 +197,18 @@ export function StaffHomeLocation({
       setShowSuggestions(results.length > 0);
       setIsSearching(false);
     }, 300);
-
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, [searchQuery]);
 
-  // ─── Close suggestions on outside click ─────────────────
+  // ─── Close suggestions on outside click ────────────────
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
+        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+        inputRef.current && !inputRef.current.contains(e.target as Node)
       ) {
         setShowSuggestions(false);
       }
@@ -148,7 +217,7 @@ export function StaffHomeLocation({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ─── Select address from suggestions ───────────────────
+  // ─── Address actions ───────────────────────────────────
 
   function selectAddress(result: GeocodingResult) {
     setAddress(result.place_name);
@@ -161,26 +230,18 @@ export function StaffHomeLocation({
     updateMapPin(result.center[0], result.center[1]);
   }
 
-  // ─── Clear address ─────────────────────────────────────
-
   function clearAddress() {
     setAddress("");
     setLat(null);
     setLng(null);
     setSearchQuery("");
     setHasChanges(true);
-    if (markerRef.current) {
-      markerRef.current.remove();
-      markerRef.current = null;
-    }
-    // Reset map view
+    if (markerRef.current) { markerRef.current.remove(); markerRef.current = null; }
     const map = mapInstanceRef.current;
-    if (map) {
-      map.flyTo({ center: [-98.5795, 39.8283], zoom: 3 });
-    }
+    if (map) map.flyTo({ center: [-98.5795, 39.8283], zoom: 3 });
   }
 
-  // ─── Update map pin ────────────────────────────────────
+  // ─── Update home pin on map ────────────────────────────
 
   const updateMapPin = useCallback((pLng: number, pLat: number) => {
     const map = mapInstanceRef.current;
@@ -205,14 +266,11 @@ export function StaffHomeLocation({
         .setLngLat([pLng, pLat])
         .addTo(map);
 
-      // Handle drag end — update coordinates
       markerRef.current.on("dragend", () => {
         const lngLat = markerRef.current.getLngLat();
         setLng(lngLat.lng);
         setLat(lngLat.lat);
         setHasChanges(true);
-
-        // Reverse geocode to get address
         reverseGeocode(lngLat.lng, lngLat.lat);
       });
     }
@@ -232,21 +290,99 @@ export function StaffHomeLocation({
       if (data.features?.[0]) {
         setAddress(data.features[0].place_name);
       }
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }
 
-  // ─── Map click to place pin ────────────────────────────
+  // ─── Render coverage overlays on map ───────────────────
+
+  const renderCoverageOverlays = useCallback((map: any) => {
+    // Clean existing layers
+    const ids = ["coverage-fill", "coverage-line", "draw-fill", "draw-line", "draw-pts"];
+    const srcs = ["coverage-src", "draw-src", "draw-pts-src"];
+    ids.forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
+    srcs.forEach((id) => { if (map.getSource(id)) map.removeSource(id); });
+
+    const color = "#8B5CF6"; // purple for coverage area
+
+    // When NOT drawing, show the saved/confirmed coverage boundary
+    if (drawMode === "none") {
+      let geojson: any = null;
+      if (polygonPoints.length >= 3) {
+        const ring = [...polygonPoints, polygonPoints[0]];
+        geojson = { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} };
+      } else if (radiusCenter) {
+        geojson = createCircleGeoJSON(radiusCenter[0], radiusCenter[1], radiusKm);
+      }
+      if (geojson) {
+        map.addSource("coverage-src", { type: "geojson", data: geojson });
+        map.addLayer({ id: "coverage-fill", type: "fill", source: "coverage-src", paint: { "fill-color": color, "fill-opacity": 0.15 } });
+        map.addLayer({ id: "coverage-line", type: "line", source: "coverage-src", paint: { "line-color": color, "line-width": 2.5, "line-dasharray": [2, 2] } });
+      }
+      return;
+    }
+
+    // When drawing, show the active preview
+    if (drawMode === "polygon" && polygonPoints.length >= 1) {
+      if (polygonPoints.length >= 3) {
+        const ring = [...polygonPoints, polygonPoints[0]];
+        map.addSource("draw-src", { type: "geojson", data: { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} } });
+        map.addLayer({ id: "draw-fill", type: "fill", source: "draw-src", paint: { "fill-color": color, "fill-opacity": 0.25 } });
+        map.addLayer({ id: "draw-line", type: "line", source: "draw-src", paint: { "line-color": color, "line-width": 2.5 } });
+      } else if (polygonPoints.length === 2) {
+        map.addSource("draw-src", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: polygonPoints }, properties: {} } });
+        map.addLayer({ id: "draw-line", type: "line", source: "draw-src", paint: { "line-color": color, "line-width": 2.5 } });
+      }
+      // Vertex dots
+      const pts = polygonPoints.map((p) => ({ type: "Feature" as const, geometry: { type: "Point" as const, coordinates: p }, properties: {} }));
+      map.addSource("draw-pts-src", { type: "geojson", data: { type: "FeatureCollection", features: pts } });
+      map.addLayer({ id: "draw-pts", type: "circle", source: "draw-pts-src", paint: { "circle-radius": 5, "circle-color": color, "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+    }
+
+    if (drawMode === "radius" && radiusCenter) {
+      const circle = createCircleGeoJSON(radiusCenter[0], radiusCenter[1], radiusKm);
+      map.addSource("draw-src", { type: "geojson", data: circle });
+      map.addLayer({ id: "draw-fill", type: "fill", source: "draw-src", paint: { "fill-color": color, "fill-opacity": 0.25 } });
+      map.addLayer({ id: "draw-line", type: "line", source: "draw-src", paint: { "line-color": color, "line-width": 2.5 } });
+      // Center dot
+      map.addSource("draw-pts-src", { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: radiusCenter }, properties: {} }] } });
+      map.addLayer({ id: "draw-pts", type: "circle", source: "draw-pts-src", paint: { "circle-radius": 6, "circle-color": color, "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+    }
+  }, [drawMode, polygonPoints, radiusCenter, radiusKm]);
+
+  // Re-render coverage overlays when state changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || mapStatus !== "ready") return;
+    try { renderCoverageOverlays(map); } catch { /* map not ready */ }
+  }, [drawMode, polygonPoints, radiusCenter, radiusKm, renderCoverageOverlays, mapStatus]);
+
+  // ─── Map click handler ─────────────────────────────────
 
   const handleMapClick = useCallback((e: any) => {
-    const newLng = e.lngLat.lng;
-    const newLat = e.lngLat.lat;
-    setLng(newLng);
-    setLat(newLat);
-    setHasChanges(true);
-    updateMapPin(newLng, newLat);
-    reverseGeocode(newLng, newLat);
+    const mode = drawModeRef.current;
+    const clickLng = e.lngLat.lng;
+    const clickLat = e.lngLat.lat;
+    const lngLat: [number, number] = [clickLng, clickLat];
+
+    if (mode === "polygon") {
+      // In polygon draw mode — add vertex
+      setPolygonPoints((prev) => [...prev, lngLat]);
+      setHasChanges(true);
+    } else if (mode === "radius") {
+      // In radius draw mode — place center
+      if (!radiusCenterRef.current) {
+        setRadiusCenter(lngLat);
+        setRadiusKm(10);
+        setHasChanges(true);
+      }
+    } else {
+      // Normal mode — place/move home pin
+      setLng(clickLng);
+      setLat(clickLat);
+      setHasChanges(true);
+      updateMapPin(clickLng, clickLat);
+      reverseGeocode(clickLng, clickLat);
+    }
   }, [updateMapPin]);
 
   // ─── Init map ──────────────────────────────────────────
@@ -259,10 +395,8 @@ export function StaffHomeLocation({
       try {
         const mapboxgl = await loadMapboxGL();
         if (cancelled || !mapRef.current) return;
-
         mapboxgl.accessToken = MAPBOX_TOKEN;
 
-        // Destroy previous
         if (markerRef.current) { markerRef.current.remove(); markerRef.current = null; }
         if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
 
@@ -271,7 +405,7 @@ export function StaffHomeLocation({
           container: mapRef.current,
           style: MAPBOX_STYLE,
           center: hasInitialLocation ? [initialLng!, initialLat!] : [-98.5795, 39.8283],
-          zoom: hasInitialLocation ? 14 : 3,
+          zoom: hasInitialLocation ? 12 : 3,
           attributionControl: false,
         });
 
@@ -281,14 +415,12 @@ export function StaffHomeLocation({
         map.on("load", () => {
           if (cancelled) return;
           setMapStatus("ready");
-
-          // Place initial marker
           if (hasInitialLocation) {
             updateMapPin(initialLng!, initialLat!);
           }
+          renderCoverageOverlays(map);
         });
 
-        // Click to place/move pin
         map.on("click", handleMapClick);
       } catch {
         if (!cancelled) setMapStatus("error");
@@ -296,9 +428,7 @@ export function StaffHomeLocation({
     }
 
     init();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -310,27 +440,109 @@ export function StaffHomeLocation({
     };
   }, []);
 
+  // ─── Drawing actions ───────────────────────────────────
+
+  function startPolygonDraw() {
+    setDrawMode("polygon");
+    setPolygonPoints([]);
+    setRadiusCenter(null);
+    const map = mapInstanceRef.current;
+    if (map) map.getCanvas().style.cursor = "crosshair";
+  }
+
+  function startRadiusDraw() {
+    setDrawMode("radius");
+    setRadiusCenter(null);
+    setPolygonPoints([]);
+    setRadiusKm(10);
+    const map = mapInstanceRef.current;
+    if (map) map.getCanvas().style.cursor = "crosshair";
+  }
+
+  function cancelDraw() {
+    setDrawMode("none");
+    // Restore previous boundary
+    if (initialCoverage?.boundaryType === "polygon" && initialCoverage.polygonCoords) {
+      setPolygonPoints(initialCoverage.polygonCoords);
+      setRadiusCenter(null);
+    } else if (initialCoverage?.boundaryType === "radius" && initialCoverage.centerLng != null && initialCoverage.centerLat != null) {
+      setRadiusCenter([initialCoverage.centerLng, initialCoverage.centerLat]);
+      setRadiusKm(initialCoverage.radiusKm ?? 10);
+      setPolygonPoints([]);
+    } else {
+      setPolygonPoints([]);
+      setRadiusCenter(null);
+    }
+    const map = mapInstanceRef.current;
+    if (map) map.getCanvas().style.cursor = "";
+  }
+
+  function undoLastPoint() {
+    setPolygonPoints((prev) => prev.slice(0, -1));
+  }
+
+  function confirmDraw() {
+    const map = mapInstanceRef.current;
+    if (map) map.getCanvas().style.cursor = "";
+    setDrawMode("none");
+    setHasChanges(true);
+  }
+
+  function clearCoverage() {
+    setPolygonPoints([]);
+    setRadiusCenter(null);
+    setDrawMode("none");
+    setHasChanges(true);
+    const map = mapInstanceRef.current;
+    if (map) map.getCanvas().style.cursor = "";
+  }
+
   // ─── Save ──────────────────────────────────────────────
 
   async function handleSave() {
+    // Build coverage data
+    let coverageBoundaryType: "none" | "polygon" | "radius" = "none";
+    let coveragePolygonCoords: [number, number][] | null = null;
+    let coverageCenterLat: number | null = null;
+    let coverageCenterLng: number | null = null;
+    let coverageRadiusKmVal: number | null = null;
+
+    if (polygonPoints.length >= 3) {
+      coverageBoundaryType = "polygon";
+      coveragePolygonCoords = polygonPoints;
+    } else if (radiusCenter) {
+      coverageBoundaryType = "radius";
+      coverageCenterLng = radiusCenter[0];
+      coverageCenterLat = radiusCenter[1];
+      coverageRadiusKmVal = radiusKm;
+    }
+
     await updateMutation.mutateAsync({
       memberId,
       homeAddress: address || null,
       homeLat: lat,
       homeLng: lng,
+      coverageBoundaryType,
+      coveragePolygonCoords,
+      coverageCenterLat,
+      coverageCenterLng,
+      coverageRadiusKm: coverageRadiusKmVal,
     });
   }
 
   // ─── Render ────────────────────────────────────────────
 
+  const mapHeight = isDrawing ? 420 : 320;
+
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Home className="w-3.5 h-3.5 text-blue-600" />
-          <p className="text-xs font-semibold text-gray-700">Home Location</p>
+          <p className="text-xs font-semibold text-gray-700">Home Location &amp; Coverage Area</p>
         </div>
-        <p className="text-xs text-gray-400">Where this staff member is based</p>
+        <p className="text-xs text-gray-400">Set home address and draw the coverage zone</p>
       </div>
 
       {/* Address search */}
@@ -343,39 +555,27 @@ export function StaffHomeLocation({
             value={searchQuery || address}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              if (address && e.target.value !== address) {
-                setAddress("");
-              }
+              if (address && e.target.value !== address) setAddress("");
             }}
             onFocus={() => {
-              if (address) {
-                setSearchQuery(address);
-              }
+              if (address) setSearchQuery(address);
               if (suggestions.length > 0) setShowSuggestions(true);
             }}
-            placeholder="Search for an address..."
+            placeholder="Search for a home address..."
             className="w-full border border-gray-200 rounded-xl pl-9 pr-20 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {isSearching && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
             {address && (
-              <button
-                type="button"
-                onClick={clearAddress}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
-              >
+              <button type="button" onClick={clearAddress} className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Suggestions dropdown */}
         {showSuggestions && suggestions.length > 0 && (
-          <div
-            ref={suggestionsRef}
-            className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
-          >
+          <div ref={suggestionsRef} className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
             {suggestions.map((s, i) => (
               <button
                 key={i}
@@ -398,22 +598,116 @@ export function StaffHomeLocation({
           <div>
             <p className="text-xs font-medium text-blue-700">{address}</p>
             {lat != null && lng != null && (
-              <p className="text-[11px] text-blue-400 mt-0.5">
-                {lat.toFixed(5)}, {lng.toFixed(5)}
-              </p>
+              <p className="text-[11px] text-blue-400 mt-0.5">{lat.toFixed(5)}, {lng.toFixed(5)}</p>
             )}
           </div>
         </div>
       )}
 
-      {/* Map with draggable pin */}
+      {/* Coverage area drawing toolbar */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-700">Coverage Area</p>
+          <p className="text-[11px] text-gray-400">
+            {hasCoverage
+              ? polygonPoints.length >= 3
+                ? `Polygon with ${polygonPoints.length} points`
+                : `${radiusKm.toFixed(1)}km radius`
+              : "No coverage area drawn"}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {drawMode === "none" ? (
+            <>
+              <button
+                type="button"
+                onClick={startPolygonDraw}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-colors"
+              >
+                <Pencil className="w-3 h-3" /> Draw Polygon
+              </button>
+              <button
+                type="button"
+                onClick={startRadiusDraw}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-colors"
+              >
+                <Circle className="w-3 h-3" /> Set Radius
+              </button>
+              {hasCoverage && (
+                <button
+                  type="button"
+                  onClick={clearCoverage}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 border border-red-200 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" /> Clear
+                </button>
+              )}
+            </>
+          ) : drawMode === "polygon" ? (
+            <>
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs font-medium text-purple-700">
+                <MousePointer className="w-3 h-3" />
+                Click to place points ({polygonPoints.length})
+                {polygonPoints.length < 3 && " — need 3+"}
+              </div>
+              {polygonPoints.length > 0 && (
+                <button type="button" onClick={undoLastPoint} className="flex items-center gap-1 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
+                  <Undo2 className="w-3 h-3" /> Undo
+                </button>
+              )}
+              {polygonPoints.length >= 3 && (
+                <button type="button" onClick={confirmDraw} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700">
+                  Confirm Shape
+                </button>
+              )}
+              <button type="button" onClick={cancelDraw} className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+            </>
+          ) : drawMode === "radius" ? (
+            <>
+              {!radiusCenter ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs font-medium text-purple-700">
+                  <MousePointer className="w-3 h-3" /> Click map to place center
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Radius:</span>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={100}
+                      step={0.5}
+                      value={radiusKm}
+                      onChange={(e) => { setRadiusKm(parseFloat(e.target.value)); setHasChanges(true); }}
+                      className="w-28 accent-purple-600"
+                    />
+                    <span className="text-xs font-semibold text-gray-700 w-16">{radiusKm.toFixed(1)}km</span>
+                    <span className="text-[11px] text-gray-400">({(radiusKm * 0.621371).toFixed(1)}mi)</span>
+                  </div>
+                  <button type="button" onClick={confirmDraw} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700">
+                    Confirm
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={cancelDraw} className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Map */}
       <div>
         <p className="text-[11px] text-gray-400 mb-2">
-          Click on the map to place a pin, or drag the pin to adjust the location.
+          {isDrawing
+            ? drawMode === "polygon"
+              ? "Click on the map to place polygon vertices for the coverage area."
+              : "Click on the map to set the center of the coverage radius."
+            : "Click the map to set the home pin. Use the toolbar above to draw a coverage area."}
         </p>
         <div
-          className="relative rounded-xl overflow-hidden border border-gray-200"
-          style={{ height: 280 }}
+          className="relative rounded-xl overflow-hidden border border-gray-200 transition-all duration-300"
+          style={{ height: mapHeight }}
         >
           <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
 
@@ -428,6 +722,26 @@ export function StaffHomeLocation({
               <span className="text-sm text-gray-500">Could not load map</span>
             </div>
           )}
+
+          {/* Drawing mode badge */}
+          {isDrawing && mapStatus === "ready" && (
+            <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 bg-purple-600 text-white rounded-full text-[11px] font-medium shadow-lg">
+              <MousePointer className="w-3 h-3" />
+              {drawMode === "polygon" ? "Drawing coverage polygon" : "Setting coverage radius"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-[11px] text-gray-400">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-blue-500" />
+          Home location (blue pin)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-purple-500" />
+          Coverage area (purple zone)
         </div>
       </div>
 
@@ -444,7 +758,7 @@ export function StaffHomeLocation({
           className="ml-auto flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
         >
           {updateMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          Save Location
+          Save Location &amp; Coverage
         </button>
       </div>
     </div>

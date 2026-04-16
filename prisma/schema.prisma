@@ -260,6 +260,13 @@ model StaffProfile {
   homeLat         Float?
   homeLng         Float?
 
+  // Staff coverage area — drawn on the map around home location
+  coverageBoundaryType  String   @default("none")  // "none" | "polygon" | "radius"
+  coveragePolygonCoords Json?    // [[lng, lat], [lng, lat], ...] — GeoJSON-style ring
+  coverageCenterLat     Float?
+  coverageCenterLng     Float?
+  coverageRadiusKm      Float?
+
   // Live location tracking (updated while clocked in)
   lastLatitude    Float?
   lastLongitude   Float?

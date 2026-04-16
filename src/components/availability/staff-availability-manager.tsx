@@ -262,6 +262,17 @@ function StaffHomeLocationWrapper({ staffId }: { staffId: string }) {
     return <p className="text-xs text-gray-400">Staff member not found.</p>;
   }
 
+  // Build initial coverage from profile data
+  const initialCoverage = profile?.coverageBoundaryType && profile.coverageBoundaryType !== "none"
+    ? {
+        boundaryType: profile.coverageBoundaryType as "polygon" | "radius",
+        polygonCoords: profile.coveragePolygonCoords as [number, number][] | undefined,
+        centerLat: profile.coverageCenterLat as number | undefined,
+        centerLng: profile.coverageCenterLng as number | undefined,
+        radiusKm: profile.coverageRadiusKm as number | undefined,
+      }
+    : null;
+
   return (
     <StaffHomeLocation
       key={staffId}
@@ -270,6 +281,7 @@ function StaffHomeLocationWrapper({ staffId }: { staffId: string }) {
       initialAddress={profile?.homeAddress ?? null}
       initialLat={profile?.homeLat ?? null}
       initialLng={profile?.homeLng ?? null}
+      initialCoverage={initialCoverage}
     />
   );
 }
