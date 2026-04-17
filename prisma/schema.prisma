@@ -84,6 +84,7 @@ model Workspace {
   staff            StaffProfile[]
   galleries        Gallery[]
   notifications    Notification[]
+  emailTemplates   EmailTemplate[]
   activityLogs     ActivityLog[]
   staffInvites     StaffInvite[]
   hours            WorkspaceHours[]
@@ -1086,6 +1087,27 @@ enum NotificationStatus {
   DELIVERED
   READ
   FAILED
+}
+
+// ─────────────────────────────────────────────────────────────
+// EMAIL TEMPLATES
+// ─────────────────────────────────────────────────────────────
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  workspaceId String
+  eventType   String   // "job_confirmation", "job_reminder", "job_assigned", "job_cancelled", "gallery_ready", "invoice_sent", "payment_receipt", "portal_welcome"
+  subject     String   // Supports {{variables}}
+  body        String   @db.Text  // HTML body with {{variables}}
+  enabled     Boolean  @default(true)
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, eventType])
+  @@index([workspaceId])
 }
 
 // ─────────────────────────────────────────────────────────────

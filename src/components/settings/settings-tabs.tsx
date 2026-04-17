@@ -32,6 +32,7 @@ import {
 import { IntegrationsTab } from "./integrations-tab";
 import { TeamMembersTab } from "./team-members-tab";
 import { BrokerageGroupsManager } from "@/components/brokerages/brokerage-groups-manager";
+import { EmailTemplatesTab } from "./email-templates-tab";
 
 const TIMEZONES = [
   "America/Toronto", "America/New_York", "America/Chicago",
@@ -304,6 +305,7 @@ type SettingsCategory =
   | "branding"
   | "links"
   | "calendar"
+  | "email-templates"
   | "notifications"
   | "integrations"
   | "team"
@@ -319,6 +321,7 @@ const SETTINGS_CATEGORIES: Array<{
   { id: "branding",      label: "Branding",          icon: Palette },
   { id: "links",         label: "Public Links",      icon: Link2 },
   { id: "calendar",      label: "Calendar",          icon: Calendar },
+  { id: "email-templates", label: "Email Templates",  icon: Mail },
   { id: "notifications", label: "Notifications",     icon: Bell },
   { id: "integrations",  label: "Integrations",      icon: Puzzle },
   { id: "team",          label: "Team",              icon: Users },
@@ -677,6 +680,14 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
         <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "integrations" && "hidden")}>
           <SectionHeading icon={Puzzle} title="Integrations" description="Connect Stripe, calendar, email, and more" />
           <IntegrationsTab />
+        </div>
+
+        {/* ── 5b. Email Templates ─────────────────────────────────────── */}
+        <div className={cn("bg-white rounded-xl border border-gray-100 p-6", activeCategory !== "email-templates" && "hidden")}>
+          <SectionHeading icon={Mail} title="Email Templates" description="Customize the content of every automated email your studio sends" />
+          <div className="mt-4">
+            <EmailTemplatesTab workspaceName={name || "Your Studio"} />
+          </div>
         </div>
 
         {/* ── 6. Email Notifications ──────────────────────────────────── */}

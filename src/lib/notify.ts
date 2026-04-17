@@ -55,7 +55,7 @@ export async function notifyJobBooked({
     }),
     // Email to client
     sendJobConfirmationEmail({
-      to: clientEmail, clientName, jobNumber, propertyAddress, scheduledAt, packageName,
+      to: clientEmail, clientName, jobNumber, propertyAddress, scheduledAt, packageName, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {
@@ -94,7 +94,7 @@ export async function notifyJobConfirmed({
       },
     }),
     sendJobConfirmationEmail({
-      to: clientEmail, clientName, jobNumber, propertyAddress, scheduledAt, packageName,
+      to: clientEmail, clientName, jobNumber, propertyAddress, scheduledAt, packageName, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {
@@ -142,7 +142,7 @@ export async function notifyJobAssigned({
     // Email to photographer
     sendJobAssignedEmail({
       to: photographerEmail, photographerName, jobId, jobNumber,
-      propertyAddress, scheduledAt, clientName, accessNotes,
+      propertyAddress, scheduledAt, clientName, accessNotes, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {
@@ -170,7 +170,7 @@ export async function notifyJobReminder({
 }) {
   await Promise.allSettled([
     sendJobReminderEmail({
-      to: clientEmail, clientName, jobNumber, propertyAddress, scheduledAt, accessNotes,
+      to: clientEmail, clientName, jobNumber, propertyAddress, scheduledAt, accessNotes, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {
@@ -209,7 +209,7 @@ export async function notifyJobDelivered({
       },
     }),
     sendGalleryReadyEmail({
-      to: clientEmail, clientName, jobNumber, propertyAddress, galleryUrl,
+      to: clientEmail, clientName, jobNumber, propertyAddress, galleryUrl, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {
@@ -248,7 +248,7 @@ export async function notifyJobCancelled({
       },
     }),
     sendJobCancelledEmail({
-      to: clientEmail, clientName, jobNumber, propertyAddress, reason,
+      to: clientEmail, clientName, jobNumber, propertyAddress, reason, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {
@@ -287,7 +287,7 @@ export async function notifyInvoiceSent({
       },
     }),
     sendInvoiceEmail({
-      to: clientEmail, clientName, invoiceNumber, amount, dueDate, paymentLink,
+      to: clientEmail, clientName, invoiceNumber, amount, dueDate, paymentLink, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {
@@ -326,7 +326,7 @@ export async function notifyInvoicePaid({
       },
     }),
     sendPaymentReceiptEmail({
-      to: clientEmail, clientName, invoiceNumber, amount, paidAt,
+      to: clientEmail, clientName, invoiceNumber, amount, paidAt, workspaceId,
     }).then(() =>
       prisma.notification.create({
         data: {

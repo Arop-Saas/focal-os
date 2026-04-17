@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { format } from "date-fns";
+import prisma from "@/lib/prisma";
 
 export const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -68,6 +69,31 @@ function ctaButton(label: string, href: string) {
   </div>`;
 }
 
+// ─── Custom template resolution ─────────────────────────────────────────────
+
+async function resolveTemplate(
+  workspaceId: string | undefined,
+  eventType: string,
+  variables: Record<string, string>,
+  fallback: { subject: string; body: string },
+): Promise<{ subject: string; body: string; enabled: boolean }> {
+  if (!workspaceId) return { ...fallback, enabled: true };
+  try {
+    const custom = await prisma.emailTemplate.findUnique({
+      where: { workspaceId_eventType: { workspaceId, eventType } },
+    });
+    if (!custom) return { ...fallback, enabled: true };
+    if (!custom.enabled) return { subject: "", body: "", enabled: false };
+
+    const replace = (text: string) =>
+      text.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
+
+    return { subject: replace(custom.subject), body: replace(custom.body), enabled: true };
+  } catch {
+    return { ...fallback, enabled: true };
+  }
+}
+
 // ─── Templates ───────────────────────────────────────────────────────────────
 
 /** Portal welcome / account created → client */
@@ -98,18 +124,21 @@ export async function sendPortalWelcomeEmail({
 
 /** Booking confirmation → client */
 export async function sendJobConfirmationEmail({
-  to, clientName, jobNumber, propertyAddress, scheduledAt, packageName, workspaceName,
+  to, clientName, jobNumber, propertyAddress, scheduledAt, packageName, workspaceName, workspaceId,
 }: {
   to: string; clientName: string; jobNumber: string;
   propertyAddress: string; scheduledAt: Date; packageName: string;
-  workspaceName?: string;
+  workspaceName?: string; workspaceId?: string;
 }) {
-  return resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject: `Booking confirmed — ${propertyAddress}`,
-    html: emailWrapper(`
-      <h2 style="color:#1B4F9E;margin:0 0 8px;">Your shoot is confirmed ✅</h2>
+  const vars = {
+    clientName, jobNumber, propertyAddress, packageName,
+    scheduledDate: format(scheduledAt, "EEEE, MMMM d"),
+    scheduledTime: format(scheduledAt, "h:mm a"),
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `Booking confirmed — ${propertyAddress}`;
+  const defaultBody = `
+      <h2 style="color:#1B4F9E;margin:0 0 8px;">Your shoot is confirmed</h2>
       <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
       <p style="color:#475569;">Your real estate photography shoot has been confirmed and is on our calendar.</p>
       ${infoBox([
@@ -119,25 +148,37 @@ export async function sendJobConfirmationEmail({
         ["Package", packageName],
       ])}
       <p style="color:#475569;">You'll receive a reminder 24 hours before your shoot, and another notification when your media is ready to download.</p>
-      <p style="color:#64748b;font-size:13px;">Questions? Reply to this email.</p>
-    `, workspaceName),
+      <p style="color:#64748b;font-size:13px;">Questions? Reply to this email.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "job_confirmation", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
   });
 }
 
 /** 24-hour reminder → client */
 export async function sendJobReminderEmail({
-  to, clientName, jobNumber, propertyAddress, scheduledAt, accessNotes, workspaceName,
+  to, clientName, jobNumber, propertyAddress, scheduledAt, accessNotes, workspaceName, workspaceId,
 }: {
   to: string; clientName: string; jobNumber: string;
   propertyAddress: string; scheduledAt: Date; accessNotes?: string | null;
-  workspaceName?: string;
+  workspaceName?: string; workspaceId?: string;
 }) {
-  return resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject: `Reminder: Your shoot is tomorrow — ${propertyAddress}`,
-    html: emailWrapper(`
-      <h2 style="color:#1B4F9E;margin:0 0 8px;">Shoot reminder 📅</h2>
+  const vars = {
+    clientName, jobNumber, propertyAddress,
+    scheduledDate: format(scheduledAt, "EEEE, MMMM d"),
+    scheduledTime: format(scheduledAt, "h:mm a"),
+    accessNotes: accessNotes ?? "",
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `Reminder: Your shoot is tomorrow — ${propertyAddress}`;
+  const defaultBody = `
+      <h2 style="color:#1B4F9E;margin:0 0 8px;">Shoot reminder</h2>
       <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
       <p style="color:#475569;">This is a friendly reminder that your photography shoot is <strong>tomorrow</strong>.</p>
       ${infoBox([
@@ -146,25 +187,37 @@ export async function sendJobReminderEmail({
         ["Date & Time", format(scheduledAt, "EEEE, MMMM d 'at' h:mm a")],
         ...(accessNotes ? [["Access Notes", accessNotes] as [string, string]] : []),
       ])}
-      <p style="color:#475569;">Please ensure the property is accessible at the scheduled time. If you need to reschedule, contact us as soon as possible.</p>
-    `, workspaceName),
+      <p style="color:#475569;">Please ensure the property is accessible at the scheduled time. If you need to reschedule, contact us as soon as possible.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "job_reminder", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
   });
 }
 
 /** Photographer assigned → staff member */
 export async function sendJobAssignedEmail({
-  to, photographerName, jobId, jobNumber, propertyAddress, scheduledAt, clientName, accessNotes, workspaceName,
+  to, photographerName, jobId, jobNumber, propertyAddress, scheduledAt, clientName, accessNotes, workspaceName, workspaceId,
 }: {
   to: string; photographerName: string; jobId: string; jobNumber: string; propertyAddress: string;
   scheduledAt: Date; clientName: string; accessNotes?: string | null;
-  workspaceName?: string;
+  workspaceName?: string; workspaceId?: string;
 }) {
-  return resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject: `New job assigned — ${jobNumber}`,
-    html: emailWrapper(`
-      <h2 style="color:#1B4F9E;margin:0 0 8px;">You've been assigned a job 📷</h2>
+  const vars = {
+    photographerName, jobNumber, clientName, propertyAddress,
+    scheduledDate: format(scheduledAt, "EEEE, MMMM d"),
+    scheduledTime: format(scheduledAt, "h:mm a"),
+    accessNotes: accessNotes ?? "", jobUrl: `${APP_URL}/jobs/${jobId}`,
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `New job assigned — ${jobNumber}`;
+  const defaultBody = `
+      <h2 style="color:#1B4F9E;margin:0 0 8px;">You've been assigned a job</h2>
       <p style="color:#475569;margin:0 0 4px;">Hi ${photographerName},</p>
       <p style="color:#475569;">A new job has been assigned to you. Here are the details:</p>
       ${infoBox([
@@ -174,68 +227,96 @@ export async function sendJobAssignedEmail({
         ["Date & Time", format(scheduledAt, "EEEE, MMMM d 'at' h:mm a")],
         ...(accessNotes ? [["Access Notes", accessNotes] as [string, string]] : []),
       ])}
-      ${ctaButton("View Job Details", `${APP_URL}/jobs/${jobId}`)}
-    `, workspaceName),
+      ${ctaButton("View Job Details", `${APP_URL}/jobs/${jobId}`)}`;
+
+  const tpl = await resolveTemplate(workspaceId, "job_assigned", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
   });
 }
 
 /** Job cancelled → client */
 export async function sendJobCancelledEmail({
-  to, clientName, jobNumber, propertyAddress, reason, workspaceName,
+  to, clientName, jobNumber, propertyAddress, reason, workspaceName, workspaceId,
 }: {
   to: string; clientName: string; jobNumber: string;
   propertyAddress: string; reason?: string | null;
-  workspaceName?: string;
+  workspaceName?: string; workspaceId?: string;
 }) {
-  return resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject: `Appointment cancelled — ${jobNumber}`,
-    html: emailWrapper(`
+  const vars = {
+    clientName, jobNumber, propertyAddress, reason: reason ?? "",
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `Appointment cancelled — ${jobNumber}`;
+  const defaultBody = `
       <h2 style="color:#dc2626;margin:0 0 8px;">Appointment cancelled</h2>
       <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
       <p style="color:#475569;">Your photography appointment for <strong>${propertyAddress}</strong> (${jobNumber}) has been cancelled.</p>
       ${reason ? `<p style="color:#475569;"><strong>Reason:</strong> ${reason}</p>` : ""}
-      <p style="color:#475569;">To reschedule, please contact us and we'll be happy to find a new time.</p>
-    `, workspaceName),
+      <p style="color:#475569;">To reschedule, please contact us and we'll be happy to find a new time.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "job_cancelled", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
   });
 }
 
 /** Media ready → client */
 export async function sendGalleryReadyEmail({
-  to, clientName, jobNumber, propertyAddress, galleryUrl, workspaceName,
+  to, clientName, jobNumber, propertyAddress, galleryUrl, workspaceName, workspaceId,
 }: {
   to: string; clientName: string; jobNumber: string;
   propertyAddress: string; galleryUrl: string;
-  workspaceName?: string;
+  workspaceName?: string; workspaceId?: string;
 }) {
-  return resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject: `Your media is ready — ${propertyAddress}`,
-    html: emailWrapper(`
-      <h2 style="color:#1B4F9E;margin:0 0 8px;">Your media is ready! 📸</h2>
+  const vars = {
+    clientName, jobNumber, propertyAddress, galleryUrl,
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `Your media is ready — ${propertyAddress}`;
+  const defaultBody = `
+      <h2 style="color:#1B4F9E;margin:0 0 8px;">Your media is ready!</h2>
       <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
       <p style="color:#475569;">The photos for your property at <strong>${propertyAddress}</strong> (Job #${jobNumber}) are ready to view and download.</p>
       ${ctaButton("View & Download Gallery", galleryUrl)}
-      <p style="color:#94a3b8;font-size:12px;">Gallery link expires in 30 days. Download your files before then.</p>
-    `, workspaceName),
+      <p style="color:#94a3b8;font-size:12px;">Gallery link expires in 30 days. Download your files before then.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "gallery_ready", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
   });
 }
 
 /** Invoice sent → client */
 export async function sendInvoiceEmail({
-  to, clientName, invoiceNumber, amount, dueDate, paymentLink, workspaceName,
+  to, clientName, invoiceNumber, amount, dueDate, paymentLink, workspaceName, workspaceId,
 }: {
   to: string; clientName: string; invoiceNumber: string;
   amount: number; dueDate: Date; paymentLink: string;
-  workspaceName?: string;
+  workspaceName?: string; workspaceId?: string;
 }) {
-  return resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject: `Invoice ${invoiceNumber} — $${amount.toFixed(2)} due`,
-    html: emailWrapper(`
+  const vars = {
+    clientName, invoiceNumber, amount: `$${amount.toFixed(2)}`,
+    dueDate: format(dueDate, "MMMM d, yyyy"), paymentLink,
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `Invoice ${invoiceNumber} — $${amount.toFixed(2)} due`;
+  const defaultBody = `
       <h2 style="color:#1B4F9E;margin:0 0 8px;">Invoice ${invoiceNumber}</h2>
       <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
       <p style="color:#475569;">Please find your invoice details below.</p>
@@ -245,25 +326,35 @@ export async function sendInvoiceEmail({
         ["Due Date", format(dueDate, "MMMM d, yyyy")],
       ])}
       ${ctaButton("Pay Invoice", paymentLink)}
-      <p style="color:#475569;font-size:13px;">Payment methods accepted: credit card, ACH bank transfer.</p>
-    `, workspaceName),
+      <p style="color:#475569;font-size:13px;">Payment methods accepted: credit card, ACH bank transfer.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "invoice_sent", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
   });
 }
 
 /** Payment receipt → client */
 export async function sendPaymentReceiptEmail({
-  to, clientName, invoiceNumber, amount, paidAt, workspaceName,
+  to, clientName, invoiceNumber, amount, paidAt, workspaceName, workspaceId,
 }: {
   to: string; clientName: string; invoiceNumber: string;
   amount: number; paidAt: Date;
-  workspaceName?: string;
+  workspaceName?: string; workspaceId?: string;
 }) {
-  return resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject: `Payment received — Invoice ${invoiceNumber}`,
-    html: emailWrapper(`
-      <h2 style="color:#16a34a;margin:0 0 8px;">Payment received ✅</h2>
+  const vars = {
+    clientName, invoiceNumber, amount: `$${amount.toFixed(2)}`,
+    paidDate: format(paidAt, "MMMM d, yyyy"),
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `Payment received — Invoice ${invoiceNumber}`;
+  const defaultBody = `
+      <h2 style="color:#16a34a;margin:0 0 8px;">Payment received</h2>
       <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
       <p style="color:#475569;">We've received your payment. Thank you!</p>
       ${infoBox([
@@ -271,8 +362,16 @@ export async function sendPaymentReceiptEmail({
         ["Amount Paid", `$${amount.toFixed(2)}`],
         ["Date", format(paidAt, "MMMM d, yyyy")],
       ])}
-      <p style="color:#475569;font-size:13px;">This email serves as your payment receipt. Please save it for your records.</p>
-    `, workspaceName),
+      <p style="color:#475569;font-size:13px;">This email serves as your payment receipt. Please save it for your records.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "payment_receipt", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
   });
 }
 
