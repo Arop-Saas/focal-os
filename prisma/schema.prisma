@@ -70,6 +70,10 @@ model Workspace {
   outsidePerKmRate      Float?   // Per-km rate for outside-territory bookings
   outsideFeeBaseKm      Float?   // Free km before per-km charge kicks in (distance from nearest boundary)
   lockDownloads         Boolean  @default(false)
+  // Payment reminder settings
+  reminderEnabled       Boolean  @default(true)    // Master toggle for automatic payment reminders
+  reminderDaysBefore    String   @default("7,3,1") // Comma-separated days before due date to send reminders
+  reminderOverdueRepeat Int      @default(7)       // Days between repeat reminders after overdue (0 = no repeat)
   bookingFormSettings   Json?    // Serialized BookingFormSettings object
   portalSettings        Json?    // Serialized PortalSettings object
 

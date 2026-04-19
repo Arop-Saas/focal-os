@@ -345,6 +345,9 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   const [autoCreateInvoice, setAutoCreateInvoice] = useState(workspace.autoCreateInvoice ?? false);
   const [invoiceDueDays, setInvoiceDueDays] = useState(String(workspace.invoiceDueDays ?? 30));
   const [lockDownloads, setLockDownloads] = useState((workspace as any).lockDownloads ?? false);
+  const [reminderEnabled, setReminderEnabled] = useState((workspace as any).reminderEnabled ?? true);
+  const [reminderDaysBefore, setReminderDaysBefore] = useState((workspace as any).reminderDaysBefore ?? "7,3,1");
+  const [reminderOverdueRepeat, setReminderOverdueRepeat] = useState(String((workspace as any).reminderOverdueRepeat ?? 7));
   const [addressLine1, setAddressLine1] = useState(workspace.addressLine1 ?? "");
   const [addressCity, setAddressCity] = useState(workspace.city ?? "");
   const [addressState, setAddressState] = useState(workspace.state ?? "");
@@ -417,6 +420,9 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
       autoCreateInvoice,
       invoiceDueDays: parseInt(invoiceDueDays) || 30,
       lockDownloads,
+      reminderEnabled,
+      reminderDaysBefore: reminderDaysBefore || "7,3,1",
+      reminderOverdueRepeat: parseInt(reminderOverdueRepeat) || 7,
     }, {
       onSuccess: () => { setBrandingSaved(true); setTimeout(() => setBrandingSaved(false), 3000); },
     });
@@ -627,6 +633,45 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
                 checked={lockDownloads}
                 onChange={setLockDownloads}
               />
+            </div>
+
+            {/* Payment Reminders */}
+            <div className="space-y-4 mt-6">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Automatic Payment Reminders</p>
+              <ToggleRow
+                label="Enable payment reminders"
+                description="Automatically email clients before invoices are due and when overdue"
+                checked={reminderEnabled}
+                onChange={setReminderEnabled}
+              />
+              {reminderEnabled && (
+                <>
+                  <Field label="Remind days before due date" hint="Comma-separated (e.g. 7,3,1). A reminder email is sent each of these days before the due date.">
+                    <input
+                      type="text"
+                      value={reminderDaysBefore}
+                      onChange={(e) => setReminderDaysBefore(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                      placeholder="7,3,1"
+                    />
+                  </Field>
+                  <Field label="Repeat overdue reminder every (days)" hint="After an invoice becomes overdue, re-send a reminder every N days. Set 0 to disable repeat reminders.">
+                    <input
+                      type="number"
+                      min="0"
+                      max="90"
+                      value={reminderOverdueRepeat}
+                      onChange={(e) => setReminderOverdueRepeat(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="7"
+                    />
+                  </Field>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Reminders use the <strong>Payment Reminder</strong> and <strong>Overdue Invoice Notice</strong> email templates.
+                    Customize them in the Email Templates section.
+                  </p>
+                </>
+              )}
             </div>
 
             {brandingSaved && <SavedBanner />}

@@ -91,6 +91,33 @@ export const EMAIL_EVENT_TYPES = {
 <strong>Date:</strong> {{paidDate}}</p>
 <p style="font-size:13px;">This email serves as your payment receipt. Please save it for your records.</p>`,
   },
+  invoice_reminder: {
+    label: "Payment Reminder",
+    description: "Sent automatically before an invoice is due or when overdue",
+    variables: ["clientName", "invoiceNumber", "amount", "dueDate", "daysUntilDue", "paymentLink", "workspaceName"],
+    defaultSubject: "Reminder: Invoice {{invoiceNumber}} — {{amount}} due {{dueDate}}",
+    defaultBody: `<h2 style="color:#f59e0b;margin:0 0 8px;">Payment reminder</h2>
+<p>Hi {{clientName}},</p>
+<p>This is a friendly reminder that your invoice is due soon.</p>
+<p><strong>Invoice #:</strong> {{invoiceNumber}}<br/>
+<strong>Amount Due:</strong> {{amount}}<br/>
+<strong>Due Date:</strong> {{dueDate}}</p>
+<p>Please submit your payment at your earliest convenience to avoid any late fees.</p>
+<p style="font-size:13px;">Payment methods accepted: credit card, ACH bank transfer.</p>`,
+  },
+  invoice_overdue: {
+    label: "Overdue Invoice Notice",
+    description: "Sent when an invoice is past due",
+    variables: ["clientName", "invoiceNumber", "amount", "dueDate", "daysOverdue", "paymentLink", "workspaceName"],
+    defaultSubject: "Overdue: Invoice {{invoiceNumber}} — {{amount}} was due {{dueDate}}",
+    defaultBody: `<h2 style="color:#dc2626;margin:0 0 8px;">Invoice overdue</h2>
+<p>Hi {{clientName}},</p>
+<p>Your invoice is now <strong>{{daysOverdue}} days past due</strong>. Please submit payment as soon as possible.</p>
+<p><strong>Invoice #:</strong> {{invoiceNumber}}<br/>
+<strong>Amount Due:</strong> {{amount}}<br/>
+<strong>Due Date:</strong> {{dueDate}}</p>
+<p>If you've already sent payment, please disregard this notice. Otherwise, please pay promptly to keep your account in good standing.</p>`,
+  },
   portal_welcome: {
     label: "Client Portal Welcome",
     description: "Sent to the client when their portal account is created",

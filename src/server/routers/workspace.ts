@@ -140,6 +140,9 @@ export const workspaceRouter = router({
         autoCreateInvoice: z.boolean().optional(),
         invoiceDueDays: z.number().int().min(0).max(365).optional(),
         lockDownloads: z.boolean().optional(),
+        reminderEnabled: z.boolean().optional(),
+        reminderDaysBefore: z.string().max(50).optional(),
+        reminderOverdueRepeat: z.number().int().min(0).max(90).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

@@ -339,6 +339,83 @@ export async function sendInvoiceEmail({
   });
 }
 
+/** Invoice payment reminder → client */
+export async function sendInvoiceReminderEmail({
+  to, clientName, invoiceNumber, amount, dueDate, paymentLink, daysUntilDue, workspaceName, workspaceId,
+}: {
+  to: string; clientName: string; invoiceNumber: string;
+  amount: number; dueDate: Date; paymentLink: string;
+  daysUntilDue: number; workspaceName?: string; workspaceId?: string;
+}) {
+  const vars = {
+    clientName, invoiceNumber, amount: `$${amount.toFixed(2)}`,
+    dueDate: format(dueDate, "MMMM d, yyyy"), paymentLink,
+    daysUntilDue: daysUntilDue.toString(),
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const urgency = daysUntilDue <= 1 ? "Tomorrow" : `in ${daysUntilDue} days`;
+  const defaultSubject = `Reminder: Invoice ${invoiceNumber} — $${amount.toFixed(2)} due ${urgency}`;
+  const defaultBody = `
+      <h2 style="color:#f59e0b;margin:0 0 8px;">Payment reminder</h2>
+      <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
+      <p style="color:#475569;">This is a friendly reminder that your invoice is due <strong>${urgency}</strong>.</p>
+      ${infoBox([
+        ["Invoice #", invoiceNumber],
+        ["Amount Due", `$${amount.toFixed(2)}`],
+        ["Due Date", format(dueDate, "MMMM d, yyyy")],
+      ])}
+      ${ctaButton("Pay Invoice", paymentLink)}
+      <p style="color:#475569;font-size:13px;">Payment methods accepted: credit card, ACH bank transfer.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "invoice_reminder", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
+  });
+}
+
+/** Invoice overdue notice → client */
+export async function sendInvoiceOverdueEmail({
+  to, clientName, invoiceNumber, amount, dueDate, paymentLink, daysOverdue, workspaceName, workspaceId,
+}: {
+  to: string; clientName: string; invoiceNumber: string;
+  amount: number; dueDate: Date; paymentLink: string;
+  daysOverdue: number; workspaceName?: string; workspaceId?: string;
+}) {
+  const vars = {
+    clientName, invoiceNumber, amount: `$${amount.toFixed(2)}`,
+    dueDate: format(dueDate, "MMMM d, yyyy"), paymentLink,
+    daysOverdue: daysOverdue.toString(),
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `Overdue: Invoice ${invoiceNumber} — $${amount.toFixed(2)} was due ${format(dueDate, "MMMM d")}`;
+  const defaultBody = `
+      <h2 style="color:#dc2626;margin:0 0 8px;">Invoice overdue</h2>
+      <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
+      <p style="color:#475569;">Your invoice is now <strong>${daysOverdue} days past due</strong>. Please submit payment as soon as possible.</p>
+      ${infoBox([
+        ["Invoice #", invoiceNumber],
+        ["Amount Due", `$${amount.toFixed(2)}`],
+        ["Due Date", format(dueDate, "MMMM d, yyyy")],
+      ])}
+      ${ctaButton("Pay Now", paymentLink)}
+      <p style="color:#475569;font-size:13px;">If you've already sent payment, please disregard this notice.</p>`;
+
+  const tpl = await resolveTemplate(workspaceId, "invoice_overdue", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, workspaceName),
+  });
+}
+
 /** Payment receipt → client */
 export async function sendPaymentReceiptEmail({
   to, clientName, invoiceNumber, amount, paidAt, workspaceName, workspaceId,

@@ -19,6 +19,8 @@ import {
   sendJobCancelledEmail,
   sendGalleryReadyEmail,
   sendInvoiceEmail,
+  sendInvoiceReminderEmail,
+  sendInvoiceOverdueEmail,
   sendPaymentReceiptEmail,
 } from "@/lib/resend";
 
@@ -141,7 +143,7 @@ export async function notifyJobAssigned({
       : []),
     // Email to photographer
     sendJobAssignedEmail({
-      to: photographerEmail, photographerName, jobId, jobNumber,
+      to: photographerEmail, photographerName, jobId: jobId!, jobNumber,
       propertyAddress, scheduledAt, clientName, accessNotes, workspaceId,
     }).then(() =>
       prisma.notification.create({
@@ -341,4 +343,73 @@ export async function notifyInvoicePaid({
       })
     ),
   ]).catch((err) => console.error("[notify] notifyInvoicePaid error:", err));
+}
+
+// ─── Invoice: Payment Reminder (before due date) ────────────────────────────
+
+export async function notifyInvoiceReminder({
+  workspaceId, jobId, userId,
+  clientEmail, clientName, invoiceNumber, amount, dueDate, paymentLink, daysUntilDue,
+}: BaseNotifyInput & {
+  clientEmail: string; clientName: string; invoiceNumber: string;
+  amount: number; dueDate: Date; paymentLink: string; daysUntilDue: number;
+}) {
+  await Promise.allSettled([
+    prisma.notification.create({
+      data: {
+        workspaceId, jobId, userId,
+        type: "INVOICE_REMINDER" as any,
+        channel: "IN_APP",
+        status: "DELIVERED",
+        title: `Payment reminder sent — ${invoiceNumber}`,
+        body: `$${amount.toFixed(2)} due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`,
+        sentAt: new Date(),
+      },
+    }),
+    sendInvoiceReminderEmail({
+      to: clientEmail, clientName, invoiceNumber, amount, dueDate, paymentLink,
+      daysUntilDue, workspaceId,
+    }).then(() =>
+      prisma.notification.create({
+        data: {
+          workspaceId, jobId,
+          type: "INVOICE_REMINDER" as any,
+          channel: "EMAIL",
+          status: "SENT",
+          title: `Payment reminder email sent to ${clientName}`,
+          body: `Sent to ${clientEmail} — due in ${daysUntilDue} days`,
+          sentAt: new Date(),
+        },
+      })
+    ),
+  ]).catch((err) => console.error("[notify] notifyInvoiceReminder error:", err));
+}
+
+// ─── Invoice: Overdue Reminder ──────────────────────────────────────────────
+
+export async function notifyInvoiceOverdue({
+  workspaceId, jobId, userId,
+  clientEmail, clientName, invoiceNumber, amount, dueDate, paymentLink, daysOverdue,
+}: BaseNotifyInput & {
+  clientEmail: string; clientName: string; invoiceNumber: string;
+  amount: number; dueDate: Date; paymentLink: string; daysOverdue: number;
+}) {
+  await Promise.allSettled([
+    sendInvoiceOverdueEmail({
+      to: clientEmail, clientName, invoiceNumber, amount, dueDate, paymentLink,
+      daysOverdue, workspaceId,
+    }).then(() =>
+      prisma.notification.create({
+        data: {
+          workspaceId, jobId,
+          type: "INVOICE_OVERDUE" as any,
+          channel: "EMAIL",
+          status: "SENT",
+          title: `Overdue notice sent to ${clientName}`,
+          body: `Sent to ${clientEmail} — ${daysOverdue} days overdue`,
+          sentAt: new Date(),
+        },
+      })
+    ),
+  ]).catch((err) => console.error("[notify] notifyInvoiceOverdue error:", err));
 }
