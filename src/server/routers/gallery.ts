@@ -352,7 +352,7 @@ export const galleryRouter = router({
       const gallery = await ctx.prisma.gallery.findUnique({
         where: { slug: input.slug },
         include: {
-          workspace: { select: { name: true, logoUrl: true, brandColor: true, stripeSecretKey: true } },
+          workspace: { select: { name: true, logoUrl: true, brandColor: true, stripeSecretKey: true, showBranding: true } as any },
           job: {
             select: {
               propertyAddress: true, propertyCity: true, propertyState: true,

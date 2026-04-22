@@ -143,6 +143,8 @@ export const workspaceRouter = router({
         reminderEnabled: z.boolean().optional(),
         reminderDaysBefore: z.string().max(50).optional(),
         reminderOverdueRepeat: z.number().int().min(0).max(90).optional(),
+        showBranding: z.boolean().optional(),
+        emailSubtitle: z.string().max(100).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

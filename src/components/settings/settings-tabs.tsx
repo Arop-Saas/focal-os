@@ -348,6 +348,8 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   const [reminderEnabled, setReminderEnabled] = useState((workspace as any).reminderEnabled ?? true);
   const [reminderDaysBefore, setReminderDaysBefore] = useState((workspace as any).reminderDaysBefore ?? "7,3,1");
   const [reminderOverdueRepeat, setReminderOverdueRepeat] = useState(String((workspace as any).reminderOverdueRepeat ?? 7));
+  const [showBranding, setShowBranding] = useState((workspace as any).showBranding ?? true);
+  const [emailSubtitle, setEmailSubtitle] = useState((workspace as any).emailSubtitle ?? "Real Estate Photography");
   const [addressLine1, setAddressLine1] = useState(workspace.addressLine1 ?? "");
   const [addressCity, setAddressCity] = useState(workspace.city ?? "");
   const [addressState, setAddressState] = useState(workspace.state ?? "");
@@ -423,6 +425,8 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
       reminderEnabled,
       reminderDaysBefore: reminderDaysBefore || "7,3,1",
       reminderOverdueRepeat: parseInt(reminderOverdueRepeat) || 7,
+      showBranding,
+      emailSubtitle: emailSubtitle || "Real Estate Photography",
     }, {
       onSuccess: () => { setBrandingSaved(true); setTimeout(() => setBrandingSaved(false), 3000); },
     });
@@ -671,6 +675,32 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
                     Customize them in the Email Templates section.
                   </p>
                 </>
+              )}
+            </div>
+
+            {/* White-Label / Branding Control */}
+            <div className="space-y-4 mt-6">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">White-Label</p>
+              <Field label="Email tagline" hint="Shown next to your company name in the email header (e.g. 'Real Estate Photography')">
+                <input
+                  type="text"
+                  value={emailSubtitle}
+                  onChange={(e) => setEmailSubtitle(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Real Estate Photography"
+                  maxLength={100}
+                />
+              </Field>
+              <ToggleRow
+                label="Show Scalist branding"
+                description="Display 'Powered by Scalist' on galleries, invoices, and emails. Paid plans can hide this."
+                checked={showBranding}
+                onChange={setShowBranding}
+              />
+              {!showBranding && (
+                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Scalist branding will be hidden from all client-facing pages and emails. This feature is available on paid plans.
+                </p>
               )}
             </div>
 

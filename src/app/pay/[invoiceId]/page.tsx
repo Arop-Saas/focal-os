@@ -25,7 +25,8 @@ export default async function DirectPayPage({ params, searchParams }: Props) {
           brandColor: true,
           stripeSecretKey: true,
           slug: true,
-        },
+          showBranding: true,
+        } as any,
       },
       client: {
         select: { firstName: true, lastName: true, email: true },
@@ -215,9 +216,11 @@ export default async function DirectPayPage({ params, searchParams }: Props) {
         </div>
       </div>
 
-      <p className="text-center text-gray-400 text-xs mt-5">
-        Powered by <span className="font-medium text-gray-500">Scalist</span>
-      </p>
+      {(workspace as any).showBranding !== false && (
+        <p className="text-center text-gray-400 text-xs mt-5">
+          Powered by <a href="https://www.scalist.io" className="font-medium text-gray-500 hover:text-gray-600">Scalist</a>
+        </p>
+      )}
     </div>
   );
 }

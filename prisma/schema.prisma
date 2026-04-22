@@ -74,6 +74,9 @@ model Workspace {
   reminderEnabled       Boolean  @default(true)    // Master toggle for automatic payment reminders
   reminderDaysBefore    String   @default("7,3,1") // Comma-separated days before due date to send reminders
   reminderOverdueRepeat Int      @default(7)       // Days between repeat reminders after overdue (0 = no repeat)
+  // White-label settings
+  showBranding          Boolean  @default(true)     // Show "Powered by Scalist" on client-facing pages (free = true, paid can toggle off)
+  emailSubtitle         String   @default("Real Estate Photography") // Tagline shown in email header next to workspace name
   bookingFormSettings   Json?    // Serialized BookingFormSettings object
   portalSettings        Json?    // Serialized PortalSettings object
 

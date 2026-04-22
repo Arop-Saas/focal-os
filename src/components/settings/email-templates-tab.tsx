@@ -61,7 +61,7 @@ function EmailPreview({ subject, body, workspaceName }: { subject: string; body:
         <div className="text-[11px] text-gray-400 mb-1">Subject</div>
         <div className="text-sm font-medium text-gray-900">{renderedSubject}</div>
         <div className="flex items-center gap-2 mt-2 text-[11px] text-gray-400">
-          <span>From: {workspaceName} &lt;noreply@scalist.io&gt;</span>
+          <span>From: {workspaceName} &lt;noreply@yourdomain.com&gt;</span>
           <span>|</span>
           <span>To: jane@example.com</span>
         </div>

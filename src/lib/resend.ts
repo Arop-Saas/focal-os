@@ -11,8 +11,21 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
 
 // ─── Shared layout ──────────────────────────────────────────────────────────
 
-function emailWrapper(body: string, workspaceName?: string) {
-  const brandName = workspaceName ?? "Scalist";
+interface EmailWrapperOptions {
+  workspaceName?: string;
+  brandColor?: string;
+  emailSubtitle?: string;
+  showBranding?: boolean;
+}
+
+function emailWrapper(body: string, opts?: string | EmailWrapperOptions) {
+  // Backwards-compatible: accept either a string (workspaceName) or options object
+  const options: EmailWrapperOptions = typeof opts === "string" ? { workspaceName: opts } : (opts ?? {});
+  const brandName = options.workspaceName ?? "Scalist";
+  const headerColor = options.brandColor ?? "#1B4F9E";
+  const subtitle = options.emailSubtitle ?? "Real Estate Photography";
+  const showBranding = options.showBranding ?? true;
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -24,9 +37,9 @@ function emailWrapper(body: string, workspaceName?: string) {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
         <!-- Header -->
-        <tr><td style="background:#1B4F9E;padding:24px 32px;">
+        <tr><td style="background:${headerColor};padding:24px 32px;">
           <span style="color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.5px;">${brandName}</span>
-          <span style="color:rgba(255,255,255,0.6);font-size:13px;margin-left:8px;">Real Estate Photography</span>
+          <span style="color:rgba(255,255,255,0.6);font-size:13px;margin-left:8px;">${subtitle}</span>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:32px;">${body}</td></tr>
@@ -36,6 +49,7 @@ function emailWrapper(body: string, workspaceName?: string) {
             You're receiving this because you have an appointment with ${brandName}.
             Questions? Reply to this email.
           </p>
+          ${showBranding ? `<p style="margin:8px 0 0;color:#c0c8d4;font-size:11px;">Powered by <a href="https://www.scalist.io" style="color:#c0c8d4;">Scalist</a></p>` : ""}
         </td></tr>
       </table>
     </td></tr>
@@ -67,6 +81,27 @@ function ctaButton(label: string, href: string) {
       ${label}
     </a>
   </div>`;
+}
+
+// ─── Workspace branding lookup ──────────────────────────────────────────────
+
+async function getWorkspaceBranding(workspaceId?: string): Promise<EmailWrapperOptions> {
+  if (!workspaceId) return {};
+  try {
+    const ws = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { name: true, brandColor: true, showBranding: true, emailSubtitle: true } as any,
+    }) as any;
+    if (!ws) return {};
+    return {
+      workspaceName: ws.name ?? undefined,
+      brandColor: ws.brandColor ?? undefined,
+      emailSubtitle: ws.emailSubtitle ?? undefined,
+      showBranding: ws.showBranding ?? true,
+    };
+  } catch {
+    return {};
+  }
 }
 
 // ─── Custom template resolution ─────────────────────────────────────────────
@@ -152,12 +187,13 @@ export async function sendJobConfirmationEmail({
 
   const tpl = await resolveTemplate(workspaceId, "job_confirmation", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -191,12 +227,13 @@ export async function sendJobReminderEmail({
 
   const tpl = await resolveTemplate(workspaceId, "job_reminder", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -231,12 +268,13 @@ export async function sendJobAssignedEmail({
 
   const tpl = await resolveTemplate(workspaceId, "job_assigned", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -262,12 +300,13 @@ export async function sendJobCancelledEmail({
 
   const tpl = await resolveTemplate(workspaceId, "job_cancelled", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -293,12 +332,13 @@ export async function sendGalleryReadyEmail({
 
   const tpl = await resolveTemplate(workspaceId, "gallery_ready", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -330,12 +370,13 @@ export async function sendInvoiceEmail({
 
   const tpl = await resolveTemplate(workspaceId, "invoice_sent", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -369,12 +410,13 @@ export async function sendInvoiceReminderEmail({
 
   const tpl = await resolveTemplate(workspaceId, "invoice_reminder", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -407,12 +449,13 @@ export async function sendInvoiceOverdueEmail({
 
   const tpl = await resolveTemplate(workspaceId, "invoice_overdue", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 
@@ -443,12 +486,13 @@ export async function sendPaymentReceiptEmail({
 
   const tpl = await resolveTemplate(workspaceId, "payment_receipt", vars, { subject: defaultSubject, body: defaultBody });
   if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
 
   return resend.emails.send({
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
-    html: emailWrapper(tpl.body, workspaceName),
+    html: emailWrapper(tpl.body, branding),
   });
 }
 

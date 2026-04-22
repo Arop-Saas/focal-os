@@ -282,7 +282,7 @@ function GalleryView({
     propertyAddress: string;
     propertyCity: string;
     propertyState: string;
-    workspace: { name: string; logoUrl: string | null; brandColor: string };
+    workspace: { name: string; logoUrl: string | null; brandColor: string; showBranding?: boolean };
     media: MediaItem[];
   };
   paymentInfo?: { amountDue: number; hasStripe: boolean; slug: string } | null;
@@ -541,7 +541,9 @@ function GalleryView({
 
       {/* Footer — extra bottom padding when payment banner is visible */}
       <footer className={`border-t border-gray-800 px-6 py-4 text-center mt-4 ${paymentInfo ? "pb-24" : ""}`}>
-        <p className="text-gray-600 text-xs">Powered by Scalist</p>
+        {gallery.workspace.showBranding !== false && (
+          <p className="text-gray-600 text-xs">Powered by <a href="https://www.scalist.io" className="hover:text-gray-400">Scalist</a></p>
+        )}
       </footer>
 
       {/* Payment banner */}
