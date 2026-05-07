@@ -1,0 +1,108 @@
+import { Suspense } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import prisma from "@/lib/prisma";
+import { resolveWorkspaceId } from "@/lib/resolve-workspace";
+import { Header } from "@/components/layout/header";
+import { InvoicesTable } from "@/components/invoices/invoices-table";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+
+export const metadata = { title: "Invoices" };
+
+interface PageProps {
+  searchParams: {
+    page?: string;
+    status?: string;
+    search?: string;
+  };
+}
+
+export default async function InvoicesPage({ searchParams }: PageProps) {
+  const supabase = await createClient();
+  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+
+  const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
+  const page = Math.max(1, parseInt(searchParams.page ?? "1"));
+  const limit = 20;
+  const skip = (page - 1) * limit;
+
+  const where = {
+    workspaceId,
+    ...(searchParams.status && { status: searchParams.status as any }),
+    ...(searchParams.search && {
+      OR: [
+        { invoiceNumber: { contains: searchParams.search, mode: "insensitive" as const } },
+        { client: { OR: [
+          { firstName: { contains: searchParams.search, mode: "insensitive" as const } },
+          { lastName: { contains: searchParams.search, mode: "insensitive" as const } },
+        ]}},
+      ],
+    }),
+  };
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [invoices, total, statsOutstanding, statsOverdue, statsPaidThisMonth] = await Promise.all([
+    prisma.invoice.findMany({
+      where,
+      include: {
+        client: { select: { id: true, firstName: true, lastName: true, email: true } },
+        job: { select: { id: true, jobNumber: true, propertyAddress: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.invoice.count({ where }),
+    // Outstanding: sum of amountDue for unpaid invoices (all, not filtered)
+    prisma.invoice.aggregate({
+      where: {
+        workspaceId,
+        status: { in: ["DRAFT", "SENT", "VIEWED", "PARTIAL", "OVERDUE"] },
+      },
+      _sum: { amountDue: true },
+    }),
+    // Overdue count
+    prisma.invoice.count({
+      where: { workspaceId, status: "OVERDUE" },
+    }),
+    // Paid this month
+    prisma.invoice.aggregate({
+      where: {
+        workspaceId,
+        status: "PAID",
+        paidAt: { gte: startOfMonth },
+      },
+      _sum: { totalAmount: true },
+    }),
+  ]);
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <Header
+        title="Invoices"
+        description={`${total} total invoices`}
+        actions={
+          <Button size="sm" asChild>
+            <Link href="/invoices/new">
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> New Invoice
+            </Link>
+          </Button>
+        }
+      />
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        <InvoicesTable
+          invoices={invoices}
+          total={total}
+          page={page}
+          limit={limit}
+          statsOutstanding={statsOutstanding._sum.amountDue ?? 0}
+          statsOverdue={statsOverdue}
+          statsPaidThisMonth={statsPaidThisMonth._sum.totalAmount ?? 0}
+        />
+      </div>
+    </div>
+  );
+}

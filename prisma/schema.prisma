@@ -1,0 +1,1282 @@
+// ============================================================
+// FOCAL OS — Prisma Schema
+// Multi-tenant SaaS for real estate photography companies
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// WORKSPACE (Tenant)
+// ─────────────────────────────────────────────────────────────
+
+model Workspace {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  logoUrl       String?
+  website       String?
+  phone         String?
+  email         String?
+  timezone      String   @default("America/New_York")
+  currency      String   @default("USD")
+  country       String   @default("US")
+
+  // Address
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+
+  // Billing (platform — for collecting subscription fees)
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
+  stripePriceId         String?
+  subscriptionStatus    SubscriptionStatus @default(TRIALING)
+  subscriptionTier      SubscriptionTier?
+  subscriptionEndsAt    DateTime?
+  trialEndsAt           DateTime?
+  gracePeriodEndsAt     DateTime?
+
+  // Stripe Connect (for collecting client payments)
+  stripePublishableKey  String?
+  stripeSecretKey       String?
+  stripeWebhookSecret   String?
+
+  // Google Calendar (workspace-level OAuth)
+  googleCalendarConnected Boolean @default(false)
+  googleCalendarEmail     String?
+
+  // Settings
+  defaultTaxRate        Float    @default(0)
+  invoicePrefix         String   @default("INV")
+  invoiceNextNumber     Int      @default(1001)
+  brandColor            String   @default("#1B4F9E")
+  autoCreateInvoice     Boolean  @default(false)
+  invoiceDueDays        Int      @default(30)
+  jobBufferMins         Int      @default(15)   // Buffer/travel time between jobs in minutes
+  // Outside-territory booking settings
+  outsideBookingEnabled Boolean  @default(true)   // Whether to allow bookings outside all territories
+  outsideFeeType        String   @default("flat") // "flat" | "per_km"
+  outsideTerritoryFee   Float?   // Flat travel fee for outside-territory bookings
+  outsidePerKmRate      Float?   // Per-km rate for outside-territory bookings
+  outsideFeeBaseKm      Float?   // Free km before per-km charge kicks in (distance from nearest boundary)
+  lockDownloads         Boolean  @default(false)
+  // Payment reminder settings
+  reminderEnabled       Boolean  @default(true)    // Master toggle for automatic payment reminders
+  reminderDaysBefore    String   @default("7,3,1") // Comma-separated days before due date to send reminders
+  reminderOverdueRepeat Int      @default(7)       // Days between repeat reminders after overdue (0 = no repeat)
+  // White-label settings
+  showBranding          Boolean  @default(true)     // Show "Powered by Scalist" on client-facing pages (free = true, paid can toggle off)
+  emailSubtitle         String   @default("Real Estate Photography") // Tagline shown in email header next to workspace name
+  bookingFormSettings   Json?    // Serialized BookingFormSettings object
+  portalSettings        Json?    // Serialized PortalSettings object
+
+  // Relations
+  members          WorkspaceMember[]
+  clients          Client[]
+  jobs             Job[]
+  packages         Package[]
+  services         Service[]
+  orders           Order[]
+  invoices         Invoice[]
+  staff            StaffProfile[]
+  galleries        Gallery[]
+  notifications    Notification[]
+  emailTemplates   EmailTemplate[]
+  activityLogs     ActivityLog[]
+  staffInvites     StaffInvite[]
+  hours            WorkspaceHours[]
+  territories      ServiceTerritory[]
+  brokerageGroups  BrokerageGroup[]
+  customerTeams    CustomerTeam[]
+  orderForms       OrderForm[]
+  coupons          Coupon[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+// ─────────────────────────────────────────────────────────────
+// ORDER FORMS
+// ─────────────────────────────────────────────────────────────
+
+model OrderForm {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String?                      // Short description shown on portal cards
+  coverImage      String?                      // Cover image URL for portal cards
+  isPublic        Boolean @default(true)
+  welcomeMessage  String?
+
+  // Field visibility (mirrors BookingFormSettings.fields)
+  fieldSettings   Json?
+
+  // Scheduling
+  confirmationMode    String  @default("IMMEDIATE")   // IMMEDIATE | MANUAL
+  assignmentStrategy  String  @default("ROUND_ROBIN") // ROUND_ROBIN | CLOSEST | PRIORITY | AUTO
+  allowCustomerChoice Boolean @default(false)
+  timeSlotInterval        Int     @default(30)             // minutes
+  minBookingNoticeHours   Int     @default(0)              // 0 = no minimum; e.g. 24 = must book 24h ahead
+  maxAdvanceBookingDays   Int     @default(0)              // 0 = no limit; e.g. 60 = can only book 60 days out
+
+  // Payment
+  paymentMode    String @default("NONE")  // NONE | FULL | PARTIAL
+  depositType    String @default("percent")  // "percent" | "fixed"
+  depositPercent Int?                     // e.g. 25 = 25% deposit
+  depositFixed   Float?                   // e.g. 100.00 = $100 flat deposit
+
+  // ── Designer / Appearance ─────────────────────────────────────────────────
+  accentColor     String  @default("#2563eb")  // Primary button & link color
+  backgroundColor String  @default("#ffffff")  // Form background
+  logoUrl         String?                      // Custom logo URL for this form
+  fontFamily      String  @default("Inter")    // Font: Inter, System, Serif, Mono
+  buttonStyle     String  @default("rounded")  // rounded | pill | square
+  showLogo        Boolean @default(true)
+  showStepNumbers Boolean @default(true)
+
+  // ── Custom Fields ──────────────────────────────────────────────────────────
+  customFields    Json?    // Array of CustomField objects (see booking-form-types.ts)
+
+  // ── SEO ───────────────────────────────────────────────────────────────────
+  seoTitle        String?
+  seoDescription  String?
+  seoImage        String?                      // Open Graph image URL
+
+  // Territory restrictions — JSON array of territory IDs (no join table needed)
+  territoryIds Json?   // string[] e.g. ["clxyz...", "clabc..."]
+
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  GRACE_PERIOD
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
+enum SubscriptionTier {
+  STARTER
+  PRO
+  AGENCY
+}
+
+// ─────────────────────────────────────────────────────────────
+// USERS & WORKSPACE MEMBERS
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  supabaseId    String   @unique  // Maps to Supabase Auth user ID
+  email         String   @unique
+  fullName      String
+  avatarUrl     String?
+  phone         String?
+  timezone      String   @default("America/New_York")
+  onboardingCompleted Boolean @default(false)
+  isSuperAdmin        Boolean @default(false)
+
+  // Google Calendar integration
+  googleRefreshToken  String?
+  googleCalendarId    String?   @default("primary")
+
+  workspaces    WorkspaceMember[]
+  activityLogs  ActivityLog[]
+  featureRequestVotes    FeatureRequestVote[]
+  featureRequestComments FeatureRequestComment[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([supabaseId])
+  @@index([email])
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        MemberRole @default(PHOTOGRAPHER)
+  isOwner     Boolean   @default(false)
+  joinedAt    DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  staffProfile StaffProfile?
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MANAGER
+  PHOTOGRAPHER
+  EDITOR
+  VA
+  VIEWER
+}
+
+// ─────────────────────────────────────────────────────────────
+// STAFF PROFILES
+// ─────────────────────────────────────────────────────────────
+
+model StaffProfile {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  memberId        String   @unique
+  employeeId      String?
+  title           String?
+  bio             String?
+
+  // Availability & Skills
+  skills          String[]  // ["photography", "drone", "video", "3d_tour"]
+  serviceRegions  String[]  // City/region names
+  maxJobsPerDay   Int      @default(4)
+  isActive        Boolean  @default(true)
+
+  // Homebase territory — only show this photographer for bookings in this territory
+  // null = available for all territories (no restriction)
+  homeTerritoryId String?
+
+  // Push notifications (mobile app)
+  pushToken       String?
+  pushPlatform    String?   // "ios" | "android"
+
+  // Home address — used for travel distance calculations
+  homeAddress     String?
+  homeLat         Float?
+  homeLng         Float?
+
+  // Staff coverage area — drawn on the map around home location
+  coverageBoundaryType  String   @default("none")  // "none" | "polygon" | "radius"
+  coveragePolygonCoords Json?    // [[lng, lat], [lng, lat], ...] — GeoJSON-style ring
+  coverageCenterLat     Float?
+  coverageCenterLng     Float?
+  coverageRadiusKm      Float?
+
+  // Live location tracking (updated while clocked in)
+  lastLatitude    Float?
+  lastLongitude   Float?
+  lastLocationAt  DateTime?
+
+  // Compensation
+  payType         PayType  @default(HOURLY)
+  payRate         Float?
+  commissionRate  Float?   // Percentage 0-100
+  mileageRate     Float?   // Per-km/mile reimbursement rate
+
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member          WorkspaceMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  homeTerritory   ServiceTerritory? @relation(fields: [homeTerritoryId], references: [id], onDelete: SetNull)
+  jobAssignments  JobAssignment[]
+  availability    StaffAvailability[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+enum PayType {
+  HOURLY
+  SALARY
+  PER_JOB
+  COMMISSION
+}
+
+model StaffAvailability {
+  id          String   @id @default(cuid())
+  staffId     String
+  dayOfWeek   Int      // 0=Sunday, 6=Saturday
+  startTime   String   // "09:00"
+  endTime     String   // "18:00"
+  isAvailable Boolean  @default(true)
+
+  staff       StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, dayOfWeek])
+  @@index([staffId])
+}
+
+model WorkspaceHours {
+  id          String   @id @default(cuid())
+  workspaceId String
+  dayOfWeek   Int      // 0=Sunday … 6=Saturday
+  isOpen      Boolean  @default(true)
+  openTime    String   @default("09:00")  // "HH:MM" 24h
+  closeTime   String   @default("17:00")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, dayOfWeek])
+  @@index([workspaceId])
+}
+
+model ServiceTerritory {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String   @default("#3B82F6")
+  description String?
+  cities      String?  // comma-separated list of cities/regions
+  travelFee   Float?   // Optional flat travel fee charged for jobs in this territory
+
+  // Boundary definition — "none" (city pins only), "polygon", or "radius"
+  boundaryType  String   @default("none")  // "none" | "polygon" | "radius"
+
+  // Polygon boundary — stored as JSON array of [lng, lat] coordinate pairs
+  polygonCoords Json?    // [[lng, lat], [lng, lat], ...] — GeoJSON-style ring
+
+  // Radius boundary — center point + radius in kilometers
+  centerLat     Float?
+  centerLng     Float?
+  radiusKm      Float?
+
+  // Outside-territory booking settings (per-territory)
+  outsideBookingEnabled Boolean  @default(true)
+  outsideFeeType        String   @default("flat")  // "flat" | "per_km"
+  outsideTerritoryFee   Float?
+  outsidePerKmRate      Float?
+  outsideFeeBaseKm      Float?
+  outsideMaxKm          Float?   // Max km outside boundary before booking is blocked (null = unlimited)
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staff       StaffProfile[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// CLIENTS
+// ─────────────────────────────────────────────────────────────
+
+model Client {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  type          ClientType @default(AGENT)
+
+  // Contact Info
+  firstName     String
+  lastName      String
+  email         String
+  phone         String?
+  company       String?
+  avatarUrl     String?
+
+  // Address
+  addressLine1  String?
+  city          String?
+  state         String?
+  postalCode    String?
+  country       String?
+
+  // CRM
+  status        ClientStatus @default(ACTIVE)
+  source        String?      // "referral", "website", "google", etc.
+  notes         String?
+  tags          String[]
+  stripeCustomerId String?
+
+  // Brokerage pricing group
+  brokerageGroupId String?
+  brokerageGroup   BrokerageGroup? @relation(fields: [brokerageGroupId], references: [id], onDelete: SetNull)
+
+  // Stats (denormalized for perf)
+  totalJobs     Int      @default(0)
+  totalRevenue  Float    @default(0)
+  lastJobAt     DateTime?
+  creditBalance Float    @default(0)
+
+  // Customer team
+  teamId        String?
+  team          CustomerTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  // Portal
+  portalAccessedAt DateTime?
+  passwordHash     String?
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  jobs          Job[]
+  orders        Order[]
+  invoices      Invoice[]
+  contacts      ClientContact[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([email, workspaceId])
+}
+
+enum ClientType {
+  AGENT
+  BROKER
+  BUILDER
+  HOMEOWNER
+  PROPERTY_MANAGER
+  OTHER
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+model ClientContact {
+  id          String  @id @default(cuid())
+  clientId    String
+  name        String
+  email       String?
+  phone       String?
+  role        String?  // "assistant", "coordinator", etc.
+  isPrimary   Boolean @default(false)
+
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// BROKERAGE PRICING GROUPS
+// ─────────────────────────────────────────────────────────────
+
+model BrokerageGroup {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  name          String                      // e.g. "RE/MAX", "Coldwell Banker VIP"
+  discountType  DiscountType @default(PERCENTAGE)
+  discountValue Float        @default(0)   // 10 = 10% off, or $10 flat
+  isActive      Boolean      @default(true)
+  notes         String?
+
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clients       Client[]
+  teams         CustomerTeam[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([workspaceId])
+}
+
+model CustomerTeam {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  name             String
+  credits          Float    @default(0)
+  notes            String?
+
+  // Optional brokerage pricing group for the whole team
+  brokerageGroupId String?
+  brokerageGroup   BrokerageGroup? @relation(fields: [brokerageGroupId], references: [id], onDelete: SetNull)
+
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members          Client[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT
+}
+
+// ─────────────────────────────────────────────────────────────
+// COUPONS / PROMO CODES
+// ─────────────────────────────────────────────────────────────
+
+model Coupon {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  code          String                        // e.g. "SAVE10", "WELCOME20"
+  discountType  DiscountType @default(PERCENTAGE)
+  discountValue Float        @default(0)     // 10 = 10% off, or $10 flat
+  maxUses       Int?                          // null = unlimited
+  usedCount     Int          @default(0)
+  expiresAt     DateTime?                     // null = never expires
+  isActive      Boolean      @default(true)
+
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  usages        CouponUsage[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId])
+}
+
+model CouponUsage {
+  id         String   @id @default(cuid())
+  couponId   String
+  email      String                          // customer email who redeemed
+  orderId    String?                         // linked order (if available)
+
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([couponId, email])               // one use per email per coupon
+  @@index([couponId])
+  @@index([email])
+}
+
+// ─────────────────────────────────────────────────────────────
+// SERVICES & PACKAGES
+// ─────────────────────────────────────────────────────────────
+
+model Service {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  description   String?
+  coverImage    String?
+  category      ServiceCategory
+  basePrice     Float    @default(0)
+  durationMins  Int      @default(60)
+  turnaroundHours Int?
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  territoryIds  Json?    // string[] — restrict this service to specific territories
+  formIds       Json?    // string[] — restrict this service to specific order forms (null = all forms)
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  packageItems  PackageItem[]
+  jobServices   JobService[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+enum ServiceCategory {
+  PHOTOGRAPHY
+  VIDEO
+  DRONE
+  VIRTUAL_TOUR_3D
+  FLOOR_PLAN
+  VIRTUAL_STAGING
+  TWILIGHT
+  SOCIAL_MEDIA
+  RUSH_EDITING
+  OTHER
+}
+
+model Package {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  description   String?
+  price         Float
+  isActive      Boolean  @default(true)
+  isPopular     Boolean  @default(false)
+  badgeLabel    String?
+  badgeColor    String?
+  coverImage    String?
+  photoCount    Int?
+  durationMins  Int?     // Shoot duration in minutes — blocks calendar time for scheduling
+  turnaroundDays Int?
+  turnaroundHours Int?
+  sortOrder     Int      @default(0)
+  territoryIds  Json?    // string[] — restrict this package to specific territories
+  formIds       Json?    // string[] — restrict this package to specific order forms (null = all forms)
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items         PackageItem[]
+  jobs          Job[]
+  orderItems    OrderItem[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+model PackageItem {
+  id          String  @id @default(cuid())
+  packageId   String
+  serviceId   String
+  quantity    Int     @default(1)
+  notes       String?
+
+  package     Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  service     Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, serviceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// JOBS / SHOOTS
+// ─────────────────────────────────────────────────────────────
+
+model Job {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  jobNumber       String
+  clientId        String
+  packageId       String?
+
+  // Property Info
+  propertyAddress String
+  propertyUnit    String?
+  propertyCity    String
+  propertyState   String
+  propertyZip     String?
+  propertyType    PropertyType @default(RESIDENTIAL)
+  squareFootage   Int?
+  bedrooms        Int?
+  bathrooms       Float?
+  mlsNumber       String?
+  listingUrl      String?
+  accessNotes     String?
+  propertyLat     Float?
+  propertyLng     Float?
+
+  // Scheduling
+  status          JobStatus  @default(PENDING)
+  scheduledAt     DateTime?
+  estimatedDurationMins Int  @default(90)
+  actualStartAt   DateTime?
+  actualEndAt     DateTime?
+
+  // Financials
+  subtotal        Float    @default(0)
+  taxAmount       Float    @default(0)
+  discountAmount  Float    @default(0)
+  totalAmount     Float    @default(0)
+
+  // Internal
+  internalNotes   String?
+  clientNotes     String?
+  priority        JobPriority @default(NORMAL)
+  priorityFee     Float    @default(0)
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client          @relation(fields: [clientId], references: [id])
+  package         Package?        @relation(fields: [packageId], references: [id])
+  assignments     JobAssignment[]
+  services        JobService[]
+  gallery         Gallery?
+  order           Order?
+  invoice         Invoice?
+  statusHistory   JobStatusHistory[]
+  notifications   Notification[]
+  messages        JobMessage[]
+  checklist       JobChecklistItem[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([workspaceId, jobNumber])
+  @@index([workspaceId])
+  @@index([clientId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+enum JobStatus {
+  PENDING
+  CONFIRMED
+  ASSIGNED
+  IN_PROGRESS
+  EDITING
+  REVIEW
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum PropertyType {
+  RESIDENTIAL
+  COMMERCIAL
+  LAND
+  MULTI_FAMILY
+  RENTAL
+  NEW_CONSTRUCTION
+}
+
+enum JobPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model JobStatusHistory {
+  id        String    @id @default(cuid())
+  jobId     String
+  status    JobStatus
+  notes     String?
+  changedBy String?   // User ID
+
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([jobId])
+}
+
+model JobAssignment {
+  id        String   @id @default(cuid())
+  jobId     String
+  staffId   String
+  role      AssignmentRole @default(PHOTOGRAPHER)
+  isPrimary Boolean  @default(true)
+  confirmedAt DateTime?
+  travelMinutes Int?   // Calculated from previous job
+  gcalEventId String?  // Google Calendar event ID for this assignment
+
+  job       Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  staff     StaffProfile @relation(fields: [staffId], references: [id])
+
+  @@unique([jobId, staffId])
+  @@index([jobId])
+  @@index([staffId])
+}
+
+enum AssignmentRole {
+  PHOTOGRAPHER
+  VIDEOGRAPHER
+  DRONE_PILOT
+  EDITOR
+  COORDINATOR
+}
+
+model JobService {
+  id          String  @id @default(cuid())
+  jobId       String
+  serviceId   String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  job         Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  service     Service @relation(fields: [serviceId], references: [id])
+
+  @@index([jobId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// ORDERS
+// ─────────────────────────────────────────────────────────────
+
+model Order {
+  id            String      @id @default(cuid())
+  workspaceId   String
+  orderNumber   String
+  jobId         String?     @unique
+  clientId      String
+  status        OrderStatus @default(PENDING)
+
+  subtotal      Float
+  taxAmount     Float       @default(0)
+  discountAmount Float      @default(0)
+  totalAmount   Float
+
+  notes         String?
+
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job           Job?        @relation(fields: [jobId], references: [id])
+  client        Client      @relation(fields: [clientId], references: [id])
+  items         OrderItem[]
+  invoice       Invoice?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([workspaceId, orderNumber])
+  @@index([workspaceId])
+  @@index([clientId])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  packageId   String?
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  package     Package? @relation(fields: [packageId], references: [id])
+
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// INVOICES
+// ─────────────────────────────────────────────────────────────
+
+model Invoice {
+  id                String        @id @default(cuid())
+  workspaceId       String
+  invoiceNumber     String
+  jobId             String?       @unique
+  orderId           String?       @unique
+  clientId          String
+  status            InvoiceStatus @default(DRAFT)
+
+  // Amounts
+  subtotal          Float
+  taxRate           Float         @default(0)
+  taxAmount         Float         @default(0)
+  discountAmount    Float         @default(0)
+  totalAmount       Float
+  amountPaid        Float         @default(0)
+  amountDue         Float
+
+  // Dates
+  issuedAt          DateTime?
+  dueAt             DateTime?
+  paidAt            DateTime?
+
+  // Stripe
+  stripePaymentIntentId  String?
+  stripeInvoiceId        String?
+  paymentLink            String?
+
+  notes             String?
+  lineItems         InvoiceLineItem[]
+
+  workspace         Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job               Job?        @relation(fields: [jobId], references: [id])
+  order             Order?      @relation(fields: [orderId], references: [id])
+  client            Client      @relation(fields: [clientId], references: [id])
+  payments          Payment[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId])
+  @@index([clientId])
+  @@index([status])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+  UNCOLLECTIBLE
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+  sortOrder   Int     @default(0)
+
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  amount          Float
+  method          PaymentMethod @default(CARD)
+  status          PaymentStatus @default(PENDING)
+  stripePaymentId String?
+  notes           String?
+  paidAt          DateTime?
+
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@index([invoiceId])
+}
+
+enum PaymentMethod {
+  CARD
+  ACH
+  CHECK
+  CASH
+  WIRE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+// ─────────────────────────────────────────────────────────────
+// GALLERIES
+// ─────────────────────────────────────────────────────────────
+
+model Gallery {
+  id              String        @id @default(cuid())
+  workspaceId     String
+  jobId           String        @unique
+  name            String
+  slug            String        @unique
+  status          GalleryStatus @default(PROCESSING)
+
+  // Access
+  isPublic        Boolean       @default(false)
+  password        String?
+  expiresAt       DateTime?
+
+  // Delivery
+  downloadEnabled Boolean       @default(true)
+  watermarkEnabled Boolean      @default(true)
+  downloadCount   Int           @default(0)
+
+  // Stats
+  viewCount       Int           @default(0)
+  mediaCount      Int           @default(0)
+
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job             Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  media           GalleryMedia[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([workspaceId])
+  @@index([slug])
+}
+
+enum GalleryStatus {
+  PROCESSING
+  READY
+  DELIVERED
+  EXPIRED
+  ARCHIVED
+}
+
+model GalleryMedia {
+  id            String     @id @default(cuid())
+  galleryId     String
+  fileName      String
+  originalName  String
+  mimeType      String
+  fileSize      Int
+  width         Int?
+  height        Int?
+  duration      Int?       // For video, in seconds
+
+  // Storage
+  storageKey    String     // S3/Supabase storage path
+  thumbnailKey  String?
+  watermarkedKey String?
+  cdnUrl        String?
+
+  mediaType     MediaType  @default(PHOTO)
+  sortOrder     Int        @default(0)
+  isCover       Boolean    @default(false)
+
+  gallery       Gallery    @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime   @default(now())
+
+  @@index([galleryId])
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+  DRONE_PHOTO
+  DRONE_VIDEO
+  FLOOR_PLAN
+  VIRTUAL_TOUR
+  DOCUMENT
+}
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String             @id @default(cuid())
+  workspaceId String
+  jobId       String?
+  userId      String?            // Target user (null = workspace-wide)
+  type        NotificationType
+  channel     NotificationChannel @default(IN_APP)
+  status      NotificationStatus  @default(PENDING)
+  title       String
+  body        String
+  data        Json?
+  readAt      DateTime?
+  sentAt      DateTime?
+  error       String?
+
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job         Job?               @relation(fields: [jobId], references: [id])
+
+  createdAt   DateTime           @default(now())
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([jobId])
+}
+
+enum NotificationType {
+  JOB_BOOKED
+  JOB_CONFIRMED
+  JOB_ASSIGNED
+  JOB_REMINDER
+  JOB_STARTED
+  JOB_DELIVERED
+  JOB_CANCELLED
+  INVOICE_SENT
+  INVOICE_PAID
+  INVOICE_OVERDUE
+  GALLERY_READY
+  PAYMENT_RECEIVED
+  STAFF_ASSIGNED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// ─────────────────────────────────────────────────────────────
+// EMAIL TEMPLATES
+// ─────────────────────────────────────────────────────────────
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  workspaceId String
+  eventType   String   // "job_confirmation", "job_reminder", "job_assigned", "job_cancelled", "gallery_ready", "invoice_sent", "payment_receipt", "portal_welcome"
+  subject     String   // Supports {{variables}}
+  body        String   @db.Text  // HTML body with {{variables}}
+  enabled     Boolean  @default(true)
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, eventType])
+  @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// ACTIVITY LOG (Audit Trail)
+// ─────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  action      String   // "job.created", "invoice.paid", etc.
+  entityType  String   // "job", "invoice", "client", etc.
+  entityId    String
+  metadata    Json?
+  ipAddress   String?
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// JOB MESSAGES (client ↔ staff messaging per job)
+// ─────────────────────────────────────────────────────────────
+
+model JobMessage {
+  id          String   @id @default(cuid())
+  jobId       String
+  workspaceId String
+  senderType  String   // "CLIENT" | "STAFF"
+  senderName  String
+  body        String
+  readAt      DateTime?
+
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([jobId])
+  @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// JOB CHECKLIST
+// ─────────────────────────────────────────────────────────────
+
+model JobChecklistItem {
+  id          String   @id @default(cuid())
+  jobId       String
+  label       String
+  checked     Boolean  @default(false)
+  sortOrder   Int      @default(0)
+
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// STAFF INVITE
+// ─────────────────────────────────────────────────────────────
+
+model StaffInvite {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  workspaceId String
+  email       String
+  fullName    String
+  role        String    @default("PHOTOGRAPHER")
+  expiresAt   DateTime
+  usedAt      DateTime?
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([token])
+  @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE REQUESTS (public roadmap / feedback board)
+// ─────────────────────────────────────────────────────────────
+
+enum FeatureRequestStatus {
+  PLANNED
+  IN_PROGRESS
+  IN_BETA
+  COMPLETED
+}
+
+enum FeatureRequestCategory {
+  GENERAL
+  DASHBOARD
+  CLIENT_PORTAL
+  JOBS
+  INVOICING
+  CALENDAR
+  MOBILE_APP
+  INTEGRATIONS
+}
+
+model FeatureRequest {
+  id          String                  @id @default(cuid())
+  title       String
+  description String?
+  status      FeatureRequestStatus    @default(PLANNED)
+  category    FeatureRequestCategory  @default(GENERAL)
+  authorId    String?                 // null = anonymous / submitted without auth
+  authorName  String?                 // display name captured at submission
+  pinned      Boolean                 @default(false)
+
+  votes       FeatureRequestVote[]
+  comments    FeatureRequestComment[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model FeatureRequestVote {
+  id               String         @id @default(cuid())
+  featureRequestId String
+  userId           String
+
+  featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime @default(now())
+
+  @@unique([featureRequestId, userId])
+  @@index([featureRequestId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE REQUEST COMMENTS
+// ─────────────────────────────────────────────────────────────
+
+model FeatureRequestComment {
+  id               String         @id @default(cuid())
+  featureRequestId String
+  authorId         String?
+  authorName       String?
+  body             String
+
+  featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  user             User?          @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt        DateTime @default(now())
+
+  @@index([featureRequestId])
+  @@index([authorId])
+}

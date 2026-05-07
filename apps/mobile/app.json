@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Scalist",
+    "slug": "scalist-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "scalist",
+    "splash": {
+      "backgroundColor": "#1B4F9E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "io.scalist.staff"
+    },
+    "android": {
+      "package": "io.scalist.staff",
+      "permissions": ["ACCESS_FINE_LOCATION"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    }
+  }
+}
