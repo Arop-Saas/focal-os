@@ -44,7 +44,7 @@ const navGroups = [
       { label: "Schedule", href: "/scheduling", icon: CalendarDays },
       { label: "Clients", href: "/clients", icon: Users },
       { label: "Messages", href: "/messages", icon: MessageCircle },
-      { label: "Staff", href: "/staff", icon: UserCheck },
+      { label: "Team", href: "/staff", icon: UserCheck },
       { label: "Listings", href: "/gallery", icon: Image },
     ],
   },
