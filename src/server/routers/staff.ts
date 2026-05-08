@@ -232,7 +232,6 @@ export const staffRouter = router({
     .query(async ({ ctx, input }) => {
       const dayOfWeek = input.date.getDay();
 
-      // Get staff with availability on this day
       const staff = await ctx.prisma.staffProfile.findMany({
         where: {
           workspaceId: ctx.workspace.id,
@@ -260,20 +259,15 @@ export const staffRouter = router({
         },
       });
 
-      // Filter by max jobs per day
-      return staff.filter(
-        (s) => s.jobAssignments.length < s.maxJobsPerDay
-      );
+      return staff.filter((s) => s.jobAssignments.length < s.maxJobsPerDay);
     }),
-
-  // ── Payout Calculator ─────────────────────────────────────────────────────
 
   payouts: workspaceProcedure
     .input(
       z.object({
         dateFrom: z.date(),
         dateTo: z.date(),
-        staffId: z.string().optional(), // filter to one photographer
+        staffId: z.string().optional(),
         statusFilter: z
           .array(
             z.enum([
@@ -287,7 +281,6 @@ export const staffRouter = router({
     .query(async ({ ctx, input }) => {
       const { dateFrom, dateTo, staffId, statusFilter } = input;
 
-      // Get all staff profiles with active assignments in range
       const staffProfiles = await ctx.prisma.staffProfile.findMany({
         where: {
           workspaceId: ctx.workspace.id,
@@ -329,66 +322,33 @@ export const staffRouter = router({
         orderBy: { member: { user: { fullName: "asc" } } },
       });
 
-      // Calculate payout per photographer
       const payouts = staffProfiles.map((sp) => {
         const jobs = sp.jobAssignments.map((a) => a.job);
         const jobCount = jobs.length;
         const totalRevenue = jobs.reduce((sum, j) => sum + (j.totalAmount ?? 0), 0);
         const totalMins = jobs.reduce((sum, j) => sum + (j.estimatedDurationMins ?? 90), 0);
         const totalHours = totalMins / 60;
-
         let payoutAmount = 0;
         let payoutBreakdown = "";
-
         switch (sp.payType) {
-          case "PER_JOB":
-            payoutAmount = (sp.payRate ?? 0) * jobCount;
-            payoutBreakdown = `$${sp.payRate ?? 0}/job × ${jobCount} jobs`;
-            break;
-          case "HOURLY":
-            payoutAmount = (sp.payRate ?? 0) * totalHours;
-            payoutBreakdown = `$${sp.payRate ?? 0}/hr × ${totalHours.toFixed(1)} hrs`;
-            break;
-          case "COMMISSION":
-            payoutAmount = ((sp.commissionRate ?? 0) / 100) * totalRevenue;
-            payoutBreakdown = `${sp.commissionRate ?? 0}% × $${totalRevenue.toFixed(2)} revenue`;
-            break;
-          case "SALARY":
-            payoutAmount = sp.payRate ?? 0;
-            payoutBreakdown = `Salary (fixed)`;
-            break;
+          case "PER_JOB": payoutAmount = (sp.payRate ?? 0) * jobCount; payoutBreakdown = `$${sp.payRate ?? 0}/job x ${jobCount} jobs`; break;
+          case "HOURLY": payoutAmount = (sp.payRate ?? 0) * totalHours; payoutBreakdown = `$${sp.payRate ?? 0}/hr x ${totalHours.toFixed(1)} hrs`; break;
+          case "COMMISSION": payoutAmount = ((sp.commissionRate ?? 0) / 100) * totalRevenue; payoutBreakdown = `${sp.commissionRate ?? 0}% x $${totalRevenue.toFixed(2)} revenue`; break;
+          case "SALARY": payoutAmount = sp.payRate ?? 0; payoutBreakdown = `Salary (fixed)`; break;
         }
-
         return {
-          staffId: sp.id,
-          name: sp.member.user.fullName,
-          email: sp.member.user.email,
-          payType: sp.payType,
-          payRate: sp.payRate,
-          commissionRate: sp.commissionRate,
+          staffId: sp.id, name: sp.member.user.fullName, email: sp.member.user.email,
+          payType: sp.payType, payRate: sp.payRate, commissionRate: sp.commissionRate,
           mileageRate: (sp as unknown as { mileageRate: number | null }).mileageRate ?? null,
-          jobCount,
-          totalRevenue,
-          totalHours: Math.round(totalHours * 10) / 10,
-          payoutAmount: Math.round(payoutAmount * 100) / 100,
-          payoutBreakdown,
-          jobs: jobs.map((j) => ({
-            jobNumber: j.jobNumber,
-            propertyAddress: j.propertyAddress,
-            scheduledAt: j.scheduledAt,
-            totalAmount: j.totalAmount,
-            estimatedDurationMins: j.estimatedDurationMins,
-            status: j.status,
-          })),
+          jobCount, totalRevenue, totalHours: Math.round(totalHours * 10) / 10,
+          payoutAmount: Math.round(payoutAmount * 100) / 100, payoutBreakdown,
+          jobs: jobs.map((j) => ({ jobNumber: j.jobNumber, propertyAddress: j.propertyAddress, scheduledAt: j.scheduledAt, totalAmount: j.totalAmount, estimatedDurationMins: j.estimatedDurationMins, status: j.status })),
         };
       });
 
       const grandTotal = payouts.reduce((sum, p) => sum + p.payoutAmount, 0);
-
       return { payouts, grandTotal: Math.round(grandTotal * 100) / 100 };
     }),
-
-  // ── Staff Availability ────────────────────────────────────────────────────
 
   getAvailability: workspaceProcedure
     .input(z.object({ staffId: z.string() }))
@@ -420,6 +380,77 @@ export const staffRouter = router({
           ? { dayOfWeek: row.dayOfWeek, isAvailable: row.isAvailable, startTime: row.startTime, endTime: row.endTime }
           : def;
       });
+    }),
+
+  // -- Update User Fields --
+
+  updateUser: workspaceProcedure
+    .input(
+      z.object({
+        memberId: z.string(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        email: z.string().email().optional(),
+        phone: z.string().nullable().optional(),
+        timezone: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { memberId, ...data } = input;
+      const member = await ctx.prisma.workspaceMember.findFirst({
+        where: { id: memberId, workspaceId: ctx.workspace.id },
+      });
+      if (!member) throw new TRPCError({ code: "NOT_FOUND" });
+      if (data.email !== undefined && member.isOwner) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "The workspace owner cannot change their email address." });
+      }
+      const updateData: Record<string, unknown> = {};
+      if (data.firstName !== undefined) updateData.firstName = data.firstName;
+      if (data.lastName !== undefined) updateData.lastName = data.lastName;
+      if (data.email !== undefined) updateData.email = data.email;
+      if (data.phone !== undefined) updateData.phone = data.phone;
+      if (data.timezone !== undefined) updateData.timezone = data.timezone;
+      return ctx.prisma.user.update({ where: { id: member.userId }, data: updateData });
+    }),
+
+  // -- Permissions & Notification Prefs --
+
+  updatePermissions: workspaceProcedure
+    .input(z.object({ staffId: z.string(), permissions: z.record(z.boolean()) }))
+    .mutation(async ({ ctx, input }) => {
+      const staff = await ctx.prisma.staffProfile.findFirst({ where: { id: input.staffId, workspaceId: ctx.workspace.id } });
+      if (!staff) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.staffProfile.update({ where: { id: input.staffId }, data: { permissions: input.permissions } });
+    }),
+
+  updateNotificationPrefs: workspaceProcedure
+    .input(z.object({ staffId: z.string(), notificationPrefs: z.record(z.boolean()) }))
+    .mutation(async ({ ctx, input }) => {
+      const staff = await ctx.prisma.staffProfile.findFirst({ where: { id: input.staffId, workspaceId: ctx.workspace.id } });
+      if (!staff) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.staffProfile.update({ where: { id: input.staffId }, data: { notificationPrefs: input.notificationPrefs } });
+    }),
+
+  // -- Workspace Roles --
+
+  listRoles: workspaceProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.workspaceRole.findMany({ where: { workspaceId: ctx.workspace.id }, orderBy: { createdAt: "asc" } });
+  }),
+
+  createRole: adminProcedure
+    .input(z.object({ name: z.string().min(2).max(50), color: z.string().optional(), permissions: z.record(z.boolean()).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.workspaceRole.create({
+        data: { workspaceId: ctx.workspace.id, name: input.name, color: input.color ?? "#6366f1", permissions: input.permissions ?? {} },
+      });
+    }),
+
+  deleteRole: adminProcedure
+    .input(z.object({ roleId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const role = await ctx.prisma.workspaceRole.findFirst({ where: { id: input.roleId, workspaceId: ctx.workspace.id } });
+      if (!role) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.workspaceRole.delete({ where: { id: input.roleId } });
     }),
 
   saveAvailability: workspaceProcedure
