@@ -100,6 +100,7 @@ model Workspace {
   customerTeams    CustomerTeam[]
   orderForms       OrderForm[]
   coupons          Coupon[]
+  workspaceRoles   WorkspaceRole[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -139,7 +140,7 @@ model OrderForm {
   depositPercent Int?                     // e.g. 25 = 25% deposit
   depositFixed   Float?                   // e.g. 100.00 = $100 flat deposit
 
-  // ── Designer / Appearance ─────────────────────────────────────────────────
+  // ── Designer / Appearance ─────────────────────────────────────────────────────
   accentColor     String  @default("#2563eb")  // Primary button & link color
   backgroundColor String  @default("#ffffff")  // Form background
   logoUrl         String?                      // Custom logo URL for this form
@@ -148,10 +149,10 @@ model OrderForm {
   showLogo        Boolean @default(true)
   showStepNumbers Boolean @default(true)
 
-  // ── Custom Fields ──────────────────────────────────────────────────────────
+  // ── Custom Fields ──────────────────────────────────────────────────────────────────
   customFields    Json?    // Array of CustomField objects (see booking-form-types.ts)
 
-  // ── SEO ───────────────────────────────────────────────────────────────────
+  // ── SEO ──────────────────────────────────────────────────────────────────────────
   seoTitle        String?
   seoDescription  String?
   seoImage        String?                      // Open Graph image URL
@@ -190,6 +191,8 @@ model User {
   supabaseId    String   @unique  // Maps to Supabase Auth user ID
   email         String   @unique
   fullName      String
+  firstName     String?
+  lastName      String?
   avatarUrl     String?
   phone         String?
   timezone      String   @default("America/New_York")
@@ -249,6 +252,9 @@ model StaffProfile {
   memberId        String   @unique
   employeeId      String?
   title           String?
+  jobRoleId       String?
+  permissions     Json?
+  notificationPrefs Json?
   bio             String?
 
   // Availability & Skills
@@ -291,6 +297,7 @@ model StaffProfile {
   workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   member          WorkspaceMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
   homeTerritory   ServiceTerritory? @relation(fields: [homeTerritoryId], references: [id], onDelete: SetNull)
+  jobRole         WorkspaceRole?    @relation(fields: [jobRoleId], references: [id], onDelete: SetNull)
   jobAssignments  JobAssignment[]
   availability    StaffAvailability[]
 
@@ -305,6 +312,26 @@ enum PayType {
   SALARY
   PER_JOB
   COMMISSION
+}
+
+// ─────────────────────────────────────────────────────────────
+// WORKSPACE ROLES (job title templates with permission presets)
+// ─────────────────────────────────────────────────────────────
+
+model WorkspaceRole {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String   @default("#6366f1")
+  permissions Json?    // permission preset for this role
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staffProfiles StaffProfile[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
 model StaffAvailability {
