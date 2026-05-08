@@ -7,9 +7,7 @@ import { useCurrentRole } from "@/hooks/use-current-role";
 import {
   MoreVertical,
   X,
-  ChevronRight,
   Search,
-  UserPlus,
   Filter,
   Pencil,
   UserX,
@@ -114,7 +112,7 @@ export function TeamTable() {
 
   return (
     <>
-      {/* Search + Filter + Add Button */}
+      {/* Search + Filter */}
       <div className="flex items-center gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -146,11 +144,6 @@ export function TeamTable() {
             ))}
           </select>
         </div>
-        {can("ADMIN") && (
-          <Button size="sm" onClick={() => setShowInviteModal(true)}>
-            <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Add Team Member
-          </Button>
-        )}
       </div>
 
       {/* Table */}
@@ -220,15 +213,6 @@ export function TeamTable() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="relative flex items-center gap-1">
-                          {member.staffProfile?.id && (
-                            <Link
-                              href={`/staff/${member.staffProfile.id}`}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-gray-700"
-                              title="View profile"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Link>
-                          )}
                           <button
                             onClick={() => setOpenMenuId(openMenuId === member.id ? null : member.id)}
                             className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -244,7 +228,7 @@ export function TeamTable() {
                                   className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                   onClick={() => setOpenMenuId(null)}
                                 >
-                                  <Pencil className="h-3.5 w-3.5" /> Edit Profile
+                                  <Pencil className="h-3.5 w-3.5" /> Edit Settings
                                 </Link>
                               )}
                               <button
@@ -273,78 +257,6 @@ export function TeamTable() {
       {/* Click outside to close menu */}
       {openMenuId && (
         <div className="fixed inset-0 z-0" onClick={() => setOpenMenuId(null)} />
-      )}
-
-      {/* Add Team Member Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Add Team Member</h2>
-              <button
-                onClick={() => setShowInviteModal(false)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <form onSubmit={handleInvite} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
-                <Input
-                  type="text"
-                  value={inviteFullName}
-                  onChange={(e) => setInviteFullName(e.target.value)}
-                  placeholder="John Doe"
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                <Input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="john@example.com"
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full px-3 py-2 rounded-md border border-gray-300 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  <option value="PHOTOGRAPHER">Photographer</option>
-                  <option value="EDITOR">Editor</option>
-                  <option value="MANAGER">Manager</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="VA">Virtual Assistant</option>
-                  <option value="VIEWER">Viewer</option>
-                </select>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowInviteModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !inviteEmail || !inviteFullName}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? "Sending invite..." : "Send Invite"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </>
   );
