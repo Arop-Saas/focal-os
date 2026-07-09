@@ -86,7 +86,6 @@ model Workspace {
   jobs             Job[]
   packages         Package[]
   services         Service[]
-  orders           Order[]
   invoices         Invoice[]
   staff            StaffProfile[]
   galleries        Gallery[]
@@ -450,9 +449,7 @@ model Client {
 
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   jobs          Job[]
-  orders        Order[]
   invoices      Invoice[]
-  contacts      ClientContact[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -474,20 +471,6 @@ enum ClientStatus {
   ACTIVE
   INACTIVE
   BLOCKED
-}
-
-model ClientContact {
-  id          String  @id @default(cuid())
-  clientId    String
-  name        String
-  email       String?
-  phone       String?
-  role        String?  // "assistant", "coordinator", etc.
-  isPrimary   Boolean @default(false)
-
-  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@index([clientId])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -642,7 +625,6 @@ model Package {
   workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   items         PackageItem[]
   jobs          Job[]
-  orderItems    OrderItem[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -715,7 +697,6 @@ model Job {
   assignments     JobAssignment[]
   services        JobService[]
   gallery         Gallery?
-  order           Order?
   invoice         Invoice?
   statusHistory   JobStatusHistory[]
   notifications   Notification[]
@@ -818,59 +799,6 @@ model JobService {
 // ORDERS
 // ─────────────────────────────────────────────────────────────
 
-model Order {
-  id            String      @id @default(cuid())
-  workspaceId   String
-  orderNumber   String
-  jobId         String?     @unique
-  clientId      String
-  status        OrderStatus @default(PENDING)
-
-  subtotal      Float
-  taxAmount     Float       @default(0)
-  discountAmount Float      @default(0)
-  totalAmount   Float
-
-  notes         String?
-
-  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  job           Job?        @relation(fields: [jobId], references: [id])
-  client        Client      @relation(fields: [clientId], references: [id])
-  items         OrderItem[]
-  invoice       Invoice?
-
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  @@unique([workspaceId, orderNumber])
-  @@index([workspaceId])
-  @@index([clientId])
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PROCESSING
-  COMPLETED
-  CANCELLED
-  REFUNDED
-}
-
-model OrderItem {
-  id          String  @id @default(cuid())
-  orderId     String
-  packageId   String?
-  description String
-  quantity    Int     @default(1)
-  unitPrice   Float
-  totalPrice  Float
-
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  package     Package? @relation(fields: [packageId], references: [id])
-
-  @@index([orderId])
-}
-
 // ─────────────────────────────────────────────────────────────
 // INVOICES
 // ─────────────────────────────────────────────────────────────
@@ -880,7 +808,6 @@ model Invoice {
   workspaceId       String
   invoiceNumber     String
   jobId             String?       @unique
-  orderId           String?       @unique
   clientId          String
   status            InvoiceStatus @default(DRAFT)
 
@@ -908,7 +835,6 @@ model Invoice {
 
   workspace         Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   job               Job?        @relation(fields: [jobId], references: [id])
-  order             Order?      @relation(fields: [orderId], references: [id])
   client            Client      @relation(fields: [clientId], references: [id])
   payments          Payment[]
 

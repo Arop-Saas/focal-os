@@ -20,15 +20,18 @@ export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Fail closed: if CRON_SECRET is not configured, reject all callers.
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const now = new Date();
-  // Window: jobs scheduled 23h–25h from now (catches the cron running
-  // once per hour without double-sending)
-  const windowStart = new Date(now.getTime() + 23 * 60 * 60 * 1000);
-  const windowEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+  // Window: jobs scheduled 24h–48h from now. The cron runs ONCE PER DAY
+  // (Vercel Hobby limitation — see vercel.json), so the window must span a
+  // full day to catch every job. Double-sends are prevented by the
+  // JOB_REMINDER notification dedupe check below, not by window width.
+  const windowStart = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
   // Find upcoming jobs in the window that haven't had a JOB_REMINDER sent
   const upcomingJobs = await prisma.job.findMany({

@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual, scryptSync, randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 
-const SECRET = process.env.CRON_SECRET ?? "scalist-portal-secret";
+// SECURITY: requires the dedicated portal secret — no CRON_SECRET reuse, no
+// hardcoded fallback. Fails closed if unset.
+function getSecret(): string {
+  const s = process.env.PORTAL_TOKEN_SECRET;
+  if (!s) throw new Error("PORTAL_TOKEN_SECRET is not set — password reset disabled.");
+  return s;
+}
 
 interface ResetPayload {
   clientId: string;
@@ -18,7 +24,7 @@ function verifyResetToken(token: string): ResetPayload | null {
     if (dotIdx === -1) return null;
     const payload = token.slice(0, dotIdx);
     const sig = token.slice(dotIdx + 1);
-    const expectedSig = createHmac("sha256", SECRET + ":reset").update(payload).digest("base64url");
+    const expectedSig = createHmac("sha256", getSecret() + ":reset").update(payload).digest("base64url");
     const sigBuf = Buffer.from(sig);
     const expectedBuf = Buffer.from(expectedSig);
     if (sigBuf.length !== expectedBuf.length) return null;

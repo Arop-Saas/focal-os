@@ -152,6 +152,101 @@ async function main() {
 
   console.log(`✅ ${clients.length} demo clients created`);
 
+  // ─── Demo Staff (photographer with availability + home base) ─────────────
+  // Uses a fake supabaseId — this user can't log in; it exists so booking
+  // E2E tests have a real photographer with real availability windows.
+  const staffUser = await prisma.user.upsert({
+    where: { email: "photographer@demo-studio.test" },
+    update: {},
+    create: {
+      supabaseId: "seed-demo-photographer",
+      email: "photographer@demo-studio.test",
+      fullName: "Demo Photographer",
+      firstName: "Demo",
+      lastName: "Photographer",
+      timezone: "America/Chicago",
+      onboardingCompleted: true,
+    },
+  });
+
+  const member = await prisma.workspaceMember.upsert({
+    where: { workspaceId_userId: { workspaceId: workspace.id, userId: staffUser.id } },
+    update: {},
+    create: {
+      workspaceId: workspace.id,
+      userId: staffUser.id,
+      role: "PHOTOGRAPHER",
+    },
+  });
+
+  // ─── Territory (radius around downtown Nashville) ────────────────────────
+  const territory = await prisma.serviceTerritory.upsert({
+    where: { id: "seed-territory-nashville" },
+    update: {},
+    create: {
+      id: "seed-territory-nashville",
+      workspaceId: workspace.id,
+      name: "Nashville Metro",
+      cities: "Nashville, Franklin, Brentwood",
+      boundaryType: "radius",
+      centerLat: 36.1627,
+      centerLng: -86.7816,
+      radiusKm: 30,
+      outsideBookingEnabled: true,
+    },
+  });
+
+  const staffProfile = await prisma.staffProfile.upsert({
+    where: { memberId: member.id },
+    update: { homeTerritoryId: territory.id },
+    create: {
+      workspaceId: workspace.id,
+      memberId: member.id,
+      title: "Lead Photographer",
+      homeTerritoryId: territory.id,
+      homeAddress: "1 Public Square, Nashville, TN 37201",
+      homeLat: 36.1663,
+      homeLng: -86.7743,
+    },
+  });
+
+  // Mon–Fri 09:00–17:00
+  for (let day = 1; day <= 5; day++) {
+    await prisma.staffAvailability.upsert({
+      where: { staffId_dayOfWeek: { staffId: staffProfile.id, dayOfWeek: day } },
+      update: { startTime: "09:00", endTime: "17:00", isAvailable: true },
+      create: {
+        staffId: staffProfile.id,
+        dayOfWeek: day,
+        startTime: "09:00",
+        endTime: "17:00",
+        isAvailable: true,
+      },
+    });
+  }
+  console.log("✅ Demo photographer + Mon–Fri availability + territory created");
+
+  // ─── Published Order Form (E2E booking entry point) ───────────────────────
+  await prisma.orderForm.upsert({
+    where: { id: "seed-orderform-realestate" },
+    update: { isPublic: true },
+    create: {
+      id: "seed-orderform-realestate",
+      workspaceId: workspace.id,
+      title: "Real Estate Media (Demo)",
+      description: "E2E test order form — Demo Studio",
+      isPublic: true,
+      confirmationMode: "IMMEDIATE",
+      assignmentStrategy: "ROUND_ROBIN",
+      allowCustomerChoice: true,
+      minBookingNoticeHours: 12,
+      maxAdvanceBookingDays: 60,
+      timeSlotInterval: 30,
+    },
+  });
+  console.log("✅ Published demo order form created");
+  console.log(`\n🧪 E2E booking URL: /book/${workspace.slug}`);
+
   console.log("\n🎉 Seed complete!");
   console.log("Next steps:");
   console.log("1. Create a user account via /register");

@@ -1,8 +1,17 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-// Falls back to CRON_SECRET for backwards compatibility.
-// Set PORTAL_TOKEN_SECRET in production for proper isolation.
-const SECRET = process.env.PORTAL_TOKEN_SECRET ?? process.env.CRON_SECRET ?? "dev-portal-secret";
+// SECURITY: portal tokens are only as strong as this secret.
+// PORTAL_TOKEN_SECRET is REQUIRED — no fallbacks. Without it, token
+// generation throws and verification fails closed (returns null).
+function getSecret(): string {
+  const s = process.env.PORTAL_TOKEN_SECRET;
+  if (!s) {
+    throw new Error(
+      "PORTAL_TOKEN_SECRET is not set — portal sessions are disabled until it is configured."
+    );
+  }
+  return s;
+}
 
 export interface PortalSession {
   clientId: string;
@@ -17,7 +26,7 @@ export const MAGIC_LINK_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 
 export function generatePortalToken(session: PortalSession): string {
   const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
-  const sig = createHmac("sha256", SECRET).update(payload).digest("base64url");
+  const sig = createHmac("sha256", getSecret()).update(payload).digest("base64url");
   return `${payload}.${sig}`;
 }
 
@@ -29,7 +38,7 @@ export function verifyPortalToken(token: string): PortalSession | null {
     const payload = token.slice(0, dotIdx);
     const sig = token.slice(dotIdx + 1);
 
-    const expectedSig = createHmac("sha256", SECRET)
+    const expectedSig = createHmac("sha256", getSecret())
       .update(payload)
       .digest("base64url");
 

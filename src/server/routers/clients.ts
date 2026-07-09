@@ -75,7 +75,6 @@ export const clientsRouter = router({
       const client = await ctx.prisma.client.findFirst({
         where: { id: input.id, workspaceId: ctx.workspace.id },
         include: {
-          contacts: true,
           jobs: {
             include: {
               package: { select: { name: true } },

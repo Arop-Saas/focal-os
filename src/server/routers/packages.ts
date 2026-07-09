@@ -203,8 +203,6 @@ export const packagesRouter = router({
       return ctx.prisma.$transaction(async (tx) => {
         // Nullify package reference on jobs (no cascade)
         await tx.job.updateMany({ where: { packageId: input.id }, data: { packageId: null } });
-        // Nullify package reference on order items (no cascade)
-        await tx.orderItem.updateMany({ where: { packageId: input.id }, data: { packageId: null } });
         // PackageItem rows cascade automatically, but delete explicitly for safety
         await tx.packageItem.deleteMany({ where: { packageId: input.id } });
         return tx.package.delete({ where: { id: input.id } });
