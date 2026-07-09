@@ -11,8 +11,12 @@ const publicRoutes = [
   "/confirm-email",
   "/verify",
   "/api/webhooks",
-  "/gallery",      // Public gallery share links
+  "/gallery",      // Public gallery share links (legacy)
+  "/g",            // Public gallery share links (short URLs used in emails)
   "/book",         // Public client booking form
+  "/privacy",      // Legal pages — must be public (linked from signup)
+  "/terms",
+  "/feedback",     // Public feedback board
   "/portal",       // Client portal (self-auth via magic link)
   "/api/portal",   // Portal API routes (login, verify, logout)
   "/mobile/login", // Photographer mobile app login
