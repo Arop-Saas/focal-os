@@ -3,6 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { generateJobNumber } from "@/lib/utils";
 import { notifyJobBooked } from "@/lib/notify";
+import { assertSlotBookable, getDayAvailability, takeSchedulingLock, SlotUnavailableError } from "@/lib/scheduling/loader";
+import { utcToWallDateISO } from "@/lib/scheduling/tz";
 import { verifyPortalToken, PORTAL_COOKIE } from "@/lib/portal-auth";
 
 // ─── Public Booking Router ────────────────────────────────────────────────────
@@ -301,6 +303,43 @@ export const bookingRouter = router({
       };
     }),
 
+  // Server-computed availability from the ONE scheduling engine.
+  // Honors: staff windows, time off, existing jobs + buffers, travel
+  // feasibility from home base / previous job, package duration, form
+  // notice/advance windows, slot interval, workspace timezone.
+  getAvailableSlots: publicProcedure
+    .input(
+      z.object({
+        slug: z.string(),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        formId: z.string().optional(),
+        packageId: z.string().optional(),
+        serviceIds: z.array(z.string()).optional(),
+        territoryId: z.string().optional(),
+        staffProfileId: z.string().optional(),
+        address: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const workspace = await ctx.prisma.workspace.findUnique({
+        where: { slug: input.slug },
+        select: { id: true },
+      });
+      if (!workspace) {
+        return { timezone: "UTC", durationMins: 60, slotIntervalMins: 30, staffSlots: [] };
+      }
+      return getDayAvailability(ctx.prisma, {
+        workspaceId: workspace.id,
+        dateISO: input.date,
+        formId: input.formId,
+        packageId: input.packageId,
+        serviceIds: input.serviceIds,
+        territoryId: input.territoryId,
+        staffProfileId: input.staffProfileId,
+        targetAddress: input.address ?? null,
+      });
+    }),
+
   // Submit the booking form — creates/finds client, creates job, fires email
   submit: publicProcedure
     .input(
@@ -389,7 +428,53 @@ export const bookingRouter = router({
 
       const scheduledAt = new Date(input.scheduledAt);
 
+      // ── Scheduling engine enforcement (S1) — full check incl. travel ──
+      const targetAddress = [input.propertyAddress, input.propertyCity, input.propertyState, input.propertyZip]
+        .filter(Boolean)
+        .join(", ");
+      try {
+        await assertSlotBookable(ctx.prisma, {
+          workspaceId: workspace.id,
+          scheduledAt,
+          staffProfileId: input.staffProfileId,
+          packageId: input.packageId,
+          serviceIds: input.serviceIds,
+          formId: input.formId,
+          targetAddress,
+        });
+      } catch (e) {
+        if (e instanceof SlotUnavailableError) {
+          throw new TRPCError({ code: "CONFLICT", message: e.message });
+        }
+        throw e;
+      }
+
       const result = await ctx.prisma.$transaction(async (tx) => {
+        // Serialize concurrent bookings for this photographer (or workspace
+        // day), then revalidate on fresh data INSIDE the transaction — this
+        // is what makes double-booking impossible. Travel was validated
+        // pre-transaction; the in-tx pass skips it to stay fast.
+        const lockKey =
+          input.staffProfileId ??
+          `ws:${workspace.id}:${utcToWallDateISO(scheduledAt, workspace.timezone)}`;
+        await takeSchedulingLock(tx, lockKey);
+        try {
+          await assertSlotBookable(tx, {
+            workspaceId: workspace.id,
+            scheduledAt,
+            staffProfileId: input.staffProfileId,
+            packageId: input.packageId,
+            serviceIds: input.serviceIds,
+            formId: input.formId,
+            targetAddress: null,
+          });
+        } catch (e) {
+          if (e instanceof SlotUnavailableError) {
+            throw new TRPCError({ code: "CONFLICT", message: e.message });
+          }
+          throw e;
+        }
+
         // Upsert client by email within this workspace
         let client = await tx.client.findFirst({
           where: { workspaceId: workspace.id, email: input.email },
@@ -522,7 +607,7 @@ export const bookingRouter = router({
         }
 
         return { job, client };
-      });
+      }, { timeout: 15000 });
 
       const clientName = `${input.firstName} ${input.lastName}`;
       const pkgName = pkg?.name ?? (alaCarteServices.length > 0 ? alaCarteServices.map((s) => s.name).join(", ") : "");

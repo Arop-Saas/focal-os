@@ -83,4 +83,61 @@ export const availabilityRouter = router({
       });
       return { ok: true };
     }),
+
+  // ── Staff time off (S1) — consumed by the scheduling engine ─────────────
+
+  listTimeOff: workspaceProcedure
+    .input(z.object({ staffProfileId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.staffTimeOff.findMany({
+        where: {
+          staff: { workspaceId: ctx.workspace.id },
+          ...(input?.staffProfileId ? { staffId: input.staffProfileId } : {}),
+          endsAt: { gte: new Date() },
+        },
+        include: {
+          staff: {
+            include: { member: { include: { user: { select: { fullName: true } } } } },
+          },
+        },
+        orderBy: { startsAt: "asc" },
+      });
+    }),
+
+  addTimeOff: workspaceProcedure
+    .input(
+      z.object({
+        staffProfileId: z.string(),
+        startsAt: z.date(),
+        endsAt: z.date(),
+        reason: z.string().max(200).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.endsAt <= input.startsAt) {
+        throw new Error("End must be after start.");
+      }
+      const staff = await ctx.prisma.staffProfile.findFirst({
+        where: { id: input.staffProfileId, workspaceId: ctx.workspace.id },
+        select: { id: true },
+      });
+      if (!staff) throw new Error("Staff member not found.");
+      return ctx.prisma.staffTimeOff.create({
+        data: {
+          staffId: staff.id,
+          startsAt: input.startsAt,
+          endsAt: input.endsAt,
+          reason: input.reason,
+        },
+      });
+    }),
+
+  removeTimeOff: workspaceProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.staffTimeOff.deleteMany({
+        where: { id: input.id, staff: { workspaceId: ctx.workspace.id } },
+      });
+      return { ok: true };
+    }),
 });

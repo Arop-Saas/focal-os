@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loader";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
 import {
@@ -463,6 +464,41 @@ export const jobsRouter = router({
       });
       if (!fullJob) throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
 
+      // ── Scheduling engine enforcement (S1): a reschedule must work for
+      // every assigned photographer (past times skip validation).
+      if (
+        input.scheduledAt &&
+        input.scheduledAt > new Date() &&
+        (!job.scheduledAt || input.scheduledAt.getTime() !== job.scheduledAt.getTime())
+      ) {
+        const assignments = await ctx.prisma.jobAssignment.findMany({
+          where: { jobId: id },
+          select: { staffId: true },
+        });
+        for (const a of assignments) {
+          try {
+            await assertSlotBookable(ctx.prisma, {
+              workspaceId: ctx.workspace.id,
+              scheduledAt: input.scheduledAt,
+              durationMins: job.estimatedDurationMins,
+              staffProfileId: a.staffId,
+              targetAddress: [
+                job.propertyAddress,
+                job.propertyCity,
+                job.propertyState,
+                job.propertyZip,
+              ].filter(Boolean).join(", "),
+              excludeJobId: id,
+            });
+          } catch (e) {
+            if (e instanceof SlotUnavailableError) {
+              throw new TRPCError({ code: "CONFLICT", message: e.message });
+            }
+            throw e;
+          }
+        }
+      }
+
       const updated = await ctx.prisma.$transaction(async (tx) => {
         const result = await tx.job.update({
           where: { id },
@@ -597,6 +633,36 @@ export const jobsRouter = router({
           include: { member: { include: { user: { select: { id: true, fullName: true, email: true } } } } },
         }),
       ]);
+
+      if (!jobForNotify || !staffForNotify) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Job or photographer not found." });
+      }
+
+      // ── Scheduling engine enforcement (S1): block assignments that create
+      // impossible days (double-booked or unreachable). Past jobs skip
+      // validation (record-keeping assignments are legitimate).
+      if (jobForNotify.scheduledAt && jobForNotify.scheduledAt > new Date()) {
+        try {
+          await assertSlotBookable(ctx.prisma, {
+            workspaceId: ctx.workspace.id,
+            scheduledAt: jobForNotify.scheduledAt,
+            durationMins: jobForNotify.estimatedDurationMins,
+            staffProfileId: input.staffId,
+            targetAddress: [
+              jobForNotify.propertyAddress,
+              jobForNotify.propertyCity,
+              jobForNotify.propertyState,
+              jobForNotify.propertyZip,
+            ].filter(Boolean).join(", "),
+            excludeJobId: jobForNotify.id,
+          });
+        } catch (e) {
+          if (e instanceof SlotUnavailableError) {
+            throw new TRPCError({ code: "CONFLICT", message: e.message });
+          }
+          throw e;
+        }
+      }
 
       // Upsert assignment
       const assignment = await ctx.prisma.jobAssignment.upsert({

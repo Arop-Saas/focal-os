@@ -299,6 +299,7 @@ model StaffProfile {
   jobRole         WorkspaceRole?    @relation(fields: [jobRoleId], references: [id], onDelete: SetNull)
   jobAssignments  JobAssignment[]
   availability    StaffAvailability[]
+  timeOffEntries  StaffTimeOff[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -346,6 +347,20 @@ model StaffAvailability {
   @@unique([staffId, dayOfWeek])
   @@index([staffId])
 }
+model StaffTimeOff {
+  id        String   @id @default(cuid())
+  staffId   String
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
+
+  staff     StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([staffId, startsAt])
+}
+
 
 model WorkspaceHours {
   id          String   @id @default(cuid())
