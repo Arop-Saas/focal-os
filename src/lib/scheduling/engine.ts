@@ -40,6 +40,7 @@ export interface EngineJob {
 export interface EngineStaff {
   staffProfileId: string;
   name?: string;
+  avatarUrl?: string | null;
   /** Availability window for THIS weekday, wall times in workspace tz. Null = not working. */
   window: { startTime: string; endTime: string } | null;
   /** Existing (non-cancelled) jobs overlapping this wall-day, sorted or not. */
@@ -76,6 +77,7 @@ export interface ComputeSlotsInput {
 export interface StaffSlots {
   staffProfileId: string;
   name?: string;
+  avatarUrl?: string | null;
   /** Bookable slot start instants (UTC), aligned to slotIntervalMins. */
   slots: Date[];
 }
@@ -218,7 +220,7 @@ export async function computeDaySlots(input: ComputeSlotsInput): Promise<StaffSl
         if (v.ok) slots.push(new Date(t));
       }
     }
-    results.push({ staffProfileId: staff.staffProfileId, name: staff.name, slots });
+    results.push({ staffProfileId: staff.staffProfileId, name: staff.name, avatarUrl: staff.avatarUrl ?? null, slots });
   }
 
   return results;

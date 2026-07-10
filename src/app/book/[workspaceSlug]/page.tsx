@@ -71,23 +71,6 @@ const initialForm: FormData = {
   clientNotes: "",
 };
 
-// Generate 30-min time slots between two "HH:MM" strings (24h)
-function generateTimeSlots(openTime: string, closeTime: string) {
-  const [oh, om] = openTime.split(":").map(Number);
-  const [ch, cm] = closeTime.split(":").map(Number);
-  const startMins = oh * 60 + (om ?? 0);
-  const endMins = ch * 60 + (cm ?? 0);
-  const slots: { label: string; value: string }[] = [];
-  for (let t = startMins; t < endMins; t += 30) {
-    const h = Math.floor(t / 60);
-    const m = t % 60;
-    const label = `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m.toString().padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
-    const value = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-    slots.push({ label, value });
-  }
-  return slots;
-}
-
 // Property type labels
 const PROPERTY_TYPES = [
   { value: "RESIDENTIAL", label: "Residential" },
@@ -369,12 +352,15 @@ function Step1Property({
             value={form.propertyAddress}
             onChange={set("propertyAddress")}
             onSelect={(result) =>
+              // Fully REPLACE the address — never merge with a previous pick
+              // (merging produced corrupted addresses like
+              //  "Jasper Avenue10060 Jasper Ave NW, EdmontonEdmonton").
               setForm({
                 ...form,
-                propertyAddress: result.streetAddress || form.propertyAddress,
-                propertyCity: result.city || form.propertyCity,
-                propertyState: result.state || form.propertyState,
-                propertyZip: result.zip || form.propertyZip,
+                propertyAddress: result.streetAddress ?? "",
+                propertyCity: result.city ?? "",
+                propertyState: result.state ?? "",
+                propertyZip: result.zip ?? "",
                 propertyLat: result.lat ?? null,
                 propertyLng: result.lng ?? null,
               })
@@ -384,7 +370,12 @@ function Step1Property({
           />
           <button
             type="button"
-            onClick={() => setManualEntry(true)}
+            onClick={() => {
+              setManualEntry(true);
+              // Start manual entry from a clean slate — mixing autocomplete
+              // fragments with typed input corrupted saved addresses (L2).
+              setForm({ ...form, propertyAddress: "", propertyCity: "", propertyState: "", propertyZip: "", propertyLat: null, propertyLng: null });
+            }}
             className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >
             Enter address manually
@@ -991,6 +982,7 @@ function Step2Package({
   territories = [],
   onTerritorySelect,
   detectedTerritoryId,
+  outsideBlocked = false,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -1010,6 +1002,7 @@ function Step2Package({
   territories?: { id: string; name: string; color: string; travelFee: number | null; description: string | null; cities: string | null }[];
   onTerritorySelect?: (territoryId: string) => void;
   detectedTerritoryId?: string;
+  outsideBlocked?: boolean;
 }) {
   const updateServiceMut = trpc.packages.updateService.useMutation();
   const updatePackageMut = trpc.packages.updatePackage.useMutation();
@@ -1047,7 +1040,9 @@ function Step2Package({
     ? packages.filter((p: any) => {
         const ids = p.territoryIds as string[] | null | undefined;
         if (!ids || ids.length === 0) return true; // untagged — always visible
-        if (!detectedTerritoryId) return false;     // tagged but no territory matched → hide
+        // Tagged + no territory matched: show the full catalog when outside
+        // bookings are allowed (travel fee applies) — hide only when blocked.
+        if (!detectedTerritoryId) return !outsideBlocked;
         return ids.includes(detectedTerritoryId);
       })
     : packages;
@@ -1056,7 +1051,7 @@ function Step2Package({
     ? services.filter((s: any) => {
         const ids = s.territoryIds as string[] | null | undefined;
         if (!ids || ids.length === 0) return true; // untagged — always visible
-        if (!detectedTerritoryId) return false;     // tagged but no territory matched → hide
+        if (!detectedTerritoryId) return !outsideBlocked;
         return ids.includes(detectedTerritoryId);
       })
     : services;
@@ -1126,6 +1121,19 @@ function Step2Package({
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Services</h2>
           <p className="text-sm text-gray-500 mt-0.5">Please choose your items below.</p>
+        {shouldFilterByTerritory && !detectedTerritoryId && (
+          outsideBlocked ? (
+            <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <p className="text-xs text-red-700">This address is outside our service area, so online booking isn't available for this location. Please contact us directly.</p>
+            </div>
+          ) : (
+            <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <p className="text-xs text-amber-700">This address is outside our standard service areas — the full catalog is shown, and a travel fee may apply.</p>
+            </div>
+          )
+        )}
         </div>
 
         {/* Tabs: Packages / Services */}
@@ -1418,6 +1426,7 @@ function Step3DateTime({
   brandColor,
   hours,
   detectedTerritoryId,
+  formId,
   minBookingNoticeHours = 0,
   maxAdvanceBookingDays = 0,
 }: {
@@ -1427,6 +1436,7 @@ function Step3DateTime({
   brandColor: string;
   hours: { dayOfWeek: number; isOpen: boolean; openTime: string; closeTime: string }[];
   detectedTerritoryId?: string;
+  formId?: string;
   minBookingNoticeHours?: number;
   maxAdvanceBookingDays?: number;
 }) {
@@ -1459,18 +1469,38 @@ function Step3DateTime({
     return "rgba(203,213,225,0.6)";                    // thunderstorm — slate
   }
 
-  // Fetch available photographers when a date is chosen
-  // Pass detectedTerritory so only territory-matched (or unassigned) photographers show
-  const { data: photographersData, isLoading: photographersLoading } =
-    trpc.booking.getAvailablePhotographers.useQuery(
+  // ── S2: slots come from THE scheduling engine (booking.getAvailableSlots).
+  // Server-computed per photographer: availability windows, time off, existing
+  // jobs + buffers, travel feasibility from home base / previous job, package
+  // duration, form notice/advance windows, slot interval — in the workspace TZ.
+  const propertyAddressFull = [form.propertyAddress, form.propertyCity, form.propertyState, form.propertyZip]
+    .filter(Boolean)
+    .join(", ");
+  const { data: engineData, isLoading: photographersLoading } =
+    trpc.booking.getAvailableSlots.useQuery(
       {
         slug: workspaceSlug,
         date: form.scheduledDate,
+        formId: formId || undefined,
+        packageId: form.packageId || undefined,
+        serviceIds: form.selectedServiceIds.length > 0 ? form.selectedServiceIds : undefined,
         ...(detectedTerritoryId ? { territoryId: detectedTerritoryId } : {}),
+        address: propertyAddressFull || undefined,
       },
-      { enabled: !!form.scheduledDate }
+      { enabled: !!form.scheduledDate, staleTime: 15_000 }
     );
-  const photographers = photographersData?.photographers ?? [];
+  const staffSlots = engineData?.staffSlots ?? [];
+  const bookingTimezone = engineData?.timezone ?? "UTC";
+
+  // Real photographers with at least one bookable slot (the "" id is the
+  // virtual staff used by workspaces without staff profiles).
+  const photographers = staffSlots
+    .filter((s) => s.staffProfileId !== "" && s.slots.length > 0)
+    .map((s) => ({
+      staffProfileId: s.staffProfileId,
+      name: s.name ?? "Photographer",
+      avatarUrl: s.avatarUrl ?? null,
+    }));
 
   // Auto-select photographer if only one is available
   useEffect(() => {
@@ -1486,57 +1516,24 @@ function Step3DateTime({
       setForm({ ...form, photographerId: "", scheduledTime: "" });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photographers]);
+  }, [photographers.map((p) => p.staffProfileId).join(",")]);
 
-  const selectedPhotographer = photographers.find(
-    (p) => p.staffProfileId === form.photographerId
-  );
+  // Slot values are UTC instants; labels rendered in the workspace timezone.
+  const slotLabel = (iso: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: bookingTimezone,
+    }).format(new Date(iso));
 
-  // Fetch booked slots (filtered to selected photographer if one is chosen)
-  const { data: slotsData } = trpc.booking.getBookedSlots.useQuery(
-    {
-      slug: workspaceSlug,
-      date: form.scheduledDate,
-      staffProfileId: form.photographerId || undefined,
-    },
-    { enabled: !!form.scheduledDate }
-  );
-
-  // Build set of blocked times — block all 30-min slots within job duration + buffer
-  const blockedTimes = new Set<string>();
-  const bufferMins = slotsData?.bufferMins ?? 15;
-  slotsData?.bookedSlots?.forEach((slot) => {
-    if (slot.scheduledAt) {
-      const startD = new Date(slot.scheduledAt);
-      const startMins = startD.getHours() * 60 + startD.getMinutes();
-      const totalBlockMins = (slot.durationMins ?? 60) + bufferMins;
-      // Block every 30-min slot from the job start through (duration + buffer)
-      for (let offset = 0; offset < totalBlockMins; offset += 30) {
-        const blockedMins = startMins + offset;
-        const bh = Math.floor(blockedMins / 60);
-        const bm = blockedMins % 60;
-        blockedTimes.add(`${bh.toString().padStart(2, "0")}:${bm.toString().padStart(2, "0")}`);
-      }
-    }
-  });
-
-  // Generate time slots based on workspace business hours for the selected day
-  const selectedDayOfWeek = form.scheduledDate
-    ? new Date(`${form.scheduledDate}T12:00:00`).getDay()
-    : null;
-  const todayHours =
-    selectedDayOfWeek !== null && hoursByDay[selectedDayOfWeek]
-      ? hoursByDay[selectedDayOfWeek]
-      : null;
-  const baseSlots =
-    todayHours && todayHours.isOpen
-      ? generateTimeSlots(todayHours.openTime, todayHours.closeTime)
-      : generateTimeSlots("09:00", "17:00"); // fallback if no hours configured
-
-  // Filter to photographer's available window if one is selected
-  const visibleSlots = baseSlots.filter((slot) => {
-    if (!selectedPhotographer) return true;
-    return slot.value >= selectedPhotographer.startTime && slot.value < selectedPhotographer.endTime;
+  const activeSlotList =
+    (form.photographerId
+      ? staffSlots.find((s) => s.staffProfileId === form.photographerId)?.slots
+      : staffSlots.find((s) => s.staffProfileId === "")?.slots) ?? [];
+  const visibleSlots = activeSlotList.map((slot) => {
+    const iso = new Date(slot as unknown as string | Date).toISOString();
+    return { label: slotLabel(iso), value: iso };
   });
 
   const showPhotographerSection =
@@ -1724,7 +1721,7 @@ function Step3DateTime({
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {visibleSlots.map((slot) => {
-                const blocked = blockedTimes.has(slot.value);
+                const blocked = false; // engine pre-filters — nothing rendered is blocked
                 const selected = form.scheduledTime === slot.value;
                 return (
                   <button
@@ -2010,7 +2007,7 @@ function Step5Review({
   const scheduledDisplay =
     form.scheduledDate && form.scheduledTime
       ? format(
-          new Date(`${form.scheduledDate}T${form.scheduledTime}`),
+          new Date(form.scheduledTime),
           "EEEE, MMMM d, yyyy 'at' h:mm aa"
         )
       : "—";
@@ -2500,18 +2497,12 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
     }
     setShowFieldErrors(false);
 
-    // After step 2: if a package is selected and there are services not in it, show add-on popup
-    if (step === 2 && form.packageId && data) {
-      const pkg = data.packages?.find((p: any) => p.id === form.packageId);
-      const pkgServiceIds = new Set(pkg?.items?.map((item: any) => item.serviceId) ?? []);
-      const alreadySelected = new Set(form.selectedServiceIds);
-      const available = (data.services ?? []).filter(
-        (s: any) => !pkgServiceIds.has(s.id) && !alreadySelected.has(s.id)
-      );
-      if (available.length > 0) {
-        setShowAddOnModal(true);
-        return;
-      }
+    // After step 2: if a package is selected and there are add-on services to
+    // offer (same territory-aware list the modal itself renders — keeping the
+    // two in sync prevents the empty "Enhance Your Shoot" popup), show it.
+    if (step === 2 && form.packageId && modalAddOnServices.length > 0) {
+      setShowAddOnModal(true);
+      return;
     }
 
     setStep((s) => {
@@ -2561,7 +2552,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       packageId: form.packageId || undefined,
       serviceIds: form.selectedServiceIds.length > 0 ? form.selectedServiceIds : undefined,
       staffProfileId: form.photographerId || undefined,
-      scheduledAt: new Date(`${form.scheduledDate}T${form.scheduledTime}`).toISOString(),
+      scheduledAt: form.scheduledTime, // UTC instant straight from the engine slot
       clientNotes: form.clientNotes || undefined,
       formId: formId || undefined,
     });
@@ -2778,7 +2769,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
         {/* Step 2 gets its own wider layout (no card wrapper) */}
         {step === 2 && (
           <div>
-            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} territories={territories} onTerritorySelect={handleTerritorySelect} detectedTerritoryId={detectedTerritory?.id} />
+            <Step2Package form={form} setForm={setForm} packages={packages} services={services ?? []} brandColor={brandColor} gridColumns={gridColumns} orderDetails={formSettings.orderDetails} workspaceSlug={workspaceSlug} onCouponApplied={setAppliedCouponData} isDesignerPreview={isDesignerPreview} onImageUpdated={() => refetchWorkspaceInfo()} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} territories={territories} onTerritorySelect={handleTerritorySelect} detectedTerritoryId={detectedTerritory?.id} outsideBlocked={!!outsideBlocked} />
             <div className="mt-4">
               <CustomFieldsRenderer step={2} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </div>
@@ -2819,7 +2810,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 3 && (
             <>
-              <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} detectedTerritoryId={detectedTerritory?.id} minBookingNoticeHours={(data?.orderForm as any)?.minBookingNoticeHours ?? 0} maxAdvanceBookingDays={(data?.orderForm as any)?.maxAdvanceBookingDays ?? 0} />
+              <Step3DateTime form={form} setForm={setForm} workspaceSlug={workspaceSlug} brandColor={brandColor} hours={data?.workspace?.hours ?? []} detectedTerritoryId={detectedTerritory?.id} formId={formId || undefined} minBookingNoticeHours={(data?.orderForm as any)?.minBookingNoticeHours ?? 0} maxAdvanceBookingDays={(data?.orderForm as any)?.maxAdvanceBookingDays ?? 0} />
               <CustomFieldsRenderer step={3} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}

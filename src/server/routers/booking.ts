@@ -480,6 +480,20 @@ export const bookingRouter = router({
           where: { workspaceId: workspace.id, email: input.email },
         });
 
+        // L3: the client record was auto-created from a booking form —
+        // keep its contact details in sync with what the client just typed.
+        // CRM-managed records (any other source) are never overwritten.
+        if (client && client.source === "booking_form") {
+          const patch: Record<string, string> = {};
+          if (input.firstName && input.firstName !== client.firstName) patch.firstName = input.firstName;
+          if (input.lastName && input.lastName !== client.lastName) patch.lastName = input.lastName;
+          if (input.phone && !client.phone) patch.phone = input.phone;
+          if (input.company && !client.company) patch.company = input.company;
+          if (Object.keys(patch).length > 0) {
+            client = await tx.client.update({ where: { id: client.id }, data: patch });
+          }
+        }
+
         if (!client) {
           client = await tx.client.create({
             data: {

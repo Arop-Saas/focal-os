@@ -77,7 +77,7 @@ export async function loadEngineStaff(db: Db, args: LoadStaffArgs): Promise<Engi
       ...(args.staffProfileId ? { id: args.staffProfileId } : {}),
     },
     include: {
-      member: { include: { user: { select: { fullName: true, email: true } } } },
+      member: { include: { user: { select: { fullName: true, email: true, avatarUrl: true } } } },
       availability: { where: { dayOfWeek } },
       timeOffEntries: {
         where: { startsAt: { lt: end }, endsAt: { gt: start } },
@@ -129,6 +129,7 @@ export async function loadEngineStaff(db: Db, args: LoadStaffArgs): Promise<Engi
       return {
         staffProfileId: p.id,
         name: p.member?.user?.fullName ?? p.member?.user?.email ?? undefined,
+        avatarUrl: p.member?.user?.avatarUrl ?? null,
         window: win ? { startTime: win.startTime, endTime: win.endTime } : null,
         jobs,
         timeOff: p.timeOffEntries,
@@ -185,13 +186,20 @@ export async function getDayAvailability(
     serviceIds: args.serviceIds,
   });
 
-  const staff = await loadEngineStaff(db, {
+  let staff = await loadEngineStaff(db, {
     workspaceId: workspace.id,
     dateISO: args.dateISO,
     timezone: workspace.timezone,
     territoryId: args.territoryId,
     staffProfileId: args.staffProfileId,
   });
+
+  // Workspaces with no staff profiles (solo setups) get a "virtual" staff
+  // member built from workspace business hours, blocked by ALL of the
+  // workspace's jobs that day — preserving pre-engine booking behavior.
+  if (staff.length === 0 && !args.staffProfileId) {
+    staff = [await buildVirtualStaff(db, workspace.id, args.dateISO, workspace.timezone)];
+  }
 
   const staffSlots = await computeDaySlots({
     dateISO: args.dateISO,
@@ -212,6 +220,55 @@ export async function getDayAvailability(
     durationMins,
     slotIntervalMins: form?.timeSlotInterval ?? 30,
     staffSlots,
+  };
+}
+
+async function buildVirtualStaff(
+  db: Db,
+  workspaceId: string,
+  dateISO: string,
+  timezone: string
+): Promise<EngineStaff> {
+  const dayOfWeek = weekdayOf(dateISO);
+  const hours = await db.workspaceHours.findFirst({
+    where: { workspaceId, dayOfWeek },
+    select: { isOpen: true, openTime: true, closeTime: true },
+  });
+  const { start, end } = wallDayUtcRange(dateISO, timezone);
+  const jobs = await db.job.findMany({
+    where: {
+      workspaceId,
+      scheduledAt: { gte: new Date(start.getTime() - 12 * 3600e3), lte: end },
+      status: { notIn: ["CANCELLED"] },
+    },
+    select: {
+      id: true, scheduledAt: true, estimatedDurationMins: true,
+      propertyAddress: true, propertyCity: true, propertyState: true, propertyZip: true,
+    },
+  });
+  const window = hours
+    ? hours.isOpen
+      ? { startTime: hours.openTime, endTime: hours.closeTime }
+      : null
+    : { startTime: "09:00", endTime: "17:00" };
+  return {
+    staffProfileId: "",
+    window,
+    jobs: jobs
+      .filter((j) => {
+        const jEnd = new Date(j.scheduledAt.getTime() + j.estimatedDurationMins * 60e3);
+        return jEnd > start && j.scheduledAt < end;
+      })
+      .map((j) => ({
+        id: j.id,
+        scheduledAt: j.scheduledAt,
+        durationMins: j.estimatedDurationMins,
+        address: [j.propertyAddress, j.propertyCity, j.propertyState, j.propertyZip]
+          .filter(Boolean).join(", "),
+      })),
+    timeOff: [],
+    homeAddress: null,
+    maxJobsPerDay: null,
   };
 }
 
