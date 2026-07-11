@@ -145,6 +145,9 @@ function StripeConfig({
   const [whSecret, setWhSecret] = useState("");
   const [error, setError] = useState("");
 
+  const connectMutation = api.workspace.connectStripe.useMutation({
+    onSuccess: (data) => { if (data.url) window.location.href = data.url; },
+  });
   const saveMutation = api.workspace.saveStripeKeys.useMutation({
     onSuccess: () => {
       setError("");
@@ -200,7 +203,20 @@ function StripeConfig({
       <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex gap-2">
         <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
         <p className="text-xs text-blue-700 leading-relaxed">
-          Enter your Stripe API keys to accept invoice payments. Find these in your{" "}
+          <span className="block mb-3">
+            <button
+              type="button"
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#635BFF] text-white text-sm font-medium hover:bg-[#5851e8] disabled:opacity-60"
+            >
+              {connectMutation.isPending ? "Opening Stripe…" : "Connect with Stripe (recommended)"}
+            </button>
+            <span className="block text-xs text-gray-400 mt-2">
+              Stripe-hosted onboarding — payments confirm automatically, no keys to paste.
+            </span>
+          </span>
+          Or enter your Stripe API keys manually (legacy). Find these in your{" "}
           <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="underline font-medium">
             Stripe Dashboard → API keys
           </a>.

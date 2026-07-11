@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Loader2, CreditCard } from "lucide-react";
 
 interface Props {
-  invoiceId: string;
+  payToken: string;
   brandColor: string;
 }
 
-export function DirectPayButton({ invoiceId, brandColor }: Props) {
+export function DirectPayButton({ payToken, brandColor }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,7 +19,7 @@ export function DirectPayButton({ invoiceId, brandColor }: Props) {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoiceId, source: "pay-page" }),
+        body: JSON.stringify({ payToken, source: "pay-page" }),
       });
       const data = await res.json() as { url?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Payment failed");

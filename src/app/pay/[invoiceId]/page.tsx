@@ -15,8 +15,10 @@ export default async function DirectPayPage({ params, searchParams }: Props) {
   const { invoiceId } = await params;
   const { paid } = await searchParams;
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
+  // The route param is the unguessable payToken (R9). Legacy tokenless
+  // invoices (none in practice) may still resolve by raw id.
+  const invoice = await prisma.invoice.findFirst({
+    where: { OR: [{ payToken: invoiceId }, { id: invoiceId, payToken: null }] },
     include: {
       workspace: {
         select: {
@@ -185,7 +187,7 @@ export default async function DirectPayPage({ params, searchParams }: Props) {
 
           {/* Pay button */}
           {canPay && !justPaid && (
-            <DirectPayButton invoiceId={invoice.id} brandColor={brandColor} />
+            <DirectPayButton payToken={invoice.payToken ?? invoice.id} brandColor={brandColor} />
           )}
 
           {/* Already paid state */}

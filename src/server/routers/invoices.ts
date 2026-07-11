@@ -2,6 +2,8 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, workspaceProcedure, managerProcedure } from "../trpc";
 import { generateInvoiceNumber } from "@/lib/utils";
+import { randomUUID } from "crypto";
+import { createInvoiceForJob, InvoiceExistsError } from "@/lib/money/invoice";
 import { notifyInvoiceSent, notifyInvoicePaid } from "@/lib/notify";
 
 export const invoicesRouter = router({
@@ -105,25 +107,22 @@ export const invoicesRouter = router({
       const totalAmount = subtotal + taxAmount - input.discountAmount;
       const amountDue = totalAmount;
 
-      // Get next invoice number
-      const ws = await ctx.prisma.workspace.findUnique({
+      // Atomic invoice number (race-free)
+      const ws = await ctx.prisma.workspace.update({
         where: { id: ctx.workspace.id },
+        data: { invoiceNextNumber: { increment: 1 } },
         select: { invoiceNextNumber: true, invoicePrefix: true },
       });
       const invoiceNumber = generateInvoiceNumber(
-        ws?.invoicePrefix ?? "INV",
-        ws?.invoiceNextNumber ?? 1001
+        ws.invoicePrefix ?? "INV",
+        ws.invoiceNextNumber - 1
       );
-
-      await ctx.prisma.workspace.update({
-        where: { id: ctx.workspace.id },
-        data: { invoiceNextNumber: { increment: 1 } },
-      });
 
       const invoice = await ctx.prisma.invoice.create({
         data: {
           workspaceId: ctx.workspace.id,
           invoiceNumber,
+          payToken: randomUUID(),
           clientId: input.clientId,
           jobId: input.jobId,
           subtotal,
@@ -170,107 +169,23 @@ export const invoicesRouter = router({
   createFromJob: workspaceProcedure
     .input(z.object({ jobId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const job = await ctx.prisma.job.findFirst({
-        where: { id: input.jobId, workspaceId: ctx.workspace.id },
-        include: {
-          client: { include: { brokerageGroup: true } },
-          package: true,
-          invoice: { select: { id: true } },
-        },
-      });
-      if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Job not found." });
-      if (job.invoice) throw new TRPCError({ code: "CONFLICT", message: "Invoice already exists for this job." });
-      if (!job.client) throw new TRPCError({ code: "BAD_REQUEST", message: "Job has no client." });
-
-      const unitPrice = job.package?.price ?? job.totalAmount ?? 0;
-      const description = job.package?.name ?? `Photography — ${job.propertyAddress}`;
-
-      const ws = await ctx.prisma.workspace.findUnique({
-        where: { id: ctx.workspace.id },
-        select: { invoiceNextNumber: true, invoicePrefix: true, defaultTaxRate: true },
-      });
-      const invoiceNumber = generateInvoiceNumber(
-        ws?.invoicePrefix ?? "INV",
-        ws?.invoiceNextNumber ?? 1001
-      );
-      await ctx.prisma.workspace.update({
-        where: { id: ctx.workspace.id },
-        data: { invoiceNextNumber: { increment: 1 } },
-      });
-
-      // ── Brokerage discount ──────────────────────────────────────────────
-      const brokerageGroup = job.client.brokerageGroup;
-      let discountAmount = 0;
-      const lineItems: { description: string; quantity: number; unitPrice: number; totalPrice: number; sortOrder: number }[] = [
-        { description, quantity: 1, unitPrice, totalPrice: unitPrice, sortOrder: 0 },
-      ];
-
-      if (brokerageGroup?.isActive) {
-        if (brokerageGroup.discountType === "PERCENTAGE") {
-          discountAmount = parseFloat(((unitPrice * brokerageGroup.discountValue) / 100).toFixed(2));
-        } else {
-          discountAmount = Math.min(brokerageGroup.discountValue, unitPrice);
+      // Delegates to core/money — the SAME implementation the automatic
+      // invoice-on-delivery hook uses (one source of truth).
+      try {
+        const created = await createInvoiceForJob(ctx.prisma, {
+          workspaceId: ctx.workspace.id,
+          jobId: input.jobId,
+        });
+        return ctx.prisma.invoice.findUnique({
+          where: { id: created.id },
+          include: { lineItems: true },
+        });
+      } catch (e) {
+        if (e instanceof InvoiceExistsError) {
+          throw new TRPCError({ code: "CONFLICT", message: e.message });
         }
-        // Add a visible discount line item (negative amount) so the client sees the saving
-        if (discountAmount > 0) {
-          const discLabel =
-            brokerageGroup.discountType === "PERCENTAGE"
-              ? `${brokerageGroup.name} discount (${brokerageGroup.discountValue}%)`
-              : `${brokerageGroup.name} discount`;
-          lineItems.push({
-            description: discLabel,
-            quantity: 1,
-            unitPrice: -discountAmount,
-            totalPrice: -discountAmount,
-            sortOrder: 1,
-          });
-        }
+        throw e;
       }
-      // ───────────────────────────────────────────────────────────────────
-
-      const taxRate = ws?.defaultTaxRate ?? 0;
-      const subtotal = unitPrice;
-      const taxAmount = parseFloat((((subtotal - discountAmount) * taxRate) / 100).toFixed(2));
-      const totalAmount = parseFloat((subtotal - discountAmount + taxAmount).toFixed(2));
-
-      const invoice = await ctx.prisma.invoice.create({
-        data: {
-          workspaceId: ctx.workspace.id,
-          invoiceNumber,
-          clientId: job.clientId,
-          jobId: job.id,
-          subtotal,
-          taxRate,
-          taxAmount,
-          discountAmount,
-          totalAmount,
-          amountDue: totalAmount,
-          status: "DRAFT",
-          dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-          lineItems: {
-            create: lineItems,
-          },
-        },
-        include: { lineItems: true, client: true },
-      });
-
-      await ctx.prisma.activityLog.create({
-        data: {
-          workspaceId: ctx.workspace.id,
-          userId: ctx.user.id,
-          action: "invoice.created",
-          entityType: "invoice",
-          entityId: invoice.id,
-          metadata: {
-            invoiceNumber,
-            totalAmount,
-            clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
-            source: "auto_from_job",
-          },
-        },
-      });
-
-      return invoice;
     }),
 
   send: workspaceProcedure
@@ -286,7 +201,8 @@ export const invoicesRouter = router({
       }
 
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
-      const paymentLink = `${APP_URL}/pay/${input.id}`;
+      // Tokenized public link (R9) — invoice IDs stay private.
+      const paymentLink = `${APP_URL}/pay/${invoice.payToken ?? input.id}`;
 
       const updated = await ctx.prisma.invoice.update({
         where: { id: input.id },
@@ -339,7 +255,8 @@ export const invoicesRouter = router({
       }
 
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
-      const paymentLink = `${APP_URL}/pay/${input.id}`;
+      // Tokenized public link (R9) — invoice IDs stay private.
+      const paymentLink = `${APP_URL}/pay/${invoice.payToken ?? input.id}`;
 
       void ctx.prisma.activityLog.create({
         data: {

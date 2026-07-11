@@ -282,6 +282,7 @@ export const workspaceRouter = router({
       select: {
         stripePublishableKey: true,
         stripeSecretKey: true,
+        stripeAccountId: true,
         googleCalendarConnected: true,
         googleCalendarEmail: true,
       },
@@ -289,7 +290,10 @@ export const workspaceRouter = router({
     if (!ws) throw new TRPCError({ code: "NOT_FOUND" });
     return {
       stripe: {
-        connected: !!(ws.stripePublishableKey && ws.stripeSecretKey),
+        // Connect is the real integration; pasted keys are legacy.
+        connected: !!(ws as { stripeAccountId?: string | null }).stripeAccountId || !!(ws.stripePublishableKey && ws.stripeSecretKey),
+        connectAccountId: (ws as { stripeAccountId?: string | null }).stripeAccountId ?? null,
+        legacyKeys: !!ws.stripeSecretKey,
         publishableKey: ws.stripePublishableKey ?? null,
         // never return the secret key to the client — just presence
         hasSecretKey: !!ws.stripeSecretKey,
@@ -299,6 +303,42 @@ export const workspaceRouter = router({
         email: ws.googleCalendarEmail ?? null,
       },
     };
+  }),
+
+  // ── Stripe Connect (S3) — the proper multi-tenant integration ──────────
+  connectStripe: ownerProcedure.mutation(async ({ ctx }) => {
+    const { platformStripe } = await import("@/lib/money/stripe");
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
+
+    let accountId = (ctx.workspace as { stripeAccountId?: string | null }).stripeAccountId ?? null;
+    if (!accountId) {
+      const ws = await ctx.prisma.workspace.findUnique({
+        where: { id: ctx.workspace.id },
+        select: { stripeAccountId: true, name: true, email: true },
+      });
+      accountId = ws?.stripeAccountId ?? null;
+      if (!accountId) {
+        const account = await platformStripe.accounts.create({
+          type: "standard",
+          email: ws?.email ?? undefined,
+          business_profile: { name: ws?.name ?? undefined },
+          metadata: { workspaceId: ctx.workspace.id },
+        });
+        accountId = account.id;
+        await ctx.prisma.workspace.update({
+          where: { id: ctx.workspace.id },
+          data: { stripeAccountId: accountId },
+        });
+      }
+    }
+
+    const link = await platformStripe.accountLinks.create({
+      account: accountId,
+      type: "account_onboarding",
+      refresh_url: `${baseUrl}/integrations?stripe=refresh`,
+      return_url: `${baseUrl}/integrations?stripe=connected`,
+    });
+    return { url: link.url };
   }),
 
   saveStripeKeys: ownerProcedure

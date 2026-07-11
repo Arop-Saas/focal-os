@@ -59,8 +59,11 @@ model Workspace {
   defaultTaxRate        Float    @default(0)
   invoicePrefix         String   @default("INV")
   invoiceNextNumber     Int      @default(1001)
+  jobPrefix             String   @default("JOB")
+  jobNextNumber         Int      @default(1001)
+  stripeAccountId       String?  // Stripe Connect (Standard) account — preferred over pasted keys
   brandColor            String   @default("#1B4F9E")
-  autoCreateInvoice     Boolean  @default(false)
+  autoCreateInvoice     Boolean  @default(true)
   invoiceDueDays        Int      @default(30)
   jobBufferMins         Int      @default(15)   // Buffer/travel time between jobs in minutes
   // Outside-territory booking settings
@@ -841,6 +844,7 @@ model Invoice {
   paidAt            DateTime?
 
   // Stripe
+  payToken          String?     @unique // unguessable public /pay link token
   stripePaymentIntentId  String?
   stripeInvoiceId        String?
   paymentLink            String?
@@ -890,6 +894,7 @@ model InvoiceLineItem {
 model Payment {
   id              String        @id @default(cuid())
   invoiceId       String
+  stripeEventId   String?       @unique // idempotency: one row per Stripe event
   amount          Float
   method          PaymentMethod @default(CARD)
   status          PaymentStatus @default(PENDING)

@@ -510,14 +510,15 @@ export const bookingRouter = router({
           });
         }
 
-        // Generate job number and increment counter
-        await tx.workspace.update({
+        // Atomic JOB counter — separate sequence from invoices (R11).
+        const wsCounter = await tx.workspace.update({
           where: { id: workspace.id },
-          data: { invoiceNextNumber: { increment: 1 } },
+          data: { jobNextNumber: { increment: 1 } },
+          select: { jobNextNumber: true, jobPrefix: true },
         });
         const jobNumber = generateJobNumber(
-          workspace.invoicePrefix ?? "JOB",
-          workspace.invoiceNextNumber
+          wsCounter.jobPrefix ?? "JOB",
+          wsCounter.jobNextNumber - 1
         );
 
         // Determine financials from package or à la carte services

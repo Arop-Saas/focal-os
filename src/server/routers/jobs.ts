@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loader";
+import { createInvoiceForJob, InvoiceExistsError } from "@/lib/money/invoice";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
 import {
@@ -9,6 +10,7 @@ import {
   notifyJobAssigned,
   notifyJobCancelled,
   notifyJobDelivered,
+  notifyInvoiceSent,
 } from "@/lib/notify";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "@/lib/gcal";
 
@@ -244,22 +246,18 @@ export const jobsRouter = router({
       const taxAmount = (subtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
       const totalAmount = subtotal + taxAmount + (jobData.priorityFee ?? 0);
 
-      // Get next job number
-      const ws = await ctx.prisma.workspace.findUnique({
-        where: { id: ctx.workspace.id },
-        select: { invoiceNextNumber: true, invoicePrefix: true },
-      });
-      const jobNumber = generateJobNumber(
-        ws?.invoicePrefix ?? "JOB",
-        ws?.invoiceNextNumber ?? 1001
-      );
-
       const job = await ctx.prisma.$transaction(async (tx) => {
-        // Increment job counter
-        await tx.workspace.update({
+        // Atomic JOB counter — separate from invoices (R11), race-free:
+        // update-with-increment returns the post-value in one statement.
+        const wsCounter = await tx.workspace.update({
           where: { id: ctx.workspace.id },
-          data: { invoiceNextNumber: { increment: 1 } },
+          data: { jobNextNumber: { increment: 1 } },
+          select: { jobNextNumber: true, jobPrefix: true },
         });
+        const jobNumber = generateJobNumber(
+          wsCounter.jobPrefix ?? "JOB",
+          wsCounter.jobNextNumber - 1
+        );
 
         const newJob = await tx.job.create({
           data: {
@@ -355,64 +353,8 @@ export const jobsRouter = router({
         });
       }
 
-      // Auto-create invoice if workspace setting is enabled
-      const wsSettings = await ctx.prisma.workspace.findUnique({
-        where: { id: ctx.workspace.id },
-        select: { autoCreateInvoice: true, invoiceDueDays: true, invoicePrefix: true, invoiceNextNumber: true },
-      });
-
-      if (wsSettings?.autoCreateInvoice && job.totalAmount > 0) {
-        const invoiceNumber = generateInvoiceNumber(
-          wsSettings.invoicePrefix ?? "INV",
-          wsSettings.invoiceNextNumber ?? 1001
-        );
-
-        const dueDays = wsSettings.invoiceDueDays ?? 30;
-        const dueAt = new Date();
-        dueAt.setDate(dueAt.getDate() + dueDays);
-
-        // Build line items from services or package
-        const lineItems = job.services.length > 0
-          ? job.services.map((s, i) => ({
-              description: s.service.name,
-              quantity: s.quantity,
-              unitPrice: Number(s.unitPrice),
-              totalPrice: Number(s.totalPrice),
-              sortOrder: i,
-            }))
-          : [{
-              description: job.propertyAddress,
-              quantity: 1,
-              unitPrice: Number(job.totalAmount),
-              totalPrice: Number(job.totalAmount),
-              sortOrder: 0,
-            }];
-
-        await ctx.prisma.$transaction(async (tx) => {
-          await tx.workspace.update({
-            where: { id: ctx.workspace.id },
-            data: { invoiceNextNumber: { increment: 1 } },
-          });
-
-          await tx.invoice.create({
-            data: {
-              workspaceId: ctx.workspace.id,
-              invoiceNumber,
-              clientId: job.clientId,
-              jobId: job.id,
-              subtotal: Number(job.subtotal),
-              taxRate: Number(job.taxAmount > 0 ? (job.taxAmount / job.subtotal) * 100 : 0),
-              taxAmount: Number(job.taxAmount),
-              discountAmount: 0,
-              totalAmount: Number(job.totalAmount),
-              amountDue: Number(job.totalAmount),
-              dueAt,
-              status: "DRAFT",
-              lineItems: { create: lineItems },
-            },
-          });
-        });
-      }
+      // NOTE (S3): invoices are created on DELIVERY (see the DELIVERED hook
+      // in `update`), not at job creation — Build Brief W6.
 
       return job;
     }),
@@ -551,6 +493,13 @@ export const jobsRouter = router({
             packageName: fullJob.services[0]?.service?.name ?? "Photography",
           });
         } else if (status === "DELIVERED") {
+          // C2 fix: the public gallery route is /g/[slug] — link the real
+          // slug (falls back to the portal when no gallery exists yet).
+          const galleryRec = await ctx.prisma.gallery.findFirst({
+            where: { jobId: id },
+            select: { slug: true },
+          });
+          const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
           void notifyJobDelivered({
             workspaceId: ctx.workspace.id,
             jobId: id,
@@ -559,8 +508,44 @@ export const jobsRouter = router({
             clientName,
             jobNumber: fullJob.jobNumber,
             propertyAddress: fullJob.propertyAddress,
-            galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io"}/g/${id}`,
+            galleryUrl: galleryRec?.slug ? `${base}/g/${galleryRec.slug}` : `${base}/portal`,
           });
+
+          // ── S3: invoice-on-delivery (Build Brief W6) ────────────────────
+          const wsMoney = await ctx.prisma.workspace.findUnique({
+            where: { id: ctx.workspace.id },
+            select: { autoCreateInvoice: true },
+          });
+          if (wsMoney?.autoCreateInvoice) {
+            try {
+              const created = await createInvoiceForJob(ctx.prisma, {
+                workspaceId: ctx.workspace.id,
+                jobId: id,
+              });
+              const payLink = `${base}/pay/${created.payToken ?? created.id}`;
+              await ctx.prisma.invoice.update({
+                where: { id: created.id },
+                data: { status: "SENT", issuedAt: new Date(), paymentLink: payLink },
+              });
+              if (created.clientEmail) {
+                void notifyInvoiceSent({
+                  workspaceId: ctx.workspace.id,
+                  jobId: id,
+                  userId: ctx.user.id,
+                  clientEmail: created.clientEmail,
+                  clientName: created.clientName,
+                  invoiceNumber: created.invoiceNumber,
+                  amount: created.totalAmount,
+                  dueDate: created.dueAt,
+                  paymentLink: payLink,
+                });
+              }
+            } catch (e) {
+              if (!(e instanceof InvoiceExistsError)) {
+                console.error("invoice-on-delivery failed:", e);
+              }
+            }
+          }
         }
       }
 
