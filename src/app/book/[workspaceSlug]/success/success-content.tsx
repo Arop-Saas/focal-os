@@ -11,6 +11,7 @@ interface Props {
   jobNumber: string;
   clientName: string;
   dateStr: string;
+  timezone?: string;
   packageName: string;
   confirmed: boolean;
 }
@@ -24,12 +25,19 @@ export function BookingSuccessContent({
   jobNumber,
   clientName,
   dateStr,
+  timezone,
   packageName,
   confirmed,
 }: Props) {
   let formattedDate = dateStr;
   try {
-    if (dateStr) formattedDate = format(new Date(dateStr), "EEEE, MMMM d, yyyy 'at' h:mm aa");
+    if (dateStr) {
+      const d = new Date(dateStr);
+      const tz = timezone || undefined;
+      const datePart = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: tz }).format(d);
+      const timePart = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz }).format(d);
+      formattedDate = `${datePart} at ${timePart}`;
+    }
   } catch { /* keep raw */ }
 
   const firstName = clientName ? clientName.split(" ")[0] : null;

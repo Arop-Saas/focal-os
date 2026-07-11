@@ -12,7 +12,7 @@ interface Props {
 export default async function BookingSuccessPage({ params, searchParams }: Props) {
   const workspace = await prisma.workspace.findUnique({
     where: { slug: params.workspaceSlug },
-    select: { name: true, logoUrl: true, brandColor: true, email: true },
+    select: { name: true, logoUrl: true, brandColor: true, email: true, timezone: true },
   });
 
   return (
@@ -26,6 +26,7 @@ export default async function BookingSuccessPage({ params, searchParams }: Props
         jobNumber={searchParams.job ?? ""}
         clientName={searchParams.name ?? ""}
         dateStr={searchParams.date ?? ""}
+        timezone={workspace?.timezone}
         packageName={searchParams.pkg ?? ""}
         confirmed={searchParams.confirmed === "true"}
       />

@@ -1983,6 +1983,7 @@ function Step5Review({
   travelFee,
   territoryName,
   orderDetails,
+  timezone,
 }: {
   form: FormData;
   setForm: (f: FormData) => void;
@@ -1996,6 +1997,7 @@ function Step5Review({
   travelFee?: number | null;
   territoryName?: string | null;
   orderDetails?: BookingFormSettings["orderDetails"];
+  timezone?: string;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pkg = packages.find((p: any) => p.id === form.packageId);
@@ -2004,13 +2006,20 @@ function Step5Review({
   const alaCarteTotal = selectedServices.reduce((sum: number, s: any) => sum + s.basePrice, 0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const photographer = photographers.find((p: any) => p.staffProfileId === form.photographerId);
-  const scheduledDisplay =
-    form.scheduledDate && form.scheduledTime
-      ? format(
-          new Date(form.scheduledTime),
-          "EEEE, MMMM d, yyyy 'at' h:mm aa"
-        )
-      : "—";
+  // Render in the WORKSPACE timezone — must match the labels the client
+  // clicked in Step 3 (browser-local rendering showed 7:30 AM for a 9:30 slot).
+  const scheduledDisplay = (() => {
+    if (!form.scheduledDate || !form.scheduledTime) return "—";
+    const d = new Date(form.scheduledTime);
+    const tz = timezone || undefined;
+    const datePart = new Intl.DateTimeFormat("en-US", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: tz,
+    }).format(d);
+    const timePart = new Intl.DateTimeFormat("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz,
+    }).format(d);
+    return `${datePart} at ${timePart}`;
+  })();
 
   // Add-ons only apply when a package is also selected; otherwise all services are a-la-carte
   const pkgServiceIds = new Set(pkg?.items?.map((item: any) => item.serviceId) ?? []);
@@ -2822,7 +2831,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
           )}
           {step === 5 && (
             <>
-              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} orderDetails={formSettings.orderDetails} />
+              <Step5Review form={form} setForm={(f: FormData) => setForm(f)} packages={packages} services={services ?? []} photographers={reviewPhotographers} brandColor={brandColor} travelFee={effectiveTravelFee} territoryName={effectiveTerritoryName} orderDetails={formSettings.orderDetails} timezone={data?.workspace?.timezone} />
               <CustomFieldsRenderer step={5} fields={customFields} values={customFieldValues} onChange={setCustomFieldValues} />
             </>
           )}
