@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loader";
 import { runDeliverySideEffects } from "@/lib/delivery";
+import { notifyJobRescheduled } from "@/lib/notify";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
 import {
@@ -499,11 +500,37 @@ export const jobsRouter = router({
             jobId: id,
             userId: ctx.user.id,
           });
+        } else if (status === "CANCELLED") {
+          // C4: cancellations made via the status dropdown never emailed
+          // anyone — the notify only lived on an unused procedure.
+          void notifyJobCancelled({
+            workspaceId: ctx.workspace.id,
+            jobId: id,
+            userId: ctx.user.id,
+            clientEmail,
+            clientName,
+            jobNumber: fullJob.jobNumber,
+            propertyAddress: fullJob.propertyAddress,
+          });
         }
       }
 
       // Fire-and-forget: update Google Calendar events if scheduledAt changed
       if (input.scheduledAt && input.scheduledAt.getTime() !== job.scheduledAt?.getTime()) {
+        // C3: tell the client — a silent reschedule is a missed appointment.
+        if (job.scheduledAt && fullJob.client?.email) {
+          void notifyJobRescheduled({
+            workspaceId: ctx.workspace.id,
+            jobId: id,
+            userId: ctx.user.id,
+            clientEmail: fullJob.client.email,
+            clientName: `${fullJob.client.firstName} ${fullJob.client.lastName}`,
+            jobNumber: fullJob.jobNumber,
+            propertyAddress: fullJob.propertyAddress,
+            oldTime: job.scheduledAt,
+            newTime: input.scheduledAt,
+          });
+        }
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore – gcalEventId added via migration, Prisma client not yet regenerated
         const assignments = await ctx.prisma.jobAssignment.findMany({

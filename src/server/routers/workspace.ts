@@ -305,6 +305,48 @@ export const workspaceRouter = router({
     };
   }),
 
+  // ── S5: owner notification prefs + email visibility ─────────────────────
+  getNotificationPrefs: workspaceProcedure.query(async ({ ctx }) => {
+    const ws = await ctx.prisma.workspace.findUnique({
+      where: { id: ctx.workspace.id },
+      select: { notificationPrefs: true },
+    });
+    const defaults = { newBooking: true, invoicePaid: true, jobCompleted: true, galleryDelivered: true, jobReminder: true };
+    return { ...defaults, ...((ws?.notificationPrefs as Record<string, boolean> | null) ?? {}) };
+  }),
+
+  saveNotificationPrefs: ownerProcedure
+    .input(
+      z.object({
+        newBooking: z.boolean(),
+        invoicePaid: z.boolean(),
+        jobCompleted: z.boolean(),
+        galleryDelivered: z.boolean(),
+        jobReminder: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.workspace.update({
+        where: { id: ctx.workspace.id },
+        data: { notificationPrefs: input },
+      });
+      return { ok: true };
+    }),
+
+  listRecentEmails: workspaceProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).default(20) }).optional())
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.emailOutbox.findMany({
+        where: { workspaceId: ctx.workspace.id },
+        orderBy: { createdAt: "desc" },
+        take: input?.limit ?? 20,
+        select: {
+          id: true, template: true, toEmail: true, subject: true,
+          status: true, attempts: true, lastError: true, sentAt: true, createdAt: true,
+        },
+      });
+    }),
+
   // ── Stripe Connect (S3) — the proper multi-tenant integration ──────────
   connectStripe: ownerProcedure.mutation(async ({ ctx }) => {
     const { platformStripe } = await import("@/lib/money/stripe");

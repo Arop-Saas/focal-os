@@ -13,6 +13,7 @@
 
 import prisma from "@/lib/prisma";
 import {
+  sendJobRescheduledEmail,
   sendJobConfirmationEmail,
   sendJobReminderEmail,
   sendJobAssignedEmail,
@@ -42,9 +43,10 @@ export async function notifyJobBooked({
   clientEmail: string; clientName: string; jobNumber: string;
   propertyAddress: string; scheduledAt: Date; packageName: string;
 }) {
+  const bellOn = await ownerPref(workspaceId, "newBooking");
   await Promise.allSettled([
-    // In-app notification (for workspace admins)
-    prisma.notification.create({
+    // In-app notification (for workspace admins) — honors owner prefs (S5)
+    !bellOn ? Promise.resolve(null) : prisma.notification.create({
       data: {
         workspaceId, jobId, userId,
         type: "JOB_BOOKED",
@@ -315,8 +317,9 @@ export async function notifyInvoicePaid({
   clientEmail: string; clientName: string; invoiceNumber: string;
   amount: number; paidAt: Date;
 }) {
+  const bellOn = await ownerPref(workspaceId, "invoicePaid");
   await Promise.allSettled([
-    prisma.notification.create({
+    !bellOn ? Promise.resolve(null) : prisma.notification.create({
       data: {
         workspaceId, jobId, userId,
         type: "INVOICE_PAID",
@@ -412,4 +415,65 @@ export async function notifyInvoiceOverdue({
       })
     ),
   ]).catch((err) => console.error("[notify] notifyInvoiceOverdue error:", err));
+}
+
+
+// ─── S5 additions ────────────────────────────────────────────────────────────
+
+async function ownerPref(workspaceId: string, key: string): Promise<boolean> {
+  try {
+    const ws = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { notificationPrefs: true },
+    });
+    const prefs = (ws?.notificationPrefs as Record<string, boolean> | null) ?? null;
+    return !prefs || prefs[key] !== false;
+  } catch { return true; }
+}
+
+/** Job rescheduled → client email + in-app bell (C3) */
+export async function notifyJobRescheduled({
+  workspaceId, jobId, userId,
+  clientEmail, clientName, jobNumber, propertyAddress, oldTime, newTime,
+}: BaseNotifyInput & {
+  clientEmail: string | null; clientName: string; jobNumber: string;
+  propertyAddress: string; oldTime: Date; newTime: Date;
+}) {
+  await Promise.allSettled([
+    prisma.notification.create({
+      data: {
+        workspaceId, jobId, userId,
+        type: "JOB_RESCHEDULED",
+        channel: "IN_APP",
+        status: "DELIVERED",
+        title: `Rescheduled — ${jobNumber}`,
+        body: `${propertyAddress} → ${newTime.toLocaleString()}`,
+        sentAt: new Date(),
+      },
+    }),
+    clientEmail
+      ? sendJobRescheduledEmail({
+          to: clientEmail, clientName, jobNumber, propertyAddress, oldTime, newTime, workspaceId,
+        })
+      : Promise.resolve(null),
+  ]);
+}
+
+/** New portal message from a client → owner bell (R13) */
+export async function notifyNewClientMessage({
+  workspaceId, jobId,
+  clientName, preview,
+}: BaseNotifyInput & { clientName: string; preview: string }) {
+  // Client messages always surface — no pref gate on direct communication.
+  await prisma.notification.create({
+    data: {
+      workspaceId, jobId,
+      type: "NEW_MESSAGE",
+      channel: "IN_APP",
+      status: "DELIVERED",
+      title: `New message from ${clientName}`,
+      body: preview.slice(0, 140),
+      sentAt: new Date(),
+    },
+  }).catch(() => {});
 }

@@ -64,6 +64,7 @@ model Workspace {
   stripeAccountId       String?  // Stripe Connect (Standard) account — preferred over pasted keys
   brandColor            String   @default("#1B4F9E")
   autoCreateInvoice     Boolean  @default(true)
+  notificationPrefs     Json?    // owner email/bell toggles (S5): newBooking, invoicePaid, jobCompleted, galleryDelivered, jobReminder
   invoiceDueDays        Int      @default(30)
   jobBufferMins         Int      @default(15)   // Buffer/travel time between jobs in minutes
   // Outside-territory booking settings
@@ -1198,6 +1199,24 @@ enum FeatureRequestCategory {
   CALENDAR
   MOBILE_APP
   INTEGRATIONS
+}
+
+model EmailOutbox {
+  id          String   @id @default(cuid())
+  workspaceId String
+  jobId       String?
+  template    String
+  toEmail     String
+  subject     String?
+  html        String?        // stored for retries
+  status      String   @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  attempts    Int      @default(0)
+  lastError   String?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([status, createdAt])
 }
 
 model FeatureRequest {

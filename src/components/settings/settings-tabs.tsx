@@ -362,9 +362,18 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
 
   // Notification prefs (UI only for now)
   const [notifPrefs, setNotifPrefs] = useState({
-    newBooking: true, invoicePaid: true, jobCompleted: true,
-    galleryDelivered: true, jobReminder: false,
+    newBooking: true, invoicePaid: true, jobCompleted: true, galleryDelivered: true, jobReminder: true,
   });
+  // S5: load saved prefs (previously these toggles saved nothing — dead UI A1)
+  const notifPrefsQuery = api.workspace.getNotificationPrefs.useQuery();
+  useEffect(() => {
+    if (notifPrefsQuery.data) setNotifPrefs(notifPrefsQuery.data);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifPrefsQuery.data]);
+  const savePrefsMutation = api.workspace.saveNotificationPrefs.useMutation({
+    onSuccess: () => { setNotifSaved(true); setTimeout(() => setNotifSaved(false), 2500); },
+  });
+  const recentEmails = api.workspace.listRecentEmails.useQuery({ limit: 15 });
 
   const [generalSaved,  setGeneralSaved]  = useState(false);
   const [brandingSaved, setBrandingSaved] = useState(false);
@@ -433,8 +442,7 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
   };
 
   const saveNotifs = () => {
-    setNotifSaved(true);
-    setTimeout(() => setNotifSaved(false), 3000);
+    savePrefsMutation.mutate(notifPrefs);
   };
 
   return (
@@ -776,10 +784,34 @@ export function SettingsTabs({ workspace }: SettingsTabsProps) {
             <ToggleRow label="24h client reminder" description="Automatically remind clients the day before their shoot" checked={notifPrefs.jobReminder} onChange={(v) => setNotifPrefs({ ...notifPrefs, jobReminder: v })} />
           </div>
           {notifSaved && <div className="mt-3"><SavedBanner /></div>}
-          <button onClick={saveNotifs}
-            className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
-            Save Preferences
+          <button onClick={saveNotifs} disabled={savePrefsMutation.isPending}
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-60">
+            {savePrefsMutation.isPending ? "Saving…" : "Save Preferences"}
           </button>
+
+          {/* S5: recent email activity — every send is observable now */}
+          <div className="mt-8">
+            <h4 className="text-sm font-semibold text-gray-800 mb-2">Recent emails</h4>
+            {recentEmails.data?.length ? (
+              <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                {recentEmails.data.map((e) => (
+                  <div key={e.id} className="flex items-center gap-3 px-3 py-2 text-xs">
+                    <span className={
+                      e.status === "SENT" ? "px-1.5 py-0.5 rounded bg-green-50 text-green-700 font-semibold" :
+                      e.status === "FAILED" ? "px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-semibold" :
+                      e.status === "SKIPPED" ? "px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold" :
+                      "px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold"
+                    }>{e.status}</span>
+                    <span className="flex-1 truncate text-gray-700">{e.subject ?? e.template}</span>
+                    <span className="text-gray-400 truncate max-w-[160px]">{e.toEmail}</span>
+                    <span className="text-gray-400 whitespace-nowrap">{new Date(e.createdAt).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">No emails sent yet.</p>
+            )}
+          </div>
         </div>
 
         {/* ── 7. Brokerage Pricing Groups — moved to Products/Services → Brokerage tab ─── */}

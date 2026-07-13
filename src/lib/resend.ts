@@ -7,6 +7,103 @@ export const resend = new Resend(process.env.RESEND_API_KEY);
 export const EMAIL_FROM =
   process.env.EMAIL_FROM ?? "Scalist <onboarding@resend.dev>";
 
+
+/**
+ * S5: THE email choke point. Every template send goes through here:
+ *  - honors workspace notification prefs (SKIPPED rows stay visible)
+ *  - writes an EmailOutbox row (PENDING -> SENT/FAILED) with stored HTML
+ *    so failures are observable and retryable - no more silent loss (R7).
+ */
+const TEMPLATE_PREF_GATE: Record<string, string> = {
+  sendJobReminderEmail: "jobReminder",
+  sendGalleryReadyEmail: "galleryDelivered",
+};
+
+export async function trackedSend(
+  template: string,
+  workspaceId: string | null | undefined,
+  payload: { from: string; to: string; subject: string; html: string }
+) {
+  let outboxId: string | null = null;
+  try {
+    if (workspaceId) {
+      const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { notificationPrefs: true },
+      });
+      const prefs = (ws?.notificationPrefs as Record<string, boolean> | null) ?? null;
+      const gate = TEMPLATE_PREF_GATE[template];
+      if (prefs && gate && prefs[gate] === false) {
+        await prisma.emailOutbox.create({
+          data: { workspaceId, template, toEmail: payload.to, subject: payload.subject, status: "SKIPPED" },
+        }).catch(() => {});
+        return null;
+      }
+      const row = await prisma.emailOutbox.create({
+        data: {
+          workspaceId, template, toEmail: payload.to, subject: payload.subject,
+          html: payload.html, status: "PENDING", attempts: 1,
+        },
+      }).catch(() => null);
+      outboxId = row?.id ?? null;
+    }
+    const res = await resend.emails.send(payload);
+    const errMsg = (res as { error?: { message?: string } | null })?.error?.message;
+    if (errMsg) throw new Error(errMsg);
+    if (outboxId) {
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: { status: "SENT", sentAt: new Date() },
+      }).catch(() => {});
+    }
+    return res;
+  } catch (e) {
+    if (outboxId) {
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: { status: "FAILED", lastError: String(e instanceof Error ? e.message : e).slice(0, 500) },
+      }).catch(() => {});
+    }
+    console.error("[email] " + template + " failed:", e);
+    return null;
+  }
+}
+
+/** Retry failed sends (called from the daily reminders cron). */
+export async function retryFailedEmails(maxAttempts = 3): Promise<number> {
+  const failed = await prisma.emailOutbox.findMany({
+    where: {
+      status: "FAILED",
+      attempts: { lt: maxAttempts },
+      html: { not: null },
+      createdAt: { gte: new Date(Date.now() - 72 * 3600e3) },
+    },
+    take: 25,
+    orderBy: { createdAt: "asc" },
+  });
+  let retried = 0;
+  for (const row of failed) {
+    try {
+      const res = await resend.emails.send({
+        from: EMAIL_FROM, to: row.toEmail, subject: row.subject ?? "Notification", html: row.html!,
+      });
+      const errMsg = (res as { error?: { message?: string } | null })?.error?.message;
+      if (errMsg) throw new Error(errMsg);
+      await prisma.emailOutbox.update({
+        where: { id: row.id },
+        data: { status: "SENT", sentAt: new Date(), attempts: { increment: 1 } },
+      });
+      retried++;
+    } catch (e) {
+      await prisma.emailOutbox.update({
+        where: { id: row.id },
+        data: { attempts: { increment: 1 }, lastError: String(e instanceof Error ? e.message : e).slice(0, 500) },
+      }).catch(() => {});
+    }
+  }
+  return retried;
+}
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
 
 // ─── Shared layout ──────────────────────────────────────────────────────────
@@ -138,7 +235,7 @@ export async function sendPortalWelcomeEmail({
   to: string; clientName: string; workspaceName?: string; portalUrl: string;
 }) {
   const brand = workspaceName ?? "Scalist";
-  return resend.emails.send({
+  return trackedSend("sendPortalWelcomeEmail", undefined, {
     from: EMAIL_FROM,
     to,
     subject: `Welcome to your ${brand} client portal`,
@@ -189,7 +286,7 @@ export async function sendJobConfirmationEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendJobConfirmationEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -229,7 +326,7 @@ export async function sendJobReminderEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendJobReminderEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -270,7 +367,7 @@ export async function sendJobAssignedEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendJobAssignedEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -302,7 +399,7 @@ export async function sendJobCancelledEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendJobCancelledEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -334,7 +431,7 @@ export async function sendGalleryReadyEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendGalleryReadyEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -372,7 +469,7 @@ export async function sendInvoiceEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendInvoiceEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -412,7 +509,7 @@ export async function sendInvoiceReminderEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendInvoiceReminderEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -451,7 +548,7 @@ export async function sendInvoiceOverdueEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendInvoiceOverdueEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -488,7 +585,7 @@ export async function sendPaymentReceiptEmail({
   if (!tpl.enabled) return null;
   const branding = await getWorkspaceBranding(workspaceId);
 
-  return resend.emails.send({
+  return trackedSend("sendPaymentReceiptEmail", workspaceId, {
     from: EMAIL_FROM,
     to,
     subject: tpl.subject,
@@ -504,7 +601,7 @@ export async function sendWelcomeEmail({
 }) {
   const dashboardUrl = `${APP_URL}/dashboard`;
   const bookingUrl = `${APP_URL}/book/${workspaceSlug}`;
-  return resend.emails.send({
+  return trackedSend("sendWelcomeEmail", undefined, {
     from: EMAIL_FROM,
     to,
     subject: `Welcome to Scalist — let's get ${workspaceName} set up 🎉`,
@@ -543,5 +640,41 @@ export async function sendWelcomeEmail({
         Questions? Just reply to this email — we're here to help.
       </p>
     `),
+  });
+}
+
+
+/** Reschedule notice → client (S5/C3) */
+export async function sendJobRescheduledEmail({
+  to, clientName, jobNumber, propertyAddress, oldTime, newTime, workspaceName, workspaceId,
+}: {
+  to: string; clientName: string; jobNumber: string; propertyAddress: string;
+  oldTime: Date; newTime: Date; workspaceName?: string; workspaceId?: string;
+}) {
+  const vars = {
+    clientName, jobNumber, propertyAddress,
+    oldTime: format(oldTime, "EEEE, MMMM d 'at' h:mm a"),
+    newTime: format(newTime, "EEEE, MMMM d 'at' h:mm a"),
+    workspaceName: workspaceName ?? "Scalist",
+  };
+  const defaultSubject = `New time for your shoot — ${propertyAddress}`;
+  const defaultBody = `
+      <h2 style="color:#1B4F9E;margin:0 0 8px;">Your shoot has been rescheduled</h2>
+      <p style="color:#475569;margin:0 0 4px;">Hi ${clientName},</p>
+      <p style="color:#475569;">The appointment for <strong>${propertyAddress}</strong> has a new time.</p>
+      ${infoBox([
+        ["Job #", jobNumber],
+        ["Previous", vars.oldTime],
+        ["New time", vars.newTime],
+      ])}
+      <p style="color:#475569;">If the new time doesn't work for you, just reply to this email.</p>`;
+  const tpl = await resolveTemplate(workspaceId, "job_rescheduled", vars, { subject: defaultSubject, body: defaultBody });
+  if (!tpl.enabled) return null;
+  const branding = await getWorkspaceBranding(workspaceId);
+  return trackedSend("sendJobRescheduledEmail", workspaceId, {
+    from: EMAIL_FROM,
+    to,
+    subject: tpl.subject,
+    html: emailWrapper(tpl.body, branding),
   });
 }

@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { notifyJobReminder } from "@/lib/notify";
+import { retryFailedEmails } from "@/lib/resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,8 +80,13 @@ export async function GET(req: NextRequest) {
 
   console.log(`[cron/reminders] Sent ${sent} reminders, skipped ${skipped} (no email/date)`);
 
+  // S5: retry recently-failed outbox emails (piggybacks on the daily cron —
+  // Vercel Hobby has no hourly crons).
+  const retriedEmails = await retryFailedEmails().catch(() => 0);
+
   return NextResponse.json({
     ok: true,
+    retriedEmails,
     jobsFound: upcomingJobs.length,
     remindersSent: sent,
     skipped,

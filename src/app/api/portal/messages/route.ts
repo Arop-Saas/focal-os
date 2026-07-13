@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPortalSession } from "@/lib/portal-session";
 import prisma from "@/lib/prisma";
+import { notifyNewClientMessage } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,14 @@ export async function POST(req: NextRequest) {
       senderName,
       body: message.trim(),
     },
+  });
+
+  // S5 (R13): surface client messages in the studio's notification bell.
+  void notifyNewClientMessage({
+    workspaceId: session.workspace.id,
+    jobId,
+    clientName: `${session.client.firstName} ${session.client.lastName}`,
+    preview: String(message ?? ""),
   });
 
   return NextResponse.json(created, { status: 201 });
