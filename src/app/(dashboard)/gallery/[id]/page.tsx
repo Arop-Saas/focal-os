@@ -35,7 +35,7 @@ interface UploadItem {
   status: "queued" | "uploading" | "done" | "error";
   progress: number;
   error?: string;
-  cdnUrl?: string;
+  cdnUrl?: string | null;
   mediaTypeHint?: string;
 }
 
@@ -135,7 +135,7 @@ export default function GalleryDetailPage() {
           }),
         });
         const urlData = await urlRes.json() as {
-          signedUrl: string; token: string; storageKey: string; cdnUrl: string;
+          signedUrl: string; token: string; storageKey: string; cdnUrl: string | null;
           fileName: string; originalName: string; mimeType: string; fileSize: number; mediaType: string;
           error?: string;
         };

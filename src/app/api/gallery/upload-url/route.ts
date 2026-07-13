@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { ensurePrivateBucket, PRIVATE_MEDIA_BUCKET } from "@/lib/gallery-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,8 +93,11 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // S4: gallery media lives in the PRIVATE bucket — viewing/downloading
+    // happens through short-lived signed URLs, never public links.
+    await ensurePrivateBucket();
     const { data, error } = await adminClient.storage
-      .from("galleries")
+      .from(PRIVATE_MEDIA_BUCKET)
       .createSignedUploadUrl(storageKey);
 
     if (error || !data) {
@@ -101,16 +105,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not create upload URL" }, { status: 500 });
     }
 
-    // Public CDN URL (available after upload completes)
-    const { data: { publicUrl } } = adminClient.storage
-      .from("galleries")
-      .getPublicUrl(storageKey);
-
     return NextResponse.json({
       signedUrl: data.signedUrl,
       token: data.token,
       storageKey,
-      cdnUrl: publicUrl,
+      cdnUrl: null, // private bucket — no public URL exists (by design)
       fileName: safeName,
       originalName: fileName,
       mimeType,

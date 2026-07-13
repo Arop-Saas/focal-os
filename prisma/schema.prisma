@@ -694,6 +694,7 @@ model Job {
   status          JobStatus  @default(PENDING)
   scheduledAt     DateTime?
   estimatedDurationMins Int  @default(90)
+  deliveredAt   DateTime?   // set once on first delivery (SLA: shoot → delivery)
   actualStartAt   DateTime?
   actualEndAt     DateTime?
 
@@ -939,7 +940,8 @@ model Gallery {
 
   // Access
   isPublic        Boolean       @default(false)
-  password        String?
+  password        String?       // LEGACY plaintext — migrated to passwordHash on first use
+  passwordHash    String?       // scrypt hash (S4)
   expiresAt       DateTime?
 
   // Delivery

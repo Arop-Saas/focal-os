@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { runDeliverySideEffects } from "@/lib/delivery";
+import { hashGalleryPassword, verifyGalleryPassword, mediaViewUrl } from "@/lib/gallery-security";
 import { router, workspaceProcedure, publicProcedure } from "../trpc";
 import { slugify } from "@/lib/utils";
 import { notifyJobDelivered } from "@/lib/notify";
@@ -84,7 +86,8 @@ export const galleryRouter = router({
           name: input.name,
           slug,
           isPublic: input.isPublic,
-          password: input.password || null,
+          password: null,
+          passwordHash: input.password ? hashGalleryPassword(input.password) : null,
           downloadEnabled: input.downloadEnabled,
           watermarkEnabled: input.watermarkEnabled,
           expiresAt: input.expiresAt || null,
@@ -107,7 +110,13 @@ export const galleryRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
+      const { id, password, ...rest } = input;
+      // S4: passwords are stored hashed; plaintext column stays null.
+      const data: typeof rest & { password?: null; passwordHash?: string | null } = { ...rest };
+      if (password !== undefined) {
+        data.password = null;
+        data.passwordHash = password ? hashGalleryPassword(password) : null;
+      }
       const gallery = await ctx.prisma.gallery.findFirst({
         where: { id, workspaceId: ctx.workspace.id },
       });
@@ -127,7 +136,7 @@ export const galleryRouter = router({
         width: z.number().optional(),
         height: z.number().optional(),
         storageKey: z.string(),
-        cdnUrl: z.string(),
+        cdnUrl: z.string().nullish(), // null for private-bucket media (S4)
         mediaType: z
           .enum(["PHOTO", "VIDEO", "DRONE_PHOTO", "DRONE_VIDEO", "FLOOR_PLAN", "VIRTUAL_TOUR"])
           .default("PHOTO"),
@@ -163,7 +172,7 @@ export const galleryRouter = router({
           width: input.width,
           height: input.height,
           storageKey: input.storageKey,
-          cdnUrl: input.cdnUrl,
+          cdnUrl: input.cdnUrl ?? null,
           mediaType: input.mediaType,
           isCover: input.isCover,
           sortOrder: count,
@@ -303,23 +312,21 @@ export const galleryRouter = router({
         data: { status: "DELIVERED", isPublic: true },
       });
 
-      // Update job to DELIVERED
       await ctx.prisma.job.update({
         where: { id: gallery.jobId },
-        data: { status: "DELIVERED" },
+        data: {
+          status: "DELIVERED",
+          statusHistory: { create: { status: "DELIVERED", changedBy: ctx.user.id } },
+        },
       });
 
-      // Fire delivery notification (fire-and-forget)
-      const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/g/${gallery.slug}`;
-      notifyJobDelivered({
+      // ONE delivery pipeline (same as jobs.update → DELIVERED):
+      // deliveredAt SLA stamp + delivery email + invoice-on-delivery.
+      void runDeliverySideEffects(ctx.prisma, {
         workspaceId: ctx.workspace.id,
         jobId: gallery.jobId,
-        clientEmail: gallery.job.client.email,
-        clientName: `${gallery.job.client.firstName} ${gallery.job.client.lastName}`,
-        jobNumber: gallery.job.jobNumber,
-        propertyAddress: gallery.job.propertyAddress,
-        galleryUrl: shareUrl,
-      }).catch(console.error);
+        userId: ctx.user.id,
+      });
 
       return updated;
     }),
@@ -352,7 +359,7 @@ export const galleryRouter = router({
       const gallery = await ctx.prisma.gallery.findUnique({
         where: { slug: input.slug },
         include: {
-          workspace: { select: { name: true, logoUrl: true, brandColor: true, stripeSecretKey: true, showBranding: true } as any },
+          workspace: { select: { name: true, logoUrl: true, brandColor: true, stripeSecretKey: true, stripeAccountId: true, showBranding: true } as any },
           job: {
             select: {
               propertyAddress: true, propertyCity: true, propertyState: true,
@@ -364,6 +371,7 @@ export const galleryRouter = router({
             select: {
               id: true,
               cdnUrl: true,
+              storageKey: true,
               originalName: true,
               width: true,
               height: true,
@@ -392,13 +400,26 @@ export const galleryRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "This gallery has expired." });
       }
 
-      // Password check
-      if (gallery.password) {
+      // Password check — hashed (S4); legacy plaintext verifies once and
+      // upgrades itself in place.
+      const storedHash = (gallery as { passwordHash?: string | null }).passwordHash;
+      if (storedHash || gallery.password) {
         if (!input.password) {
           return { requiresPassword: true as const, gallery: null };
         }
-        if (input.password !== gallery.password) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Incorrect password." });
+        if (storedHash) {
+          if (!verifyGalleryPassword(input.password, storedHash)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Incorrect password." });
+          }
+        } else if (gallery.password) {
+          if (input.password !== gallery.password) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Incorrect password." });
+          }
+          // lazy upgrade to hash
+          void ctx.prisma.gallery.update({
+            where: { slug: input.slug },
+            data: { password: null, passwordHash: hashGalleryPassword(input.password) },
+          }).catch(() => {});
         }
       }
 
@@ -414,7 +435,7 @@ export const galleryRouter = router({
       }).catch(() => {});
 
       // Strip secret key from workspace before returning
-      const { stripeSecretKey: _secret, ...workspacePublic } = gallery.workspace;
+      const { stripeSecretKey: _secret, stripeAccountId: _acct, ...workspacePublic } = gallery.workspace as typeof gallery.workspace & { stripeAccountId?: string | null };
 
       return {
         requiresPassword: false as const,
@@ -423,7 +444,7 @@ export const galleryRouter = router({
           invoiceId: invoice.id,
           amountDue: invoice.amountDue,
           totalAmount: invoice.totalAmount,
-          hasStripe: !!_secret,
+          hasStripe: !!_secret || !!(gallery.workspace as { stripeAccountId?: string | null }).stripeAccountId,
         } : null,
         gallery: {
           id: gallery.id,
@@ -437,8 +458,16 @@ export const galleryRouter = router({
           propertyCity: gallery.job.propertyCity,
           propertyState: gallery.job.propertyState,
           workspace: workspacePublic,
-          // If unpaid: return media for blur preview but flag them
-          media: gallery.media,
+          // S4: private-bucket media is served via short-lived SIGNED view
+          // URLs (legacy public media passes through). Downloads never use
+          // these — they go through /api/gallery/download, which re-checks
+          // password + payment server-side.
+          media: await Promise.all(
+            gallery.media.map(async (m) => ({
+              ...m,
+              cdnUrl: await mediaViewUrl(m),
+            }))
+          ),
         },
       };
     }),

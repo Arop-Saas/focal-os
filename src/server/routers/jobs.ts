@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loader";
-import { createInvoiceForJob, InvoiceExistsError } from "@/lib/money/invoice";
+import { runDeliverySideEffects } from "@/lib/delivery";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
 import {
@@ -10,7 +10,6 @@ import {
   notifyJobAssigned,
   notifyJobCancelled,
   notifyJobDelivered,
-  notifyInvoiceSent,
 } from "@/lib/notify";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "@/lib/gcal";
 
@@ -493,59 +492,13 @@ export const jobsRouter = router({
             packageName: fullJob.services[0]?.service?.name ?? "Photography",
           });
         } else if (status === "DELIVERED") {
-          // C2 fix: the public gallery route is /g/[slug] — link the real
-          // slug (falls back to the portal when no gallery exists yet).
-          const galleryRec = await ctx.prisma.gallery.findFirst({
-            where: { jobId: id },
-            select: { slug: true },
-          });
-          const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
-          void notifyJobDelivered({
+          // ONE delivery pipeline for every path (also used by gallery.publish):
+          // deliveredAt SLA stamp + delivery email + invoice-on-delivery.
+          void runDeliverySideEffects(ctx.prisma, {
             workspaceId: ctx.workspace.id,
             jobId: id,
             userId: ctx.user.id,
-            clientEmail,
-            clientName,
-            jobNumber: fullJob.jobNumber,
-            propertyAddress: fullJob.propertyAddress,
-            galleryUrl: galleryRec?.slug ? `${base}/g/${galleryRec.slug}` : `${base}/portal`,
           });
-
-          // ── S3: invoice-on-delivery (Build Brief W6) ────────────────────
-          const wsMoney = await ctx.prisma.workspace.findUnique({
-            where: { id: ctx.workspace.id },
-            select: { autoCreateInvoice: true },
-          });
-          if (wsMoney?.autoCreateInvoice) {
-            try {
-              const created = await createInvoiceForJob(ctx.prisma, {
-                workspaceId: ctx.workspace.id,
-                jobId: id,
-              });
-              const payLink = `${base}/pay/${created.payToken ?? created.id}`;
-              await ctx.prisma.invoice.update({
-                where: { id: created.id },
-                data: { status: "SENT", issuedAt: new Date(), paymentLink: payLink },
-              });
-              if (created.clientEmail) {
-                void notifyInvoiceSent({
-                  workspaceId: ctx.workspace.id,
-                  jobId: id,
-                  userId: ctx.user.id,
-                  clientEmail: created.clientEmail,
-                  clientName: created.clientName,
-                  invoiceNumber: created.invoiceNumber,
-                  amount: created.totalAmount,
-                  dueDate: created.dueAt,
-                  paymentLink: payLink,
-                });
-              }
-            } catch (e) {
-              if (!(e instanceof InvoiceExistsError)) {
-                console.error("invoice-on-delivery failed:", e);
-              }
-            }
-          }
         }
       }
 

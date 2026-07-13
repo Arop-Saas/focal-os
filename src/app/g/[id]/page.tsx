@@ -186,12 +186,27 @@ async function downloadFile(url: string, filename: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
+/**
+ * S4: downloads go through the SERVER gate (/api/gallery/download), which
+ * re-checks password + payment before minting a 60s signed URL. Grabbing a
+ * viewing URL from the DOM no longer yields a permanent download link.
+ */
+async function downloadViaGate(slug: string, mediaId: string, pw?: string) {
+  const qs = new URLSearchParams({ slug, id: mediaId, ...(pw ? { pw } : {}) });
+  const res = await fetch(`/api/gallery/download?${qs.toString()}`);
+  const data = (await res.json()) as { url?: string; filename?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? "Download failed");
+  await downloadFile(data.url, data.filename ?? "photo");
+}
+
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 
 function Lightbox({
   media,
   index,
   downloadEnabled,
+  slug,
+  pw,
   onClose,
   onPrev,
   onNext,
@@ -199,6 +214,8 @@ function Lightbox({
   media: MediaItem[];
   index: number;
   downloadEnabled: boolean;
+  slug: string;
+  pw?: string;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -227,7 +244,7 @@ function Lightbox({
         <div className="flex items-center gap-3">
           {downloadEnabled && item.cdnUrl && (
             <button
-              onClick={() => downloadFile(item.cdnUrl!, item.originalName)}
+              onClick={() => void downloadViaGate(slug, item.id, pw)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors"
             >
               ↓ Download
@@ -270,7 +287,9 @@ function Lightbox({
 function GalleryView({
   gallery,
   paymentInfo,
+  pw,
 }: {
+  pw?: string;
   gallery: {
     id: string;
     name: string;
@@ -311,7 +330,7 @@ function GalleryView({
     for (let i = 0; i < downloadable.length; i++) {
       const item = downloadable[i];
       if (item.cdnUrl) {
-        await downloadFile(item.cdnUrl, item.originalName);
+        await downloadViaGate(gallery.slug, item.id, pw).catch(() => {});
         setDownloadProgress({ done: i + 1, total: downloadable.length });
         // Small delay to avoid browser blocking multiple downloads
         if (i < downloadable.length - 1) await new Promise((r) => setTimeout(r, 400));
@@ -465,7 +484,7 @@ function GalleryView({
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100">
                   {canDownload && photo.cdnUrl && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); downloadFile(photo.cdnUrl!, photo.originalName); }}
+                      onClick={(e) => { e.stopPropagation(); void downloadViaGate(gallery.slug, photo.id, pw); }}
                       className="bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1 rounded-lg font-medium backdrop-blur-sm transition-colors"
                     >
                       ↓
@@ -492,7 +511,7 @@ function GalleryView({
                   <p className="text-xs text-gray-400 truncate">{video.originalName}</p>
                   {canDownload && video.cdnUrl && (
                     <button
-                      onClick={() => downloadFile(video.cdnUrl!, video.originalName)}
+                      onClick={() => void downloadViaGate(gallery.slug, video.id, pw)}
                       className="ml-2 shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
                     >
                       ↓ Save
@@ -526,7 +545,7 @@ function GalleryView({
                   <p className="text-xs text-gray-400 truncate">{fp.originalName}</p>
                   {canDownload && fp.cdnUrl && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); downloadFile(fp.cdnUrl!, fp.originalName); }}
+                      onClick={(e) => { e.stopPropagation(); void downloadViaGate(gallery.slug, fp.id, pw); }}
                       className="ml-2 shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
                     >
                       ↓ Save
@@ -564,6 +583,8 @@ function GalleryView({
           media={activeTab === "photos" ? photos : floorplans}
           index={lightboxIndex}
           downloadEnabled={canDownload}
+          slug={gallery.slug}
+          pw={pw}
           onClose={() => setLightboxIndex(null)}
           onPrev={() => setLightboxIndex((i) => Math.max(0, (i ?? 0) - 1))}
           onNext={() => setLightboxIndex((i) => Math.min(activeMedia.length - 1, (i ?? 0) + 1))}
@@ -651,6 +672,7 @@ export default function GalleryPage() {
         </div>
       )}
       <GalleryView
+        pw={password}
         gallery={data.gallery as Parameters<typeof GalleryView>[0]["gallery"]}
         paymentInfo={paymentInfo}
       />
