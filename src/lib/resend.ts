@@ -73,7 +73,12 @@ export async function trackedSend(
 export async function retryFailedEmails(maxAttempts = 3): Promise<number> {
   const failed = await prisma.emailOutbox.findMany({
     where: {
-      status: "FAILED",
+      // FAILED sends, plus PENDING rows that never resolved — a serverless
+      // function can die between "row created" and "status updated".
+      OR: [
+        { status: "FAILED" },
+        { status: "PENDING", createdAt: { lt: new Date(Date.now() - 10 * 60e3) } },
+      ],
       attempts: { lt: maxAttempts },
       html: { not: null },
       createdAt: { gte: new Date(Date.now() - 72 * 3600e3) },

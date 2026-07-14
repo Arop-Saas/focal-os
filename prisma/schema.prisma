@@ -1201,6 +1201,40 @@ enum FeatureRequestCategory {
   INTEGRATIONS
 }
 
+model TimeEntry {
+  id          String   @id @default(cuid())
+  workspaceId String
+  staffId     String
+  jobId       String?
+  startedAt   DateTime
+  endedAt     DateTime
+  minutes     Int
+  source      String   @default("CLOCK") // CLOCK | MANUAL
+
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, startedAt])
+  @@index([staffId, startedAt])
+}
+
+model MileageEntry {
+  id          String   @id @default(cuid())
+  workspaceId String
+  staffId     String
+  jobId       String?
+  date        DateTime
+  fromAddress String?
+  toAddress   String?
+  distanceKm  Float
+  source      String   @default("AUTO") // AUTO (drive-time engine) | MANUAL
+
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, date])
+  @@index([staffId, date])
+  @@index([jobId])
+}
+
 model EmailOutbox {
   id          String   @id @default(cuid())
   workspaceId String

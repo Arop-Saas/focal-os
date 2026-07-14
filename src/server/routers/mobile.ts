@@ -536,11 +536,77 @@ export const mobileRouter = router({
       if (!job) throw new TRPCError({ code: "NOT_FOUND" });
       if (!job.actualStartAt) throw new TRPCError({ code: "BAD_REQUEST", message: "Not clocked in yet." });
 
-      return ctx.prisma.job.update({
+      const endedAt = new Date();
+      const updated = await ctx.prisma.job.update({
         where: { id: input.jobId },
-        data: { actualEndAt: new Date() },
+        data: { actualEndAt: endedAt },
         select: { id: true, actualStartAt: true, actualEndAt: true },
       });
+
+      // ── S6 (Build Brief W3): clock-out auto-creates the payroll records ──
+      // Time entry from the actual clock window; mileage from the previous
+      // job today (or home base) to this property, via the drive-time engine.
+      try {
+        const existing = await ctx.prisma.timeEntry.findFirst({
+          where: { jobId: job.id, staffId: ctx.staffProfile.id },
+          select: { id: true },
+        });
+        if (!existing) {
+          const minutes = Math.max(1, Math.round((endedAt.getTime() - job.actualStartAt.getTime()) / 60000));
+          await ctx.prisma.timeEntry.create({
+            data: {
+              workspaceId: job.workspaceId,
+              staffId: ctx.staffProfile.id,
+              jobId: job.id,
+              startedAt: job.actualStartAt,
+              endedAt,
+              minutes,
+              source: "CLOCK",
+            },
+          });
+
+          // Previous location: latest job today (same staff) that ended
+          // before this one started; falls back to the home base.
+          const dayStart = new Date(job.actualStartAt); dayStart.setHours(0, 0, 0, 0);
+          const prev = await ctx.prisma.job.findFirst({
+            where: {
+              workspaceId: job.workspaceId,
+              id: { not: job.id },
+              actualEndAt: { gte: dayStart, lte: job.actualStartAt },
+              assignments: { some: { staffId: ctx.staffProfile.id } },
+            },
+            orderBy: { actualEndAt: "desc" },
+            select: { propertyAddress: true, propertyCity: true, propertyState: true, propertyZip: true },
+          });
+          const fromAddress = prev
+            ? [prev.propertyAddress, prev.propertyCity, prev.propertyState, prev.propertyZip].filter(Boolean).join(", ")
+            : ctx.staffProfile.homeAddress ?? null;
+          const toAddress = [job.propertyAddress, job.propertyCity, job.propertyState, job.propertyZip]
+            .filter(Boolean).join(", ");
+          if (fromAddress && toAddress && fromAddress !== toAddress) {
+            const { getTravelTime } = await import("@/lib/scheduling/travel-time");
+            const t = await getTravelTime(fromAddress, toAddress);
+            if (t.distanceKm > 0) {
+              await ctx.prisma.mileageEntry.create({
+                data: {
+                  workspaceId: job.workspaceId,
+                  staffId: ctx.staffProfile.id,
+                  jobId: job.id,
+                  date: endedAt,
+                  fromAddress,
+                  toAddress,
+                  distanceKm: t.distanceKm,
+                  source: "AUTO",
+                },
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error("clockOut bookkeeping failed:", e);
+      }
+
+      return updated;
     }),
 
   // Mark job complete

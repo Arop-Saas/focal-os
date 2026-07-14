@@ -10,6 +10,7 @@ import { bookingRouter } from "./booking";
 import { galleryRouter } from "./gallery";
 import { notificationsRouter } from "./notifications";
 import { availabilityRouter } from "./availability";
+import { timesheetRouter } from "./timesheet";
 import { territoriesRouter } from "./territories";
 import { messagesRouter } from "./messages";
 import { checklistRouter } from "./checklist";
@@ -33,6 +34,7 @@ export const appRouter = router({
   gallery: galleryRouter,
   notifications: notificationsRouter,
   availability: availabilityRouter,
+  timesheet: timesheetRouter,
   territories: territoriesRouter,
   messages: messagesRouter,
   checklist: checklistRouter,

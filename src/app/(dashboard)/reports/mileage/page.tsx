@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
@@ -22,8 +22,47 @@ export default function MileagePage() {
   const [dateTo, setDateTo] = useState(PRESETS[0].to);
   const [irsRate, setIrsRate] = useState(String(IRS_DEFAULT_RATE));
   const [groupByStaff, setGroupByStaff] = useState(false);
-  // Per-job mileage state: { [jobId]: number }
+  // Per-job mileage state: { [jobId]: miles-as-string }
   const [jobMileage, setJobMileage] = useState<Record<string, string>>({});
+
+  // ── S6: REAL mileage records (A6 fixed — this page used to forget
+  // everything on refresh). AUTO rows come from photographer clock-outs
+  // (drive-time engine, previous job → this job); edits here persist as
+  // MANUAL rows that take precedence.
+  const KM_TO_MI = 0.621371;
+  const entriesQuery = trpc.timesheet.listMileage.useQuery({ dateFrom, dateTo });
+  const setMileageMutation = trpc.timesheet.setJobMileage.useMutation({
+    onSuccess: () => entriesQuery.refetch(),
+  });
+  useEffect(() => {
+    if (!entriesQuery.data) return;
+    const byJob: Record<string, { km: number; manual: boolean }> = {};
+    for (const e of entriesQuery.data) {
+      if (!e.jobId) continue;
+      const cur = byJob[e.jobId];
+      const isManual = e.source === "MANUAL";
+      if (!cur || (isManual && !cur.manual)) byJob[e.jobId] = { km: e.distanceKm, manual: isManual };
+    }
+    setJobMileage((prev) => {
+      const next = { ...prev };
+      for (const [jobId, v] of Object.entries(byJob)) {
+        if (next[jobId] === undefined || next[jobId] === "") {
+          next[jobId] = (v.km * KM_TO_MI).toFixed(1);
+        }
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entriesQuery.data]);
+
+  const persistMileage = (jobId: string, scheduledAt: string | Date | null) => {
+    const miles = parseFloat(jobMileage[jobId] || "0") || 0;
+    setMileageMutation.mutate({
+      jobId,
+      distanceKm: parseFloat((miles / KM_TO_MI).toFixed(2)),
+      date: scheduledAt ? new Date(scheduledAt) : new Date(),
+    });
+  };
 
   const { data, isLoading } = trpc.jobs.list.useQuery({
     page: 1,
@@ -121,6 +160,7 @@ export default function MileagePage() {
               step="0.1"
               value={jobMileage[j.id] ?? ""}
               onChange={(e) => setJobMileage((prev) => ({ ...prev, [j.id]: e.target.value }))}
+              onBlur={() => persistMileage(j.id, j.scheduledAt)}
               placeholder="0"
               className="w-20 border border-gray-200 rounded-md px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
