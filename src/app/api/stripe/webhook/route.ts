@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
             stripeEventId: event.id,
             amount: amountPaid,
             method: "CARD",
-            status: "COMPLETED",
+            status: "SUCCEEDED",
             stripePaymentId: (session.payment_intent as string) ?? null,
             paidAt,
             notes: event.account ? `Connect acct ${event.account}` : null,

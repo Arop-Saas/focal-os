@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Workspace } from "@prisma/client";
 import { api } from "@/lib/trpc/client";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";

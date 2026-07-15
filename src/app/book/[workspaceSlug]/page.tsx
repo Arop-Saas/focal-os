@@ -440,7 +440,7 @@ function Step1Property({
                 <p className="text-sm font-medium text-red-800">Outside our service area</p>
                 <p className="text-xs text-red-600 mt-0.5">
                   Unfortunately, this address is beyond our maximum service distance. Please try a different address or contact us directly to make arrangements.
-                  {outsideInfo?.distanceKm ? ` (${outsideInfo.distanceKm.toFixed(1)}km from nearest service area)` : ""}
+                  {outsideDistanceKm ? ` (${outsideDistanceKm.toFixed(1)}km from nearest service area)` : ""}
                 </p>
               </div>
             </div>
