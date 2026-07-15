@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
+import { TimeOffManager } from "@/components/availability/time-off-manager";
 import { AvailabilityTabs } from "@/components/availability/availability-tabs";
 
 export const metadata = { title: "Availability" };
@@ -97,6 +98,7 @@ export default async function AvailabilityPage() {
           }))}
           staffMembers={staffMembers}
         />
+        <TimeOffManager />
       </div>
     </div>
   );

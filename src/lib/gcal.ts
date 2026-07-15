@@ -5,7 +5,12 @@
 
 import { google } from "googleapis";
 
-const SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/calendar.events",
+  // S7: read-back — lets the scheduling engine treat external calendar
+  // events as busy time. Existing connections need a reconnect to grant it.
+  "https://www.googleapis.com/auth/calendar.readonly",
+];
 
 // ─── OAuth2 Client ────────────────────────────────────────────────────────────
 
@@ -126,5 +131,41 @@ export async function updateCalendarEvent(
   } catch (err) {
     console.error("[gcal] updateCalendarEvent error:", err);
     return false;
+  }
+}
+
+
+/**
+ * S7 (B6): busy ranges from the photographer's Google Calendar.
+ * Fails soft — any error (incl. missing readonly scope on old
+ * connections) returns [] so slot generation never breaks.
+ */
+export async function getBusyRanges(
+  refreshToken: string,
+  calendarId: string | null | undefined,
+  timeMin: Date,
+  timeMax: Date
+): Promise<{ startsAt: Date; endsAt: Date }[]> {
+  try {
+    const auth = getOAuthClient();
+    auth.setCredentials({ refresh_token: refreshToken });
+    const calendar = google.calendar({ version: "v3", auth });
+    const res = await Promise.race([
+      calendar.freebusy.query({
+        requestBody: {
+          timeMin: timeMin.toISOString(),
+          timeMax: timeMax.toISOString(),
+          items: [{ id: calendarId || "primary" }],
+        },
+      }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("freebusy timeout")), 3000)),
+    ]);
+    const busy = (res as { data?: { calendars?: Record<string, { busy?: { start?: string | null; end?: string | null }[] }> } })
+      ?.data?.calendars?.[calendarId || "primary"]?.busy ?? [];
+    return busy
+      .filter((b) => b.start && b.end)
+      .map((b) => ({ startsAt: new Date(b.start!), endsAt: new Date(b.end!) }));
+  } catch {
+    return [];
   }
 }

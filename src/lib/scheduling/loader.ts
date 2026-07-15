@@ -16,6 +16,7 @@ import {
 } from "./engine";
 import { wallDayUtcRange, utcToWallDateISO } from "./tz";
 import { getTravelTime } from "./travel-time";
+import { getBusyRanges } from "@/lib/gcal";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -77,7 +78,7 @@ export async function loadEngineStaff(db: Db, args: LoadStaffArgs): Promise<Engi
       ...(args.staffProfileId ? { id: args.staffProfileId } : {}),
     },
     include: {
-      member: { include: { user: { select: { fullName: true, email: true, avatarUrl: true } } } },
+      member: { include: { user: { select: { fullName: true, email: true, avatarUrl: true, googleRefreshToken: true, googleCalendarId: true } } } },
       availability: { where: { dayOfWeek } },
       timeOffEntries: {
         where: { startsAt: { lt: end }, endsAt: { gt: start } },
@@ -101,6 +102,18 @@ export async function loadEngineStaff(db: Db, args: LoadStaffArgs): Promise<Engi
       },
     },
   });
+
+  // S7 (B6): external Google Calendar events count as busy time — merged
+  // into timeOff so the engine can never double-book against them.
+  const busyByStaff = new Map<string, { startsAt: Date; endsAt: Date }[]>();
+  await Promise.all(
+    profiles.map(async (p) => {
+      const token = p.member?.user?.googleRefreshToken;
+      if (!token) return;
+      const busy = await getBusyRanges(token, p.member?.user?.googleCalendarId, start, end);
+      if (busy.length) busyByStaff.set(p.id, busy);
+    })
+  );
 
   return profiles
     .filter((p) => {
@@ -132,7 +145,7 @@ export async function loadEngineStaff(db: Db, args: LoadStaffArgs): Promise<Engi
         avatarUrl: p.member?.user?.avatarUrl ?? null,
         window: win ? { startTime: win.startTime, endTime: win.endTime } : null,
         jobs,
-        timeOff: p.timeOffEntries,
+        timeOff: [...p.timeOffEntries, ...(busyByStaff.get(p.id) ?? [])],
         homeAddress: p.homeAddress ?? null,
         maxJobsPerDay: p.maxJobsPerDay ?? null,
       } satisfies EngineStaff;

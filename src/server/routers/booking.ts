@@ -627,6 +627,39 @@ export const bookingRouter = router({
       const clientName = `${input.firstName} ${input.lastName}`;
       const pkgName = pkg?.name ?? (alaCarteServices.length > 0 ? alaCarteServices.map((s) => s.name).join(", ") : "");
 
+      // ── S7 (B6): client bookings now land on the photographer's Google
+      // Calendar immediately (previously only admin-assigned jobs did).
+      if (input.staffProfileId) {
+        void (async () => {
+          try {
+            const staff = await ctx.prisma.staffProfile.findUnique({
+              where: { id: input.staffProfileId! },
+              include: { member: { include: { user: { select: { googleRefreshToken: true, googleCalendarId: true } } } } },
+            });
+            const token = staff?.member?.user?.googleRefreshToken;
+            if (!token) return;
+            const { createCalendarEvent } = await import("@/lib/gcal");
+            const durationMins = result.job.estimatedDurationMins ?? 60;
+            const eventId = await createCalendarEvent(token, {
+              title: `📷 Shoot — ${input.propertyAddress}`,
+              description: `Job ${result.job.jobNumber} · booked online by ${input.firstName} ${input.lastName}`,
+              startAt: scheduledAt,
+              endAt: new Date(scheduledAt.getTime() + durationMins * 60000),
+              location: targetAddress,
+              calendarId: staff?.member?.user?.googleCalendarId ?? undefined,
+            });
+            if (eventId) {
+              await ctx.prisma.jobAssignment.updateMany({
+                where: { jobId: result.job.id, staffId: input.staffProfileId! },
+                data: { gcalEventId: String(eventId) },
+              });
+            }
+          } catch (e) {
+            console.error("booking gcal push failed:", e);
+          }
+        })();
+      }
+
       if (confirmationMode === "IMMEDIATE") {
         // Auto-confirm: send confirmation email to client + in-app notification
         notifyJobBooked({
