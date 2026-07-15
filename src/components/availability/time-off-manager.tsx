@@ -10,9 +10,12 @@ import { trpc } from "@/lib/trpc/client";
 import { format } from "date-fns";
 import { Palmtree, Plus, Trash2 } from "lucide-react";
 
-export function TimeOffManager() {
+export function TimeOffManager({
+  staffMembers,
+}: {
+  staffMembers: { id: string; name: string | null }[];
+}) {
   const utils = trpc.useUtils();
-  const staffQuery = trpc.staff.list.useQuery();
   const listQuery = trpc.availability.listTimeOff.useQuery({});
   const addMutation = trpc.availability.addTimeOff.useMutation({
     onSuccess: () => { utils.availability.listTimeOff.invalidate(); setStart(""); setEnd(""); setReason(""); },
@@ -26,12 +29,7 @@ export function TimeOffManager() {
   const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
 
-  const staffOptions = (staffQuery.data ?? [])
-    .filter((m: { staffProfile?: { id: string } | null }) => m.staffProfile?.id)
-    .map((m: { staffProfile?: { id: string } | null; user?: { fullName?: string | null; email?: string | null } | null }) => ({
-      id: m.staffProfile!.id,
-      name: m.user?.fullName ?? m.user?.email ?? "Team member",
-    }));
+  const staffOptions = staffMembers.map((m) => ({ id: m.id, name: m.name ?? "Team member" }));
 
   const canAdd = staffId && start && end && new Date(end) > new Date(start);
 

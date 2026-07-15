@@ -98,7 +98,7 @@ export default async function AvailabilityPage() {
           }))}
           staffMembers={staffMembers}
         />
-        <TimeOffManager />
+        <TimeOffManager staffMembers={staffMembers.map((m) => ({ id: m.id, name: m.name }))} />
       </div>
     </div>
   );
