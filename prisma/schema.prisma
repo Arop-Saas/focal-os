@@ -104,6 +104,8 @@ model Workspace {
   orderForms       OrderForm[]
   coupons          Coupon[]
   workspaceRoles   WorkspaceRole[]
+  portalSessions   PortalSession[]
+  clientCredits    ClientCredit[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -465,10 +467,13 @@ model Client {
   // Portal
   portalAccessedAt DateTime?
   passwordHash     String?
+  portalRevokedAt  DateTime?      // S8: tokens/sessions issued before this instant are dead
 
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   jobs          Job[]
   invoices      Invoice[]
+  portalSessions PortalSession[]
+  credits        ClientCredit[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1307,4 +1312,47 @@ model FeatureRequestComment {
 
   @@index([featureRequestId])
   @@index([authorId])
+}
+// ─────────────────────────────────────────────────────────────
+// S8: revocable client portal sessions (R8)
+// Opaque token in cookie → sha256 hash here. Revoke = kill row.
+// ─────────────────────────────────────────────────────────────
+model PortalSession {
+  id          String    @id @default(cuid())
+  workspaceId String
+  clientId    String
+  tokenHash   String    @unique // sha256(base64url token); raw token never stored
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  lastSeenAt  DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([workspaceId, expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// S8: client credit ledger (B9). Client.creditBalance is the
+// derived cache; every change writes a ledger row in the same tx.
+// amount > 0 grant, amount < 0 application/adjustment.
+// ─────────────────────────────────────────────────────────────
+model ClientCredit {
+  id          String   @id @default(cuid())
+  workspaceId String
+  clientId    String
+  amount      Float
+  reason      String?
+  invoiceId   String?  // set when applied to an invoice
+  createdById String?  // admin user; null = system (e.g. auto-apply)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@index([workspaceId, createdAt])
 }

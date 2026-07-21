@@ -125,27 +125,85 @@ export async function createInvoiceForJob(
 
   const taxRate = ws.defaultTaxRate ?? 0;
   const taxAmount = parseFloat((((subtotal - discountAmount) * taxRate) / 100).toFixed(2));
-  const totalAmount = parseFloat((subtotal - discountAmount + taxAmount).toFixed(2));
+  const grossTotal = parseFloat((subtotal - discountAmount + taxAmount).toFixed(2));
   const dueAt = new Date(Date.now() + (ws.invoiceDueDays ?? 30) * 24 * 3600e3);
 
-  const invoice = await db.invoice.create({
-    data: {
-      workspaceId: args.workspaceId,
-      invoiceNumber,
-      payToken: randomUUID(),
-      clientId: job.clientId,
-      jobId: job.id,
-      subtotal,
-      taxRate,
-      taxAmount,
-      discountAmount,
-      totalAmount,
-      amountDue: totalAmount,
-      dueAt,
-      lineItems: { create: lineItems },
-    },
-    select: { id: true, invoiceNumber: true, totalAmount: true, payToken: true },
-  });
+  // ── S8 (B9): auto-apply available client credit ─────────────────────────
+  // Guarded decrement first (never lets the cached balance go negative even
+  // under concurrent invoicing), then the invoice line + ledger row. When db
+  // is a transaction client the whole block is atomic; standalone, the
+  // catch-block compensation restores the balance if invoice creation fails.
+  let creditApplied = 0;
+  const availableCredit = parseFloat((job.client.creditBalance ?? 0).toFixed(2));
+  if (availableCredit > 0 && grossTotal > 0) {
+    const toApply = Math.min(availableCredit, grossTotal);
+    const guarded = await db.client.updateMany({
+      where: { id: job.clientId, creditBalance: { gte: toApply } },
+      data: { creditBalance: { decrement: toApply } },
+    });
+    if (guarded.count === 1) {
+      creditApplied = toApply;
+      lineItems.push({
+        description: "Account credit applied",
+        quantity: 1,
+        unitPrice: -creditApplied,
+        totalPrice: -creditApplied,
+        sortOrder: lineItems.length,
+      });
+    }
+  }
+
+  const totalAmount = parseFloat((grossTotal - creditApplied).toFixed(2));
+
+  // Arrow-const (not a hoisted declaration) so TS keeps the `job` null-check
+  // narrowing from the top of the function inside the closure.
+  const createInvoiceRow = async () =>
+    db.invoice.create({
+      data: {
+        workspaceId: args.workspaceId,
+        invoiceNumber,
+        payToken: randomUUID(),
+        clientId: job.clientId,
+        jobId: job.id,
+        subtotal,
+        taxRate,
+        taxAmount,
+        discountAmount,
+        totalAmount,
+        amountDue: totalAmount,
+        dueAt,
+        lineItems: { create: lineItems },
+      },
+      select: { id: true, invoiceNumber: true, totalAmount: true, payToken: true },
+    });
+
+  let invoice: { id: string; invoiceNumber: string; totalAmount: number; payToken: string | null };
+  try {
+    invoice = await createInvoiceRow();
+  } catch (e) {
+    if (creditApplied > 0) {
+      // Give the credit back — the invoice never came to exist.
+      await db.client
+        .update({
+          where: { id: job.clientId },
+          data: { creditBalance: { increment: creditApplied } },
+        })
+        .catch(() => {});
+    }
+    throw e;
+  }
+
+  if (creditApplied > 0) {
+    await db.clientCredit.create({
+      data: {
+        workspaceId: args.workspaceId,
+        clientId: job.clientId,
+        amount: -creditApplied,
+        reason: `Applied to invoice ${invoice.invoiceNumber}`,
+        invoiceId: invoice.id,
+      },
+    });
+  }
 
   return {
     ...invoice,

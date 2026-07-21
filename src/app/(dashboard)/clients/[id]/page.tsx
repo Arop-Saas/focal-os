@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { ArrowLeft, Mail, Phone, MapPin, ExternalLink, PlusCircle, Wallet, AlertCircle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PortalInviteButton } from "@/components/clients/portal-invite-button";
+import { ClientPortalCreditsManager } from "@/components/clients/client-portal-credits-manager";
 import { ClientNotesEditor } from "@/components/clients/client-notes-editor";
 import { BrokerageGroupSelector } from "@/components/clients/brokerage-group-selector";
 
@@ -184,6 +185,9 @@ export default async function ClientDetailPage({ params }: PageProps) {
               </div>
             </div>
           </div>
+
+          {/* S8: portal security + credit management */}
+          <ClientPortalCreditsManager clientId={client.id} />
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

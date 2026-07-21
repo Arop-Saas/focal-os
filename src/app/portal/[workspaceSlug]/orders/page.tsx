@@ -5,8 +5,13 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Package, ArrowRight, ShoppingCart, CheckCircle2, Circle, Clock } from "lucide-react";
 import { PortalMessageThread } from "@/components/portal/portal-message-thread";
+import { PortalRescheduleButton } from "@/components/portal/portal-reschedule-button";
 
 export const dynamic = "force-dynamic";
+
+// S8: statuses a client may move themselves + minimum notice (server re-checks)
+const PORTAL_RESCHEDULABLE = ["PENDING", "CONFIRMED", "ASSIGNED"];
+const MIN_NOTICE_MS = 24 * 3600e3;
 
 // Ordered pipeline steps (excludes off-path states like CANCELLED / ON_HOLD)
 const PIPELINE_STEPS = [
@@ -168,6 +173,17 @@ export default async function PortalOrdersPage({
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
+                      {job.scheduledAt &&
+                        PORTAL_RESCHEDULABLE.includes(job.status) &&
+                        job.scheduledAt.getTime() - Date.now() >= MIN_NOTICE_MS && (
+                          <PortalRescheduleButton
+                            workspaceSlug={params.workspaceSlug}
+                            jobId={job.id}
+                            scheduledAtISO={job.scheduledAt.toISOString()}
+                            timezone={workspace.timezone}
+                            brandColor={workspace.brandColor ?? "#3B82F6"}
+                          />
+                        )}
                       {job.gallery?.isPublic && (
                         <Link
                           href={`/g/${job.gallery.slug}`}

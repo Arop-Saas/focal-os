@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   verifyPortalToken,
-  generatePortalToken,
+  createPortalDbSession,
   PORTAL_COOKIE,
-  PORTAL_TOKEN_TTL_MS,
+  PORTAL_SESSION_TTL_SECONDS,
 } from "@/lib/portal-auth";
 import prisma from "@/lib/prisma";
 
@@ -24,6 +24,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(errorUrl("expired"));
   }
 
+  // The magic-link payload is only trusted as far as the DB confirms it:
+  // client must exist, belong to this workspace, and not be revoked since.
+  const [client, workspace] = await Promise.all([
+    prisma.client.findUnique({ where: { id: session.clientId } }),
+    prisma.workspace.findUnique({ where: { slug } }),
+  ]);
+  if (!client || !workspace || client.workspaceId !== workspace.id) {
+    return NextResponse.redirect(errorUrl("invalid"));
+  }
+  if (
+    client.portalRevokedAt &&
+    session.exp - 72 * 60 * 60 * 1000 < client.portalRevokedAt.getTime()
+  ) {
+    // Magic link minted before access was revoked — refuse it.
+    return NextResponse.redirect(errorUrl("revoked"));
+  }
+
   // Stamp portal access timestamp (fire-and-forget)
   prisma.client
     .update({
@@ -32,21 +49,22 @@ export async function GET(req: NextRequest) {
     })
     .catch(() => {});
 
-  // Issue a 7-day session cookie
-  const sessionToken = generatePortalToken({
-    ...session,
-    exp: Date.now() + PORTAL_TOKEN_TTL_MS,
+  // S8 (R8): issue a revocable server-side session instead of a stateless token.
+  const { cookieValue } = await createPortalDbSession(prisma, {
+    workspaceId: workspace.id,
+    clientId: client.id,
+    userAgent: req.headers.get("user-agent"),
   });
 
   const response = NextResponse.redirect(
     new URL(`/portal/${slug}/dashboard`, req.url)
   );
 
-  response.cookies.set(PORTAL_COOKIE, sessionToken, {
+  response.cookies.set(PORTAL_COOKIE, cookieValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: PORTAL_SESSION_TTL_SECONDS,
     path: "/",
   });
 
