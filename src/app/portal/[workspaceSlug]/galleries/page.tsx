@@ -2,7 +2,7 @@ import { requirePortalSession } from "@/lib/portal-session";
 import prisma from "@/lib/prisma";
 import { PortalNav } from "@/components/portal/portal-nav";
 import Link from "next/link";
-import { format } from "date-fns";
+import { fmtInTz, DISPLAY_DATE } from "@/lib/scheduling/tz";
 import { Images, ArrowRight, ExternalLink, Lock, Download, Eye, Calendar, MapPin, Video } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -151,7 +151,7 @@ export default async function PortalGalleriesPage({
                           {job.scheduledAt && (
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {format(new Date(job.scheduledAt), "MMM d, yyyy")}
+                              {fmtInTz(job.scheduledAt, workspace.timezone, DISPLAY_DATE)}
                             </span>
                           )}
                           {gallery.viewCount > 0 && (
@@ -169,7 +169,7 @@ export default async function PortalGalleriesPage({
                         {/* Expiry warning */}
                         {gallery.expiresAt && new Date(gallery.expiresAt) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && (
                           <p className="text-xs text-amber-600 mt-2 font-medium">
-                            ⚠ Expires {format(new Date(gallery.expiresAt), "MMM d, yyyy")}
+                            ⚠ Expires {fmtInTz(gallery.expiresAt, workspace.timezone, DISPLAY_DATE)}
                           </p>
                         )}
 
@@ -219,7 +219,7 @@ export default async function PortalGalleriesPage({
                           {job.scheduledAt && (
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {format(new Date(job.scheduledAt), "MMM d, yyyy")}
+                              {fmtInTz(job.scheduledAt, workspace.timezone, DISPLAY_DATE)}
                             </span>
                           )}
                         </div>

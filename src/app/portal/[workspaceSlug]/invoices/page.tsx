@@ -2,7 +2,7 @@ import { requirePortalSession } from "@/lib/portal-session";
 import prisma from "@/lib/prisma";
 import { PortalNav } from "@/components/portal/portal-nav";
 import { InvoicePayButton } from "@/components/portal/invoice-pay-button";
-import { format } from "date-fns";
+import { fmtInTz, DISPLAY_DATE, DISPLAY_DATE_SHORT } from "@/lib/scheduling/tz";
 import { Receipt, CheckCircle, Clock, AlertCircle, XCircle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -118,7 +118,7 @@ export default async function PortalInvoicesPage({
                           </p>
                           <p className="text-xs text-gray-400 mt-0.5 font-mono">
                             #{inv.invoiceNumber}
-                            {inv.dueAt ? ` · Due ${format(new Date(inv.dueAt), "MMM d")}` : ""}
+                            {inv.dueAt ? ` · Due ${fmtInTz(inv.dueAt, workspace.timezone, DISPLAY_DATE_SHORT)}` : ""}
                           </p>
                         </div>
                         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${cfg.color}`}>
@@ -165,10 +165,10 @@ export default async function PortalInvoicesPage({
                           {inv.job?.propertyAddress ?? "—"}
                         </td>
                         <td className="px-5 py-3.5 text-xs text-gray-500">
-                          {inv.issuedAt ? format(new Date(inv.issuedAt), "MMM d, yyyy") : "—"}
+                          {inv.issuedAt ? fmtInTz(inv.issuedAt, workspace.timezone, DISPLAY_DATE) : "—"}
                         </td>
                         <td className="px-5 py-3.5 text-xs text-gray-500">
-                          {inv.dueAt ? format(new Date(inv.dueAt), "MMM d, yyyy") : "—"}
+                          {inv.dueAt ? fmtInTz(inv.dueAt, workspace.timezone, DISPLAY_DATE) : "—"}
                         </td>
                         <td className="px-5 py-3.5 text-right text-gray-800 font-medium">
                           ${inv.totalAmount.toFixed(2)}

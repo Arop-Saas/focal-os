@@ -91,9 +91,13 @@ export async function rescheduleJob(db: Db, args: RescheduleArgs) {
     },
   });
 
-  // ── Fire-and-forget side effects (never block or fail the reschedule) ──────
+  // ── Side effects — AWAITED so they survive the serverless response freeze.
+  // On Vercel, work left running after the handler returns is killed, so a
+  // `void`ed email silently never sends. Neither call can fail the reschedule:
+  // notifyJobRescheduled swallows internally (Promise.allSettled) and
+  // syncCalendarEvents is wrapped in try/catch.
   if (oldTime && job.client?.email) {
-    void notifyJobRescheduled({
+    await notifyJobRescheduled({
       workspaceId: args.workspaceId,
       jobId: job.id,
       userId: args.notifyUserId,
@@ -106,7 +110,7 @@ export async function rescheduleJob(db: Db, args: RescheduleArgs) {
     });
   }
 
-  void syncCalendarEvents(db, job.id, args.newTime, updated.estimatedDurationMins, updated.propertyAddress);
+  await syncCalendarEvents(db, job.id, args.newTime, updated.estimatedDurationMins, updated.propertyAddress);
 
   return { job: updated, changed: true as const };
 }
@@ -137,20 +141,28 @@ async function syncCalendarEvents(
       },
     });
 
+    const updates: Promise<unknown>[] = [];
     for (const assignment of assignments) {
       const refreshToken = (assignment as any).staff.member.user.googleRefreshToken;
       const calendarId = (assignment as any).staff.member.user.googleCalendarId ?? "primary";
       const gcalEventId = (assignment as any).gcalEventId;
       if (refreshToken && gcalEventId) {
         const endAt = new Date(startAt.getTime() + (durationMins ?? 90) * 60_000);
-        updateCalendarEvent(refreshToken, gcalEventId, {
-          title: `📷 Shoot — ${propertyAddress}`,
-          startAt,
-          endAt,
-          calendarId,
-        }).catch(console.error);
+        updates.push(
+          updateCalendarEvent(refreshToken, gcalEventId, {
+            title: `📷 Shoot — ${propertyAddress}`,
+            startAt,
+            endAt,
+            calendarId,
+          }).catch((e) => {
+            console.error("[reschedule] gcal event update failed:", e);
+          })
+        );
       }
     }
+    // Await the actual API calls — otherwise they're orphaned and die with the
+    // serverless invocation. allSettled so one bad token can't reject the batch.
+    await Promise.allSettled(updates);
   } catch (err) {
     console.error("[reschedule] gcal sync failed:", err);
   }

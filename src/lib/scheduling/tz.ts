@@ -99,3 +99,34 @@ export function addWallDays(dateISO: string, days: number): string {
   const next = new Date(Date.UTC(y, m - 1, d + days, 12));
   return `${next.getUTCFullYear()}-${(next.getUTCMonth() + 1).toString().padStart(2, "0")}-${next.getUTCDate().toString().padStart(2, "0")}`;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * DISPLAY helpers — render a stored UTC instant in the WORKSPACE wall zone.
+ *
+ * Anything shown to a user (client portal, invoices, admin job history) must
+ * go through these. date-fns `format()` renders in the SERVER's zone — which
+ * is UTC on Vercel — so a 10:00 AM MDT shoot shows as "4:00 PM". Never use
+ * date-fns `format()` on a stored instant that a user will read.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** "Jul 24, 2026" */
+export const DISPLAY_DATE: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+/** "Jul 24" */
+export const DISPLAY_DATE_SHORT: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+/** "1:00 PM" */
+export const DISPLAY_TIME: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", hour12: true };
+
+/** Format a UTC instant for display in `timeZone` (thin, cached Intl wrapper). */
+export function fmtInTz(
+  date: Date | string,
+  timeZone: string,
+  opts: Intl.DateTimeFormatOptions
+): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-US", { ...opts, timeZone }).format(d);
+}
+
+/** "Jul 24, 2026 at 1:00 PM" in `timeZone`. */
+export function fmtDateTimeInTz(date: Date | string, timeZone: string): string {
+  return `${fmtInTz(date, timeZone, DISPLAY_DATE)} at ${fmtInTz(date, timeZone, DISPLAY_TIME)}`;
+}

@@ -2,7 +2,7 @@ import { requirePortalSession } from "@/lib/portal-session";
 import prisma from "@/lib/prisma";
 import { PortalNav } from "@/components/portal/portal-nav";
 import Link from "next/link";
-import { format } from "date-fns";
+import { fmtInTz, fmtDateTimeInTz, DISPLAY_DATE } from "@/lib/scheduling/tz";
 import { Package, ArrowRight, ShoppingCart, CheckCircle2, Circle, Clock } from "lucide-react";
 import { PortalMessageThread } from "@/components/portal/portal-message-thread";
 import { PortalRescheduleButton } from "@/components/portal/portal-reschedule-button";
@@ -165,10 +165,10 @@ export default async function PortalOrdersPage({
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
                           {job.scheduledAt
-                            ? `Scheduled: ${format(new Date(job.scheduledAt), "MMM d, yyyy 'at' h:mm aa")}`
+                            ? `Scheduled: ${fmtDateTimeInTz(job.scheduledAt, workspace.timezone)}`
                             : "Date TBD"}
                           {" · "}
-                          Booked {format(new Date(job.createdAt), "MMM d, yyyy")}
+                          Booked {fmtInTz(job.createdAt, workspace.timezone, DISPLAY_DATE)}
                         </p>
                       </div>
                     </div>

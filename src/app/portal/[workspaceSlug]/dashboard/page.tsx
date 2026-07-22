@@ -2,7 +2,7 @@ import { requirePortalSession } from "@/lib/portal-session";
 import prisma from "@/lib/prisma";
 import { PortalNav } from "@/components/portal/portal-nav";
 import Link from "next/link";
-import { format } from "date-fns";
+import { fmtInTz, DISPLAY_DATE, DISPLAY_TIME } from "@/lib/scheduling/tz";
 import { CalendarDays, Package, Receipt, Image, ArrowRight, ShoppingCart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -131,7 +131,7 @@ export default async function PortalDashboardPage({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{job.propertyAddress}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {job.scheduledAt ? format(new Date(job.scheduledAt), "h:mm aa") : "Time TBD"} · #{job.jobNumber}
+                        {job.scheduledAt ? fmtInTz(job.scheduledAt, workspace.timezone, DISPLAY_TIME) : "Time TBD"} · #{job.jobNumber}
                       </p>
                     </div>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[job.status] ?? "bg-gray-100 text-gray-600"}`}>
@@ -194,7 +194,7 @@ export default async function PortalDashboardPage({
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-gray-900 truncate">{job.propertyAddress}</p>
                           <p className="text-xs text-gray-400 mt-0.5">
-                            #{job.jobNumber} · {job.scheduledAt ? format(new Date(job.scheduledAt), "MMM d, yyyy") : "Date TBD"}
+                            #{job.jobNumber} · {job.scheduledAt ? fmtInTz(job.scheduledAt, workspace.timezone, DISPLAY_DATE) : "Date TBD"}
                           </p>
                         </div>
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusColors[job.status] ?? "bg-gray-100 text-gray-600"}`}>
@@ -220,7 +220,7 @@ export default async function PortalDashboardPage({
                         <td className="px-4 py-3 font-mono text-xs text-gray-500">#{job.jobNumber}</td>
                         <td className="px-4 py-3 text-gray-800 font-medium max-w-[200px] truncate">{job.propertyAddress}</td>
                         <td className="px-4 py-3 text-gray-500 text-xs">
-                          {job.scheduledAt ? format(new Date(job.scheduledAt), "MMM d, yyyy") : "—"}
+                          {job.scheduledAt ? fmtInTz(job.scheduledAt, workspace.timezone, DISPLAY_DATE) : "—"}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[job.status] ?? "bg-gray-100 text-gray-600"}`}>
