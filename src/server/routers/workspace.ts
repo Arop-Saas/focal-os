@@ -69,7 +69,7 @@ export const workspaceRouter = router({
             city: input.city,
             state: input.state,
             postalCode: input.postalCode,
-            trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
+            trialEndsAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days (3-month free trial)
           },
         });
 
