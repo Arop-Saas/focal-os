@@ -5,12 +5,11 @@ import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { subWeeks, startOfWeek } from "date-fns";
 import { Header } from "@/components/layout/header";
 import { DashboardStats } from "@/components/dashboard/stats";
-import { UpcomingJobs } from "@/components/dashboard/upcoming-jobs";
+import { WeekSchedule } from "@/components/dashboard/week-schedule";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { JobPipeline } from "@/components/dashboard/job-pipeline";
-import { SetupChecklist } from "@/components/dashboard/setup-checklist";
-import type { SetupStep } from "@/components/dashboard/setup-checklist";
+import { addWallDays, utcToWallDateISO, wallDateDayOfWeek, wallTimeToUtc } from "@/lib/scheduling/tz";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 
@@ -32,12 +31,15 @@ export default async function DashboardPage() {
   const now = new Date();
 
   // Time boundaries
-  const startOfToday    = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfToday      = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
-  const sevenDaysOut    = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const startOfMonth    = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfLastMonth= new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth  = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  // Current wall-clock week (Sunday–Saturday) in the workspace timezone
+  const todayISO     = utcToWallDateISO(now, workspace.timezone);
+  const weekStartISO = addWallDays(todayISO, -wallDateDayOfWeek(todayISO));
+  const weekStartUtc = wallTimeToUtc(weekStartISO, "00:00", workspace.timezone);
+  const weekEndUtc   = wallTimeToUtc(addWallDays(weekStartISO, 7), "00:00", workspace.timezone);
 
   const jobInclude = {
     client: { select: { firstName: true, lastName: true, phone: true } },
@@ -62,8 +64,7 @@ export default async function DashboardPage() {
     pendingInvoices,
     activeClients,
     overdueInvoices,
-    todaysJobs,
-    upcomingJobs,
+    weekJobs,
     jobStatusCounts,
     activityLogs,
     revenueForSparkline,
@@ -95,21 +96,11 @@ export default async function DashboardPage() {
     prisma.job.findMany({
       where: {
         workspaceId: workspace.id,
-        scheduledAt: { gte: startOfToday, lt: endOfToday },
+        scheduledAt: { gte: weekStartUtc, lt: weekEndUtc },
         status: { notIn: ["CANCELLED"] },
       },
       include: jobInclude,
       orderBy: { scheduledAt: "asc" },
-    }),
-    prisma.job.findMany({
-      where: {
-        workspaceId: workspace.id,
-        scheduledAt: { gte: endOfToday, lte: sevenDaysOut },
-        status: { in: ["CONFIRMED", "ASSIGNED", "PENDING"] },
-      },
-      include: jobInclude,
-      orderBy: { scheduledAt: "asc" },
-      take: 8,
     }),
     prisma.job.groupBy({
       by: ["status"],
@@ -147,65 +138,6 @@ export default async function DashboardPage() {
     weeklyRevenue.push(total);
   }
 
-  // ── Setup checklist data ──────────────────────────────────────────────────
-  let setupSteps: SetupStep[] = [];
-
-  {
-    const [packageCount, staffWithAvailability] = await Promise.all([
-      prisma.package.count({ where: { workspaceId: workspace.id } }),
-      prisma.staffProfile.count({
-        where: {
-          workspaceId: workspace.id,
-          availability: { some: { isAvailable: true } },
-        },
-      }),
-    ]);
-
-    setupSteps = [
-      {
-        id: "logo",
-        emoji: "🎨",
-        title: "Add your logo & brand color",
-        description: "Personalise your client-facing gallery and booking page.",
-        done: !!workspace.logoUrl,
-        href: "/settings",
-        cta: "Go to Settings",
-      },
-      {
-        id: "package",
-        emoji: "📦",
-        title: "Create your first package",
-        description: "Bundle your services into packages clients can book.",
-        done: packageCount > 0,
-        href: "/packages",
-        cta: "Create Package",
-      },
-      {
-        id: "availability",
-        emoji: "📅",
-        title: "Set your availability",
-        description: "Let clients know when you're available to shoot.",
-        done: staffWithAvailability > 0,
-        href: "/availability",
-        cta: "Set Availability",
-      },
-      {
-        id: "client",
-        emoji: "👤",
-        title: "Add your first client",
-        description: "Import from CSV or add clients manually.",
-        done: activeClients > 0,
-        href: "/clients",
-        cta: "Add Clients",
-      },
-    ];
-  }
-
-  const bookingUrl =
-    typeof process !== "undefined"
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/book/${workspace.slug}`
-      : `/book/${workspace.slug}`;
-
   const firstName = user.fullName.split(" ")[0];
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -239,10 +171,6 @@ export default async function DashboardPage() {
           </Link>
         )}
 
-        {setupSteps.length > 0 && (
-          <SetupChecklist steps={setupSteps} bookingUrl={bookingUrl} />
-        )}
-
         <DashboardStats
           jobsThisMonth={jobsThisMonth}
           jobsDelta={jobsDelta}
@@ -259,7 +187,12 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2">
-            <UpcomingJobs todaysJobs={todaysJobs} upcomingJobs={upcomingJobs} />
+            <WeekSchedule
+              jobs={weekJobs}
+              timezone={workspace.timezone}
+              weekStartISO={weekStartISO}
+              todayISO={todayISO}
+            />
           </div>
           <div>
             <ActivityFeed logs={activityLogs} />
