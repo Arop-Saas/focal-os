@@ -69,7 +69,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             <span className="text-gray-300">/</span>
             <div className="min-w-0">
               <h1 className="text-sm font-semibold text-gray-900 truncate">{job.propertyAddress}</h1>
-              <p className="text-xs text-gray-400">Job #{job.jobNumber}</p>
+              <p className="text-xs text-gray-400">Order #{job.jobNumber}</p>
             </div>
           </div>
 

@@ -24,7 +24,7 @@ export function JobPipeline({ statusCounts }: { statusCounts: StatusCount[] }) {
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-          Active Pipeline · {totalActive} job{totalActive !== 1 ? "s" : ""}
+          Active Pipeline · {totalActive} order{totalActive !== 1 ? "s" : ""}
         </p>
         <Link href="/jobs" className="text-[11px] text-blue-600 hover:text-blue-700 transition-colors font-medium">
           Manage

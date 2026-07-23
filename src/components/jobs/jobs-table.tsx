@@ -78,7 +78,7 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
     return (
       <div className="bg-white rounded-xl border flex flex-col items-center justify-center py-16 text-center">
         <div className="text-5xl mb-4">📋</div>
-        <p className="text-base font-semibold text-gray-700">No jobs found</p>
+        <p className="text-base font-semibold text-gray-700">No orders found</p>
         <p className="text-sm text-muted-foreground mt-1">
           Try changing your filters or create a new job.
         </p>
@@ -173,7 +173,7 @@ export function JobsTable({ jobs, total, page, limit }: JobsTableProps) {
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
                 />
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Job</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Order</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Client</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Scheduled</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Photographer</th>

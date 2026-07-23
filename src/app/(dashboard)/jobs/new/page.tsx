@@ -4,7 +4,7 @@ import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import { NewJobForm } from "@/components/jobs/new-job-form";
 
-export const metadata = { title: "New Job" };
+export const metadata = { title: "New Order" };
 
 export default async function NewJobPage({ searchParams }: { searchParams: { clientId?: string } }) {
   const supabase = await createClient();
@@ -36,7 +36,7 @@ export default async function NewJobPage({ searchParams }: { searchParams: { cli
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <Header title="New Job" description="Schedule a new photography shoot" />
+      <Header title="New Order" description="Schedule a new photography shoot" />
       <div className="flex-1 overflow-y-auto p-6">
         <NewJobForm
           clients={clients}

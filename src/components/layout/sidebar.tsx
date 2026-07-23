@@ -17,7 +17,6 @@ import {
   CreditCard,
   Aperture,
   LogOut,
-  Shield,
   ShieldAlert,
   Clock,
   MessageCircle,
@@ -31,7 +30,14 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-const navGroups = [
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children?: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[];
+};
+
+const navGroups: { label: string | null; items: NavItem[] }[] = [
   {
     label: null,
     items: [
@@ -41,17 +47,20 @@ const navGroups = [
   {
     label: "Operations",
     items: [
-      { label: "Jobs", href: "/jobs", icon: Briefcase },
+      {
+        label: "Orders",
+        href: "/jobs",
+        icon: Briefcase,
+        children: [{ label: "Listings", href: "/gallery", icon: Image }],
+      },
       { label: "Schedule", href: "/scheduling", icon: CalendarDays },
       { label: "Clients", href: "/clients", icon: Users },
-      { label: "Messages", href: "/messages", icon: MessageCircle },
       { label: "Team", href: "/staff", icon: UserCheck },
-      { label: "Roles", href: "/team/roles", icon: Shield },
-      { label: "Listings", href: "/gallery", icon: Image },
+      { label: "Collaboration", href: "/collaboration", icon: MessageCircle },
     ],
   },
   {
-    label: "OrderForm",
+    label: "Studio",
     items: [
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Availability", href: "/availability", icon: Clock },
@@ -134,28 +143,52 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
               {group.items.map((item) => {
                 const active = isActive(item.href);
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-all duration-150",
-                      active
-                        ? "bg-white/[0.08] text-white"
-                        : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
-                    )}
-                  >
-                    {active && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r-full bg-blue-400" />
-                    )}
-                    <item.icon
+                  <div key={item.href}>
+                    <Link
+                      href={item.href}
                       className={cn(
-                        "h-[15px] w-[15px] shrink-0 transition-colors",
-                        active ? "text-blue-400" : "text-slate-500"
+                        "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-all duration-150",
+                        active
+                          ? "bg-white/[0.08] text-white"
+                          : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
                       )}
-                    />
-                    {item.label}
-                    {item.href === "/messages" && <MessagesUnreadBadge />}
-                  </Link>
+                    >
+                      {active && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r-full bg-blue-400" />
+                      )}
+                      <item.icon
+                        className={cn(
+                          "h-[15px] w-[15px] shrink-0 transition-colors",
+                          active ? "text-blue-400" : "text-slate-500"
+                        )}
+                      />
+                      {item.label}
+                      {item.href === "/collaboration" && <MessagesUnreadBadge />}
+                    </Link>
+                    {item.children?.map((child) => {
+                      const childActive = isActive(child.href);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={cn(
+                            "relative ml-[22px] flex items-center gap-2.5 rounded-md border-l border-white/[0.06] px-2.5 py-1.5 text-[12.5px] font-medium transition-all duration-150",
+                            childActive
+                              ? "bg-white/[0.08] text-white"
+                              : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+                          )}
+                        >
+                          <child.icon
+                            className={cn(
+                              "h-[14px] w-[14px] shrink-0 transition-colors",
+                              childActive ? "text-blue-400" : "text-slate-500"
+                            )}
+                          />
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 );
               })}
             </div>

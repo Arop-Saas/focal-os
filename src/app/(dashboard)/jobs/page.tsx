@@ -9,7 +9,7 @@ import { JobFilters } from "@/components/jobs/job-filters";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
-export const metadata = { title: "Jobs" };
+export const metadata = { title: "Orders" };
 
 interface PageProps {
   searchParams: {
@@ -78,11 +78,11 @@ export default async function JobsPage({ searchParams }: PageProps) {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header
-        title="Jobs"
-        description={`${total} total jobs`}
+        title="Orders"
+        description={`${total} total orders`}
         actions={
           <Button size="sm" asChild>
-            <Link href="/jobs/new"><Plus className="h-3.5 w-3.5 mr-1.5" /> New Job</Link>
+            <Link href="/jobs/new"><Plus className="h-3.5 w-3.5 mr-1.5" /> New Order</Link>
           </Button>
         }
       />
