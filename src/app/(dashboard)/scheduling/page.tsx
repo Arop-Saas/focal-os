@@ -63,6 +63,11 @@ export default async function SchedulingPage() {
     orderBy: { scheduledAt: "asc" },
   });
 
+  const businessHours = await prisma.workspaceHours.findMany({
+    where: { workspaceId },
+    select: { dayOfWeek: true, isOpen: true, openTime: true, closeTime: true },
+  });
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header
@@ -77,7 +82,7 @@ export default async function SchedulingPage() {
         }
       />
       <div className="flex-1 overflow-hidden p-6">
-        <ScheduleView jobs={jobs} />
+        <ScheduleView jobs={jobs} businessHours={businessHours} />
       </div>
     </div>
   );

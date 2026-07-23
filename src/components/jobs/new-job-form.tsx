@@ -379,6 +379,13 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [clientSearch, setClientSearch] = useState("");
+  // Inline client creation — new clients appear in the picker immediately
+  const [localClients, setLocalClients] = useState<Client[]>(clients);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [ncFirst, setNcFirst] = useState("");
+  const [ncLast, setNcLast] = useState("");
+  const [ncEmail, setNcEmail] = useState("");
+  const [ncPhone, setNcPhone] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
   const [mlsSearchValue, setMlsSearchValue] = useState("");
@@ -484,18 +491,43 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
     });
   }
 
+  const createClientMutation = trpc.clients.create.useMutation();
+  const ncValid = ncFirst.trim() && ncLast.trim() && /^\S+@\S+\.\S+$/.test(ncEmail.trim());
+
+  async function handleCreateClient() {
+    if (!ncValid) return;
+    const created = await createClientMutation.mutateAsync({
+      firstName: ncFirst.trim(),
+      lastName: ncLast.trim(),
+      email: ncEmail.trim(),
+      phone: ncPhone.trim() || undefined,
+    });
+    const asClient: Client = {
+      id: created.id,
+      firstName: created.firstName,
+      lastName: created.lastName,
+      email: created.email,
+      company: created.company ?? null,
+    };
+    setLocalClients((prev) => [asClient, ...prev]);
+    setValue("clientId", asClient.id, { shouldValidate: true });
+    setShowNewClient(false);
+    setClientSearch("");
+    setNcFirst(""); setNcLast(""); setNcEmail(""); setNcPhone("");
+  }
+
   const filteredClients = useMemo(() => {
     const q = clientSearch.toLowerCase();
-    if (!q) return clients;
-    return clients.filter(
+    if (!q) return localClients;
+    return localClients.filter(
       (c) =>
         `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
         c.email.toLowerCase().includes(q) ||
         (c.company ?? "").toLowerCase().includes(q)
     );
-  }, [clients, clientSearch]);
+  }, [localClients, clientSearch]);
 
-  const selectedClient = clients.find((c) => c.id === clientId);
+  const selectedClient = localClients.find((c) => c.id === clientId);
   const servicesTotal = selectedServices.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
 
   return (
@@ -525,6 +557,41 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
               className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {showNewClient ? (
+            <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+              <p className="text-sm font-semibold text-gray-900">New client</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input value={ncFirst} onChange={(e) => setNcFirst(e.target.value)} placeholder="First name"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input value={ncLast} onChange={(e) => setNcLast(e.target.value)} placeholder="Last name"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <input value={ncEmail} onChange={(e) => setNcEmail(e.target.value)} type="email" placeholder="Email"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input value={ncPhone} onChange={(e) => setNcPhone(e.target.value)} type="tel" placeholder="Phone (optional)"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              {createClientMutation.error && (
+                <p className="text-xs text-red-600">{createClientMutation.error.message}</p>
+              )}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setShowNewClient(false)}
+                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button type="button" onClick={handleCreateClient} disabled={!ncValid || createClientMutation.isPending}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                  {createClientMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  Create & select
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setShowNewClient(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:border-blue-400 hover:bg-blue-50/40 hover:text-blue-600">
+              <Plus className="h-4 w-4" /> Create new client
+            </button>
+          )}
 
           <div className="space-y-2 max-h-72 overflow-y-auto -mx-1 px-1">
             {filteredClients.length === 0 ? (

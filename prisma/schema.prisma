@@ -1318,6 +1318,7 @@ model StaffInvite {
   workspaceId String
   email       String
   fullName    String
+  phone       String?
   role        String    @default("PHOTOGRAPHER")
   expiresAt   DateTime
   usedAt      DateTime?

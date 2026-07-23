@@ -6,24 +6,45 @@ import { UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+// Same roles the onboarding wizard offers — "Member" is the standard staff role
+const ROLE_OPTIONS = [
+  { value: "PHOTOGRAPHER", label: "Member" },
+  { value: "ADMIN", label: "Admin" },
+];
+
 export function AddTeamMemberButton() {
   const [showModal, setShowModal] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("PHOTOGRAPHER");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const inviteMutation = trpc.staff.invite.useMutation();
 
+  const valid =
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
+    /^\S+@\S+\.\S+$/.test(email.trim()) &&
+    phone.trim().length >= 7;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !fullName) return;
+    if (!valid) return;
     setIsSubmitting(true);
     try {
-      await inviteMutation.mutateAsync({ email, fullName, role: role as any });
+      await inviteMutation.mutateAsync({
+        email: email.trim(),
+        fullName: `${firstName.trim()} ${lastName.trim()}`,
+        phone: phone.trim(),
+        role: role as never,
+      });
       setShowModal(false);
+      setFirstName("");
+      setLastName("");
       setEmail("");
-      setFullName("");
+      setPhone("");
       setRole("PHOTOGRAPHER");
     } finally {
       setIsSubmitting(false);
@@ -37,46 +58,65 @@ export function AddTeamMemberButton() {
       </Button>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b p-6">
               <h2 className="text-lg font-semibold text-gray-900">Add Team Member</h2>
-              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded transition-colors">
+              <button onClick={() => setShowModal(false)} className="rounded p-1 transition-colors hover:bg-gray-100" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
-                <Input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" disabled={isSubmitting} />
+            <form onSubmit={handleSubmit} className="space-y-4 p-6">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="inv-first" className="mb-1.5 block text-sm font-medium text-gray-700">
+                    First name <span className="text-red-400">*</span>
+                  </label>
+                  <Input id="inv-first" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jordan" disabled={isSubmitting} required />
+                </div>
+                <div>
+                  <label htmlFor="inv-last" className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Last name <span className="text-red-400">*</span>
+                  </label>
+                  <Input id="inv-last" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Reyes" disabled={isSubmitting} required />
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" disabled={isSubmitting} />
+                <label htmlFor="inv-email" className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Email <span className="text-red-400">*</span>
+                </label>
+                <Input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jordan@example.com" disabled={isSubmitting} required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
+                <label htmlFor="inv-phone" className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Phone <span className="text-red-400">*</span>
+                </label>
+                <Input id="inv-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" disabled={isSubmitting} required />
+              </div>
+              <div>
+                <label htmlFor="inv-role" className="mb-1.5 block text-sm font-medium text-gray-700">Role</label>
                 <select
+                  id="inv-role"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   disabled={isSubmitting}
-                  className="w-full px-3 py-2 rounded-md border border-gray-300 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 >
-                  <option value="PHOTOGRAPHER">Photographer</option>
-                  <option value="EDITOR">Editor</option>
-                  <option value="MANAGER">Manager</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="VA">Virtual Assistant</option>
-                  <option value="VIEWER">Viewer</option>
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
                 </select>
               </div>
+              {inviteMutation.error && (
+                <p className="text-sm text-red-600">{inviteMutation.error.message}</p>
+              )}
               <div className="flex gap-2 pt-4">
                 <button type="button" onClick={() => setShowModal(false)} disabled={isSubmitting}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
                   Cancel
                 </button>
-                <button type="submit" disabled={isSubmitting || !email || !fullName}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="submit" disabled={isSubmitting || !valid}
+                  className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
                   {isSubmitting ? "Sending invite..." : "Send Invite"}
                 </button>
               </div>

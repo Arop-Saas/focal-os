@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -65,7 +65,17 @@ const JOB_STATUS_COLORS: Record<string, string> = {
   ON_HOLD:      "bg-orange-100 border-orange-400 text-orange-900",
 };
 
-const WEEK_HOURS = Array.from({ length: 10 }, (_, i) => i + 9); // 9am–6pm
+// Full day — the week grid shows all 24 hours; the viewport opens on business
+// hours ±1h and scrolls to reach off-hours (shaded darker).
+const WEEK_HOURS = Array.from({ length: 24 }, (_, i) => i);
+const WEEK_ROW_PX = 80; // h-20
+
+type DayHours = { dayOfWeek: number; isOpen: boolean; openTime: string; closeTime: string };
+
+function hourToMin(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
 
 // Dispatch timeline: 7am–7pm in pixels (1 min = 2px)
 const DISPATCH_START_HOUR = 7;
@@ -131,6 +141,8 @@ type DispatchPhotographer = {
 
 interface ScheduleViewProps {
   jobs: BaseJob[];
+  /** Workspace business hours (0=Sunday…6=Saturday) — shades off-hours rows */
+  businessHours?: DayHours[];
 }
 
 // ---------------------------------------------------------------------------
@@ -757,11 +769,34 @@ function WeekGridView({
   jobs,
   weekDays,
   onJobClick,
+  businessHours,
 }: {
   jobs: BaseJob[];
   weekDays: Date[];
   onJobClick: (job: BaseJob) => void;
+  businessHours?: DayHours[];
 }) {
+  const hoursByDow = useMemo(
+    () => new Map((businessHours ?? []).map((h) => [h.dayOfWeek, h])),
+    [businessHours]
+  );
+  function isBusinessHour(day: Date, hour: number): boolean {
+    const h = hoursByDow.get(day.getDay());
+    if (!h) return hour >= 8 && hour < 18; // no data — assume 8–6
+    if (!h.isOpen) return false;
+    return hour >= Math.floor(hourToMin(h.openTime) / 60) && hour < Math.ceil(hourToMin(h.closeTime) / 60);
+  }
+
+  // Open the viewport on business hours ±1h; off-hours reachable by scroll
+  const openDays = (businessHours ?? []).filter((h) => h.isOpen);
+  const minOpenHour = openDays.length ? Math.min(...openDays.map((h) => Math.floor(hourToMin(h.openTime) / 60))) : 8;
+  const maxCloseHour = openDays.length ? Math.max(...openDays.map((h) => Math.ceil(hourToMin(h.closeTime) / 60))) : 18;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(minOpenHour - 1, 0) * WEEK_ROW_PX;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const viewportPx = Math.min(maxCloseHour + 1 - Math.max(minOpenHour - 1, 0), 14) * WEEK_ROW_PX;
   const jobsByDayAndHour = useMemo(() => {
     const grid: Record<string, Record<number, BaseJob[]>> = {};
     weekDays.forEach((day) => {
@@ -781,7 +816,7 @@ function WeekGridView({
   }, [jobs, weekDays]);
 
   return (
-    <div className="bg-white rounded-xl border overflow-auto">
+    <div className="bg-white rounded-xl border overflow-hidden">
       {/* Days header */}
       <div className="grid grid-cols-8 border-b sticky top-0 bg-gray-50 z-10">
         <div className="border-r p-2">
@@ -803,7 +838,8 @@ function WeekGridView({
         })}
       </div>
 
-      {/* Time grid */}
+      {/* Time grid — full day, scrolls; opens on business hours */}
+      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: viewportPx }}>
       <div className="grid grid-cols-8">
         <div className="border-r bg-gray-50 divide-y">
           {WEEK_HOURS.map((hour) => (
@@ -824,7 +860,13 @@ function WeekGridView({
               className={cn("border-r divide-y", isToday && "bg-blue-50/30")}
             >
               {WEEK_HOURS.map((hour) => (
-                <div key={`${dayKey}-${hour}`} className="h-20 p-1 border-b relative">
+                <div
+                  key={`${dayKey}-${hour}`}
+                  className={cn(
+                    "h-20 p-1 border-b relative",
+                    !isBusinessHour(day, hour) && "bg-gray-100/80"
+                  )}
+                >
                   {(jobsByDayAndHour[dayKey]?.[hour] ?? []).map((job) => (
                     <button
                       key={job.id}
@@ -843,6 +885,7 @@ function WeekGridView({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
@@ -1066,9 +1109,9 @@ function MonthGridView({
 // Main ScheduleView
 // ---------------------------------------------------------------------------
 
-export function ScheduleView({ jobs }: ScheduleViewProps) {
+export function ScheduleView({ jobs, businessHours }: ScheduleViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<ViewMode>("month");
+  const [view, setView] = useState<ViewMode>("week");
   const [selectedJob, setSelectedJob] = useState<BaseJob | DispatchJob | null>(null);
 
   // Week helpers
@@ -1158,6 +1201,7 @@ export function ScheduleView({ jobs }: ScheduleViewProps) {
             jobs={weekJobs}
             weekDays={weekDays}
             onJobClick={(job) => setSelectedJob(job)}
+            businessHours={businessHours}
           />
         )}
 

@@ -78,6 +78,7 @@ export const staffRouter = router({
           .enum(["OWNER", "ADMIN", "MANAGER", "PHOTOGRAPHER", "EDITOR", "VA", "VIEWER"])
           .default("PHOTOGRAPHER"),
         fullName: z.string().min(2),
+        phone: z.string().min(7).optional(), // required by the Team UI; optional for onboarding invites
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -114,6 +115,7 @@ export const staffRouter = router({
           workspaceId: ctx.workspace.id,
           email: input.email,
           fullName: input.fullName,
+          phone: input.phone ?? null,
           role: input.role,
           expiresAt,
         },

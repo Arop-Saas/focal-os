@@ -70,14 +70,16 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
+// Unified with onboarding: Member (standard staff role) or Admin.
+// Legacy granular roles (Manager/Editor/VA/Viewer) still display honestly
+// until their member is switched to one of these.
 const ROLE_OPTIONS = [
-  { value: "ADMIN",        label: "Admin",        hint: "Full access except billing" },
-  { value: "MANAGER",      label: "Manager",      hint: "Manage orders, clients & schedule" },
-  { value: "PHOTOGRAPHER", label: "Photographer", hint: "Assigned shoots & own schedule" },
-  { value: "EDITOR",       label: "Editor",       hint: "Galleries & delivery" },
-  { value: "VA",           label: "Assistant",    hint: "Admin support tasks" },
-  { value: "VIEWER",       label: "Viewer",       hint: "Read-only access" },
+  { value: "PHOTOGRAPHER", label: "Member", hint: "Standard team member — assigned shoots & own schedule" },
+  { value: "ADMIN",        label: "Admin",  hint: "Full management access" },
 ];
+const LEGACY_ROLE_LABELS: Record<string, string> = {
+  MANAGER: "Manager", EDITOR: "Editor", VA: "Assistant", VIEWER: "Viewer",
+};
 
 const PAY_TYPES = [
   { value: "HOURLY",     label: "Hourly" },
@@ -228,7 +230,9 @@ export function TeamMemberSettings({ staff, initialAvailability }: {
   }
 
   const initial = staff.member.user.fullName?.[0]?.toUpperCase() ?? "?";
-  const roleLabel = ROLE_OPTIONS.find((r) => r.value === role)?.label ?? (staff.member.isOwner ? "Owner" : role);
+  const roleLabel = staff.member.isOwner
+    ? "Owner"
+    : ROLE_OPTIONS.find((r) => r.value === role)?.label ?? LEGACY_ROLE_LABELS[role] ?? role;
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -432,6 +436,12 @@ export function TeamMemberSettings({ staff, initialAvailability }: {
                     This member is the workspace owner and always has full access.
                   </p>
                 ) : (
+                  <>
+                  {LEGACY_ROLE_LABELS[role] && (
+                    <p className="rounded-lg bg-gray-50 px-4 py-2.5 text-[12px] text-gray-500">
+                      Current role: <span className="font-medium text-gray-700">{LEGACY_ROLE_LABELS[role]}</span> (legacy) — pick a role below to switch.
+                    </p>
+                  )}
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Access role">
                     {ROLE_OPTIONS.map((r) => (
                       <button key={r.value} role="radio" aria-checked={role === r.value}
@@ -445,6 +455,7 @@ export function TeamMemberSettings({ staff, initialAvailability }: {
                       </button>
                     ))}
                   </div>
+                  </>
                 )}
                 <div className="flex items-center justify-between rounded-lg border px-4 py-3">
                   <div>

@@ -65,6 +65,9 @@ export async function POST(req: NextRequest) {
           supabaseId: supabaseUserId,
           email: invite.email,
           fullName: invite.fullName,
+          firstName: invite.fullName.split(" ")[0] ?? null,
+          lastName: invite.fullName.split(" ").slice(1).join(" ") || null,
+          phone: invite.phone ?? null,
         },
       });
     } else {
