@@ -35,7 +35,28 @@ type Step1Data = z.infer<typeof step1Schema>;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const COUNTRIES = [
+// Shown first in the dropdown, then every other country alphabetically
+const PINNED_COUNTRY_CODES = ["US", "CA", "GB", "AU"];
+
+// ISO 3166-1 alpha-2 — names resolved client-side via Intl.DisplayNames
+const COUNTRY_CODES = [
+  "AD","AE","AF","AG","AI","AL","AM","AO","AR","AS","AT","AU","AW","AX","AZ",
+  "BA","BB","BD","BE","BF","BG","BH","BI","BJ","BL","BM","BN","BO","BQ","BR","BS","BT","BW","BY","BZ",
+  "CA","CC","CD","CF","CG","CH","CI","CK","CL","CM","CN","CO","CR","CU","CV","CW","CX","CY","CZ",
+  "DE","DJ","DK","DM","DO","DZ","EC","EE","EG","ER","ES","ET","FI","FJ","FK","FM","FO","FR",
+  "GA","GB","GD","GE","GF","GG","GH","GI","GL","GM","GN","GP","GQ","GR","GT","GU","GW","GY",
+  "HK","HN","HR","HT","HU","ID","IE","IL","IM","IN","IO","IQ","IR","IS","IT","JE","JM","JO","JP",
+  "KE","KG","KH","KI","KM","KN","KP","KR","KW","KY","KZ","LA","LB","LC","LI","LK","LR","LS","LT","LU","LV","LY",
+  "MA","MC","MD","ME","MF","MG","MH","MK","ML","MM","MN","MO","MP","MQ","MR","MS","MT","MU","MV","MW","MX","MY","MZ",
+  "NA","NC","NE","NF","NG","NI","NL","NO","NP","NR","NU","NZ","OM",
+  "PA","PE","PF","PG","PH","PK","PL","PM","PR","PS","PT","PW","PY","QA","RE","RO","RS","RU","RW",
+  "SA","SB","SC","SD","SE","SG","SI","SK","SL","SM","SN","SO","SR","SS","ST","SV","SX","SY","SZ",
+  "TC","TD","TG","TH","TJ","TK","TL","TM","TN","TO","TR","TT","TV","TW","TZ",
+  "UA","UG","US","UY","UZ","VA","VC","VE","VG","VI","VN","VU","WF","WS","YE","YT","ZA","ZM","ZW",
+];
+
+type CountryOption = { code: string; label: string };
+const FALLBACK_COUNTRIES: CountryOption[] = [
   { code: "US", label: "United States" },
   { code: "CA", label: "Canada" },
   { code: "GB", label: "United Kingdom" },
@@ -82,7 +103,7 @@ const EMPTY_ROW: TeammateRow = { fullName: "", email: "", role: "PHOTOGRAPHER" }
 
 const STEPS = [
   { label: "Studio info",    icon: Building2 },
-  { label: "Monthly volume", icon: BarChart3 },
+  { label: "Volume", icon: BarChart3 },
   { label: "Invite team",    icon: Users },
 ];
 
@@ -120,10 +141,49 @@ export default function OnboardingPage() {
   });
 
   // Form
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<Step1Data>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<Step1Data>({
     resolver: zodResolver(step1Schema),
     defaultValues: { timezone: "America/New_York" },
   });
+
+  // Full country + timezone lists are built after mount (Intl APIs) so the
+  // server render stays deterministic; until then the fallbacks show.
+  const [countries, setCountries] = useState<CountryOption[]>(FALLBACK_COUNTRIES);
+  const [timezones, setTimezones] = useState(TIMEZONES);
+  useEffect(() => {
+    try {
+      const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+      const all = COUNTRY_CODES
+        .map((code) => ({ code, label: regionNames.of(code) ?? code }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+      const pinned = PINNED_COUNTRY_CODES
+        .map((p) => all.find((c) => c.code === p))
+        .filter((c): c is CountryOption => Boolean(c));
+      setCountries([...pinned, ...all.filter((c) => !PINNED_COUNTRY_CODES.includes(c.code))]);
+    } catch { /* keep fallback list */ }
+
+    try {
+      const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
+      const zones = intl.supportedValuesOf?.("timeZone");
+      if (zones?.length) {
+        const offsetOf = (z: string) => {
+          try {
+            return new Intl.DateTimeFormat("en-US", { timeZone: z, timeZoneName: "shortOffset" })
+              .formatToParts(new Date())
+              .find((p) => p.type === "timeZoneName")?.value ?? "";
+          } catch { return ""; }
+        };
+        setTimezones(
+          zones.map((z) => {
+            const offset = offsetOf(z);
+            return { value: z, label: `${z.replace(/_/g, " ")}${offset ? ` (${offset})` : ""}` };
+          })
+        );
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (zones.includes(browserTz)) setValue("timezone", browserTz);
+      }
+    } catch { /* keep fallback list */ }
+  }, [setValue]);
 
   // Workspace address derived from company name, with live availability check
   const companyName = watch("name") ?? "";
@@ -313,9 +373,24 @@ export default function OnboardingPage() {
                     onChange={(e) => { setCountry(e.target.value); setSelectedCity(null); }}
                     className={inputClass}
                   >
-                    {COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.label}</option>
-                    ))}
+                    {countries.length > PINNED_COUNTRY_CODES.length ? (
+                      <>
+                        <optgroup label="Popular">
+                          {countries.slice(0, PINNED_COUNTRY_CODES.length).map((c) => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="All countries">
+                          {countries.slice(PINNED_COUNTRY_CODES.length).map((c) => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </optgroup>
+                      </>
+                    ) : (
+                      countries.map((c) => (
+                        <option key={c.code} value={c.code}>{c.label}</option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -326,6 +401,9 @@ export default function OnboardingPage() {
                     country={country.toLowerCase()}
                     value={selectedCity}
                     onChange={(v) => { setSelectedCity(v); if (v) setCityError(false); }}
+                    onTimezone={(tz) => {
+                      if (timezones.some((t) => t.value === tz)) setValue("timezone", tz);
+                    }}
                   />
                   {cityError && <p className="text-[11px] text-red-500">Select your city from the list</p>}
                 </div>
@@ -334,7 +412,7 @@ export default function OnboardingPage() {
               <div className="space-y-1.5">
                 <label className="block text-[13px] font-medium text-gray-700">Timezone</label>
                 <select {...register("timezone")} className={inputClass}>
-                  {TIMEZONES.map((tz) => (
+                  {timezones.map((tz) => (
                     <option key={tz.value} value={tz.value}>{tz.label}</option>
                   ))}
                 </select>

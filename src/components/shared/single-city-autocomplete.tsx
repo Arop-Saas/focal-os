@@ -22,6 +22,8 @@ interface SingleCityAutocompleteProps {
   country: string;
   value: SelectedCity | null;
   onChange: (value: SelectedCity | null) => void;
+  /** Called with the city's IANA timezone once resolved (e.g. "America/Chicago") */
+  onTimezone?: (timezone: string) => void;
   placeholder?: string;
   className?: string;
 }
@@ -42,6 +44,7 @@ export function SingleCityAutocomplete({
   country,
   value,
   onChange,
+  onTimezone,
   placeholder = "Search for your city…",
   className,
 }: SingleCityAutocompleteProps) {
@@ -50,6 +53,7 @@ export function SingleCityAutocomplete({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [searchUnavailable, setSearchUnavailable] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,10 +74,13 @@ export function SingleCityAutocomplete({
         const data = await res.json();
         const results: CityPrediction[] = data.predictions ?? [];
         setPredictions(results);
-        setIsOpen(results.length > 0);
+        setSearchUnavailable(data.error === "unavailable");
+        setIsOpen(true); // always open — shows results, "no matches", or "unavailable"
         setActiveIndex(-1);
       } catch {
         setPredictions([]);
+        setSearchUnavailable(true);
+        setIsOpen(true);
       } finally {
         setIsLoading(false);
       }
@@ -95,7 +102,18 @@ export function SingleCityAutocomplete({
     setQuery("");
     setPredictions([]);
     setIsOpen(false);
+
+    // Resolve the city's timezone via place details (same token closes the
+    // autocomplete billing session), then rotate the session token.
+    const session = sessionRef.current;
     sessionRef.current = generateSessionToken();
+    if (onTimezone) {
+      const params = new URLSearchParams({ placeId: p.placeId, session });
+      fetch(`/api/places/details?${params}`)
+        .then((res) => res.json())
+        .then((data) => { if (data?.timezone) onTimezone(data.timezone); })
+        .catch(() => { /* keep whatever timezone is already selected */ });
+    }
   }
 
   function clearSelection() {
@@ -184,8 +202,15 @@ export function SingleCityAutocomplete({
         </div>
       )}
 
-      {isOpen && predictions.length > 0 && !value && (
+      {isOpen && !value && query.trim().length > 0 && !isLoading && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[240px] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+          {predictions.length === 0 && (
+            <p className="px-3.5 py-3 text-[13px] text-gray-500">
+              {searchUnavailable
+                ? "City search is temporarily unavailable. Please try again in a moment."
+                : "No matching cities found."}
+            </p>
+          )}
           {predictions.map((p, i) => (
             <button
               key={p.placeId}

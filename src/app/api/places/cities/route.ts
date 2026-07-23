@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
 
   if (!res.ok) {
     console.warn("[places/cities] Google v2 error:", res.status);
-    return NextResponse.json({ predictions: [] });
+    // Surface the failure so the UI can distinguish "unavailable" from "no matches"
+    return NextResponse.json({ predictions: [], error: "unavailable" });
   }
 
   const data = await res.json();

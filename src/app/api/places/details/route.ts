@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import tzLookup from "tz-lookup";
 
 /**
  * Place details via Google Places API (New) — v2.
@@ -62,13 +63,23 @@ export async function GET(req: NextRequest) {
   const route = get("route");
   const streetAddress = [streetNumber, route].filter(Boolean).join(" ");
 
+  const lat = data.location?.latitude ?? null;
+  const lng = data.location?.longitude ?? null;
+
+  // Resolve the place's IANA timezone from its coordinates (offline lookup)
+  let timezone: string | null = null;
+  if (lat != null && lng != null) {
+    try { timezone = tzLookup(lat, lng); } catch { /* out-of-range coords */ }
+  }
+
   return NextResponse.json({
     streetAddress,
     city: get("locality") || get("sublocality") || get("neighborhood"),
     state: get("administrative_area_level_1", true), // "TX", "AB", etc.
     zip: get("postal_code"),
     country: get("country", true),
-    lat: data.location?.latitude ?? null,
-    lng: data.location?.longitude ?? null,
+    lat,
+    lng,
+    timezone,
   });
 }
