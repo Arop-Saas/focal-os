@@ -9,6 +9,7 @@ import {
   Users,
   UserCheck,
   Receipt,
+  Layers,
   Image,
   CalendarDays,
   BarChart3,
@@ -57,6 +58,7 @@ const navGroups: { label: string | null; items: NavItem[] }[] = [
   {
     label: "Studio",
     items: [
+      { label: "Services & Pricing", href: "/catalog", icon: Layers },
       { label: "Invoices", href: "/invoices", icon: Receipt },
       { label: "Availability", href: "/availability", icon: Clock },
       { label: "Forms/Services", href: "/order-form", icon: ClipboardList },

@@ -111,6 +111,10 @@ model Workspace {
   appointments     Appointment[]
   productionTasks  ProductionTask[]
   jobNotes         JobNote[]
+  catalogItems     CatalogItem[]
+  offerings        Offering[]
+  productRules     ProductRule[]
+  orderLineSnapshots OrderLineSnapshot[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -173,6 +177,8 @@ model OrderForm {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  offerings   Offering[]
 
   @@index([workspaceId])
 }
@@ -739,6 +745,7 @@ model Job {
   appointments    Appointment[]
   productionTasks ProductionTask[]
   orderNotes      JobNote[]
+  orderLines      OrderLineSnapshot[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -965,6 +972,174 @@ model JobNote {
   author       User?     @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
 
   createdAt    DateTime @default(now())
+
+  @@index([jobId])
+  @@index([workspaceId])
+}
+
+// ─── SERVICES & PRICING catalog (docs/services-products-plan.md) ─────────
+// Catalog item → Offering (per order form) → OrderLineSnapshot (frozen buy).
+// Legacy Service/Package rows are bridged via legacyServiceId/legacyPackageId
+// and stay the source for old surfaces until each migrates to the catalog.
+
+enum CatalogItemRole {
+  MAIN
+  ADD_ON
+  PACKAGE
+}
+
+enum FulfillmentMode {
+  ON_SITE
+  PRODUCTION_ONLY
+  HYBRID
+}
+
+enum CatalogPricingMode {
+  FIXED
+  STARTING_AT
+  PER_UNIT
+  COMPONENT_SUM
+}
+
+enum PublicationState {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum VisitMode {
+  NONE
+  SAME_VISIT
+  SEPARATE_VISIT
+}
+
+model CatalogItem {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  role             CatalogItemRole  @default(MAIN)
+  state            PublicationState @default(DRAFT)
+  category         String?  // user-created collection label, not an enum
+  legacyServiceId  String?  @unique
+  legacyPackageId  String?  @unique
+  currentVersionId String?  @unique
+
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  currentVersion   CatalogItemVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  versions         CatalogItemVersion[]
+  offerings        Offering[]
+  packageComponents PackageComponent[] @relation("PackageParent")
+  usedInPackages   PackageComponent[]  @relation("PackageChild")
+  rules            ProductRule[]
+  snapshots        OrderLineSnapshot[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([workspaceId, state])
+}
+
+model CatalogItemVersion {
+  id                 String   @id @default(cuid())
+  itemId             String
+  versionNumber      Int      @default(1)
+  name               String
+  description        String?
+  imageUrl           String?
+  pricingMode        CatalogPricingMode @default(FIXED)
+  basePrice          Float    @default(0)
+  unitLabel          String?  // e.g. "per image" for PER_UNIT
+  fulfillmentMode    FulfillmentMode @default(ON_SITE)
+  visitMode          VisitMode @default(SAME_VISIT)
+  baseDurationMins   Int      @default(60)
+  requiredSkills     String[] // matches StaffProfile.skills tokens
+  productionTaskType ProductionTaskType? // task generated for PRODUCTION_ONLY/HYBRID
+
+  item               CatalogItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  currentOf          CatalogItem? @relation("CurrentVersion")
+
+  createdAt          DateTime @default(now())
+
+  @@unique([itemId, versionNumber])
+}
+
+model Offering {
+  id            String  @id @default(cuid())
+  workspaceId   String
+  itemId        String
+  orderFormId   String
+  visible       Boolean @default(true)
+  sortOrder     Int     @default(0)
+  labelOverride String?
+
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  item          CatalogItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  orderForm     OrderForm   @relation(fields: [orderFormId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+
+  @@unique([itemId, orderFormId])
+  @@index([orderFormId])
+  @@index([workspaceId])
+}
+
+model PackageComponent {
+  id            String @id @default(cuid())
+  packageItemId String
+  childItemId   String
+  quantity      Int     @default(1)
+  showOnForm    Boolean @default(true)
+
+  package       CatalogItem @relation("PackageParent", fields: [packageItemId], references: [id], onDelete: Cascade)
+  child         CatalogItem @relation("PackageChild", fields: [childItemId], references: [id], onDelete: Cascade)
+
+  @@unique([packageItemId, childItemId])
+}
+
+model ProductRule {
+  id              String  @id @default(cuid())
+  workspaceId     String
+  itemId          String?
+  name            String  // human-readable explanation shown in quotes
+  priority        Int     @default(100)
+  active          Boolean @default(true)
+  conditionType   String  @default("SQFT_RANGE") // typed; only SQFT_RANGE in v1
+  conditionMin    Float?
+  conditionMax    Float?
+  priceAdd        Float   @default(0)
+  durationAddMins Int     @default(0)
+  quantitySet     Int?
+  hide            Boolean @default(false)
+
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  item            CatalogItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId, itemId])
+}
+
+model OrderLineSnapshot {
+  id              String  @id @default(cuid())
+  workspaceId     String
+  jobId           String
+  catalogItemId   String?
+  versionId       String?
+  source          String  @default("CATALOG") // CATALOG | LEGACY_SERVICE | CUSTOM
+  name            String
+  quantity        Int     @default(1)
+  unitPrice       Float
+  totalPrice      Float
+  durationMins    Int     @default(0)
+  visitMode       VisitMode       @default(SAME_VISIT)
+  fulfillmentMode FulfillmentMode @default(ON_SITE)
+  explanation     Json?   // pricing evaluation lines
+
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job             Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  catalogItem     CatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime @default(now())
 
   @@index([jobId])
   @@index([workspaceId])

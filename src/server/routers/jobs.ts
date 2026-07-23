@@ -4,6 +4,7 @@ import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loade
 import { runDeliverySideEffects } from "@/lib/delivery";
 import { syncPrimaryAppointment, appointmentStatusForJobStatus, cancelAppointmentsForJob } from "@/lib/orders/appointments";
 import { findOrCreateProperty } from "@/lib/orders/property";
+import { quoteOrderLines, snapshotAndGenerate } from "@/lib/orders/pricing";
 import { notifyJobRescheduled } from "@/lib/notify";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
@@ -325,6 +326,29 @@ export const jobsRouter = router({
           jobId: newJob.id,
           scheduledAt: newJob.scheduledAt,
           durationMins: newJob.estimatedDurationMins,
+        });
+
+        // Snapshot the purchased lines with explained pricing, and generate
+        // downstream work (production tasks, separate-visit appointments).
+        // Admin-entered prices win but the computed price is recorded.
+        const quoted = await quoteOrderLines(tx, {
+          workspaceId: ctx.workspace.id,
+          squareFootage: jobData.squareFootage ?? null,
+          lines: [
+            ...(jobData.packageId
+              ? [{ packageId: jobData.packageId, quantity: 1 }]
+              : []),
+            ...serviceItems.map((s) => ({
+              serviceId: s.serviceId,
+              quantity: s.quantity,
+              unitPriceOverride: s.unitPrice,
+            })),
+          ],
+        });
+        await snapshotAndGenerate(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: newJob.id,
+          lines: quoted.lines,
         });
 
         // "How did you hear about us?" — first answer sticks to the client

@@ -3,6 +3,7 @@ import { workspaceRouter } from "./workspace";
 import { jobsRouter } from "./jobs";
 import { clientsRouter } from "./clients";
 import { staffRouter } from "./staff";
+import { catalogRouter } from "./catalog";
 import { packagesRouter } from "./packages";
 import { invoicesRouter } from "./invoices";
 import { schedulingRouter } from "./scheduling";
@@ -27,6 +28,7 @@ export const appRouter = router({
   jobs: jobsRouter,
   clients: clientsRouter,
   staff: staffRouter,
+  catalog: catalogRouter,
   packages: packagesRouter,
   invoices: invoicesRouter,
   scheduling: schedulingRouter,
