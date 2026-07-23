@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
-  Archive, Camera, ChevronDown, ChevronRight, Clock, Layers,
-  Loader2, Package as PackageIcon, Plus, Ruler, Trash2, X,
+  Archive, Camera, Calculator, ChevronDown, ChevronRight, Clock, Layers,
+  Loader2, Package as PackageIcon, Plus, X,
 } from "lucide-react";
+import { CatalogItemPanel } from "./catalog-item-panel";
+import { QuoteConsole } from "./quote-console";
 
 export interface CatalogRow {
   id: string;
@@ -55,6 +57,7 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("all");
   const [showNew, setShowNew] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const setState = trpc.catalog.setState.useMutation({ onSuccess: () => router.refresh() });
@@ -86,12 +89,20 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-        >
-          <Plus className="h-3.5 w-3.5" /> New service
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowConsole(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+          >
+            <Calculator className="h-3.5 w-3.5" /> Test pricing
+          </button>
+          <button
+            onClick={() => setShowNew(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-3.5 w-3.5" /> New service
+          </button>
+        </div>
       </div>
 
       {/* List */}
@@ -178,7 +189,7 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
                       )}
                     </div>
                   </div>
-                  {isOpen && <RulesPanel itemId={r.id} itemName={r.name} />}
+                  {isOpen && <CatalogItemPanel itemId={r.id} role={r.role} />}
                 </div>
               );
             })}
@@ -187,104 +198,12 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
       )}
 
       {showNew && <NewServiceModal onClose={() => setShowNew(false)} />}
-    </div>
-  );
-}
-
-/** Square-footage rules for one item — the Phase-1 rule type. */
-function RulesPanel({ itemId, itemName }: { itemId: string; itemName: string }) {
-  const router = useRouter();
-  const rules = trpc.catalog.listRules.useQuery({ itemId });
-  const addRule = trpc.catalog.addRule.useMutation({
-    onSuccess: () => { rules.refetch(); router.refresh(); },
-  });
-  const deleteRule = trpc.catalog.deleteRule.useMutation({
-    onSuccess: () => { rules.refetch(); router.refresh(); },
-  });
-
-  const [min, setMin] = useState("");
-  const [max, setMax] = useState("");
-  const [price, setPrice] = useState("");
-  const [mins, setMins] = useState("");
-
-  function submit() {
-    const priceAdd = parseFloat(price) || 0;
-    const durationAddMins = parseInt(mins) || 0;
-    if (!priceAdd && !durationAddMins) return;
-    const minV = min ? parseFloat(min) : null;
-    const maxV = max ? parseFloat(max) : null;
-    const range = `${minV != null ? minV.toLocaleString() : "0"}–${maxV != null ? maxV.toLocaleString() : "∞"} sq ft`;
-    const effects = [
-      priceAdd ? `${priceAdd > 0 ? "+" : "−"}$${Math.abs(priceAdd)}` : null,
-      durationAddMins ? `${durationAddMins > 0 ? "+" : "−"}${Math.abs(durationAddMins)} min` : null,
-    ].filter(Boolean).join(", ");
-    addRule.mutate({
-      itemId,
-      name: `${range}: ${effects}`,
-      conditionMin: minV,
-      conditionMax: maxV,
-      priceAdd,
-      durationAddMins,
-    });
-    setMin(""); setMax(""); setPrice(""); setMins("");
-  }
-
-  return (
-    <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-4 pl-12">
-      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-gray-400">
-        <Ruler className="h-3 w-3" /> Square-footage rules for {itemName}
-      </p>
-
-      {rules.isLoading ? (
-        <Loader2 className="h-4 w-4 animate-spin text-gray-300" />
-      ) : (
-        <div className="space-y-1.5">
-          {(rules.data ?? []).map((rule) => (
-            <div key={rule.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
-              <p className="text-[12px] text-gray-700">
-                <span className="font-medium">When</span> {rule.conditionMin?.toLocaleString() ?? "0"}–{rule.conditionMax?.toLocaleString() ?? "∞"} sq ft
-                <span className="font-medium"> then</span>
-                {rule.priceAdd !== 0 && ` ${rule.priceAdd > 0 ? "add" : "subtract"} $${Math.abs(rule.priceAdd)}`}
-                {rule.priceAdd !== 0 && rule.durationAddMins !== 0 && " and"}
-                {rule.durationAddMins !== 0 && ` ${rule.durationAddMins > 0 ? "add" : "subtract"} ${Math.abs(rule.durationAddMins)} min`}
-              </p>
-              <button
-                onClick={() => deleteRule.mutate({ ruleId: rule.id })}
-                aria-label="Delete rule"
-                className="shrink-0 rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-red-500"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
-          {(rules.data ?? []).length === 0 && (
-            <p className="text-[12px] text-gray-400">No rules yet — price and duration stay flat for any size.</p>
-          )}
-        </div>
+      {showConsole && (
+        <QuoteConsole
+          items={rows.filter((r) => r.state === "PUBLISHED").map((r) => ({ id: r.id, name: r.name }))}
+          onClose={() => setShowConsole(false)}
+        />
       )}
-
-      {/* Sentence builder */}
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px] text-gray-600">
-        <span className="font-medium">When</span>
-        <input value={min} onChange={(e) => setMin(e.target.value)} placeholder="2,501" inputMode="numeric" className={cn(inputCls, "w-20")} aria-label="Min square footage" />
-        <span>–</span>
-        <input value={max} onChange={(e) => setMax(e.target.value)} placeholder="4,000" inputMode="numeric" className={cn(inputCls, "w-20")} aria-label="Max square footage" />
-        <span>sq ft,</span>
-        <span className="font-medium">add</span>
-        <span>$</span>
-        <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="75" inputMode="decimal" className={cn(inputCls, "w-16")} aria-label="Price to add" />
-        <span>and</span>
-        <input value={mins} onChange={(e) => setMins(e.target.value)} placeholder="30" inputMode="numeric" className={cn(inputCls, "w-14")} aria-label="Minutes to add" />
-        <span>min</span>
-        <button
-          onClick={submit}
-          disabled={addRule.isPending}
-          className="ml-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-[12px] font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-        >
-          {addRule.isPending ? "Adding…" : "Add rule"}
-        </button>
-      </div>
-      {addRule.error && <p className="mt-1.5 text-[11px] text-red-600">{addRule.error.message}</p>}
     </div>
   );
 }

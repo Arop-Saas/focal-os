@@ -223,6 +223,102 @@ export const catalogRouter = router({
       return ctx.prisma.productRule.delete({ where: { id: rule.id } });
     }),
 
+  getItem: workspaceProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const item = await ctx.prisma.catalogItem.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspace!.id },
+        include: { currentVersion: true },
+      });
+      if (!item) throw new TRPCError({ code: "NOT_FOUND" });
+      return item;
+    }),
+
+  /** Order forms available for offerings (id + title only). */
+  listOrderForms: workspaceProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.orderForm.findMany({
+      where: { workspaceId: ctx.workspace!.id },
+      select: { id: true, title: true },
+      orderBy: { sortOrder: "asc" },
+    });
+  }),
+
+  listOfferings: workspaceProcedure
+    .input(z.object({ itemId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.offering.findMany({
+        where: { workspaceId: ctx.workspace!.id, itemId: input.itemId },
+        select: { id: true, orderFormId: true, visible: true },
+      });
+    }),
+
+  /** Toggle whether an item is offered on an order form. */
+  setOffering: adminProcedure
+    .input(z.object({ itemId: z.string(), orderFormId: z.string(), offered: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const [item, form] = await Promise.all([
+        ctx.prisma.catalogItem.findFirst({
+          where: { id: input.itemId, workspaceId: ctx.workspace!.id }, select: { id: true },
+        }),
+        ctx.prisma.orderForm.findFirst({
+          where: { id: input.orderFormId, workspaceId: ctx.workspace!.id }, select: { id: true },
+        }),
+      ]);
+      if (!item || !form) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (input.offered) {
+        return ctx.prisma.offering.upsert({
+          where: { itemId_orderFormId: { itemId: input.itemId, orderFormId: input.orderFormId } },
+          create: { workspaceId: ctx.workspace!.id, itemId: input.itemId, orderFormId: input.orderFormId },
+          update: { visible: true },
+        });
+      }
+      await ctx.prisma.offering.deleteMany({
+        where: { itemId: input.itemId, orderFormId: input.orderFormId },
+      });
+      return { removed: true };
+    }),
+
+  listComponents: workspaceProcedure
+    .input(z.object({ packageItemId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.packageComponent.findMany({
+        where: { packageItemId: input.packageItemId, package: { workspaceId: ctx.workspace!.id } },
+        include: { child: { include: { currentVersion: true } } },
+      });
+    }),
+
+  addComponent: adminProcedure
+    .input(z.object({ packageItemId: z.string(), childItemId: z.string(), quantity: z.number().int().min(1).max(99).default(1) }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.packageItemId === input.childItemId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A package cannot contain itself." });
+      }
+      const [parent, child] = await Promise.all([
+        ctx.prisma.catalogItem.findFirst({ where: { id: input.packageItemId, workspaceId: ctx.workspace!.id } }),
+        ctx.prisma.catalogItem.findFirst({ where: { id: input.childItemId, workspaceId: ctx.workspace!.id } }),
+      ]);
+      if (!parent || !child) throw new TRPCError({ code: "NOT_FOUND" });
+      if (parent.role !== "PACKAGE") throw new TRPCError({ code: "BAD_REQUEST", message: "Components can only be added to packages." });
+      if (child.role === "PACKAGE") throw new TRPCError({ code: "BAD_REQUEST", message: "Packages cannot contain other packages." });
+
+      return ctx.prisma.packageComponent.upsert({
+        where: { packageItemId_childItemId: { packageItemId: input.packageItemId, childItemId: input.childItemId } },
+        create: { packageItemId: input.packageItemId, childItemId: input.childItemId, quantity: input.quantity },
+        update: { quantity: input.quantity },
+      });
+    }),
+
+  removeComponent: adminProcedure
+    .input(z.object({ componentId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const comp = await ctx.prisma.packageComponent.findFirst({
+        where: { id: input.componentId, package: { workspaceId: ctx.workspace!.id } },
+      });
+      if (!comp) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.packageComponent.delete({ where: { id: comp.id } });
+    }),
+
   /** Test console: quote a hypothetical order and see the explanation. */
   quotePreview: workspaceProcedure
     .input(
