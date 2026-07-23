@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +41,7 @@ interface WeekScheduleProps {
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOUR_PX = 40; // pixel height of one hour row
+const GRID_HOURS = 24; // the grid always spans the full day; scrolling reveals off-hours
 
 const STATUS_BLOCK: Record<string, string> = {
   PENDING: "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100",
@@ -122,22 +126,23 @@ export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO, hours }: 
     (byDay.get(iso) ?? byDay.set(iso, []).get(iso)!).push({ job, startMin, endMin });
   }
 
-  // Time axis: span the business hours of all open days, extended to fit any
-  // job that falls outside them; fallback 8 AM – 6 PM.
+  // Full-day axis; the visible window initially covers business hours ±1h
   const openDays = hours.filter((h) => h.isOpen);
-  let axisStart = openDays.length ? Math.min(...openDays.map((h) => toMin(h.openTime))) : 8 * 60;
-  let axisEnd = openDays.length ? Math.max(...openDays.map((h) => toMin(h.closeTime))) : 18 * 60;
-  for (const items of Array.from(byDay.values())) {
-    for (const it of items) {
-      axisStart = Math.min(axisStart, it.startMin);
-      axisEnd = Math.max(axisEnd, it.endMin);
-    }
-  }
-  const startHour = Math.floor(axisStart / 60);
-  const endHour = Math.min(Math.ceil(axisEnd / 60), 24);
-  const axisHours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
-  const gridHeight = axisHours.length * HOUR_PX;
-  const yOf = (min: number) => ((min - startHour * 60) / 60) * HOUR_PX;
+  const openStartMin = openDays.length ? Math.min(...openDays.map((h) => toMin(h.openTime))) : 8 * 60;
+  const openEndMin = openDays.length ? Math.max(...openDays.map((h) => toMin(h.closeTime))) : 18 * 60;
+
+  const gridHeight = GRID_HOURS * HOUR_PX;
+  const yOf = (min: number) => (min / 60) * HOUR_PX;
+
+  const windowTop = Math.max(yOf(openStartMin) - HOUR_PX, 0);
+  const windowBottom = Math.min(yOf(openEndMin) + HOUR_PX, gridHeight);
+  const viewportHeight = windowBottom - windowTop;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = windowTop;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const iso = addWallDays(weekStartISO, i);
@@ -156,7 +161,6 @@ export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO, hours }: 
   // "Now" marker, in the workspace timezone
   const nowParts = utcToWallParts(new Date(), timezone);
   const nowMin = nowParts.hour * 60 + nowParts.minute;
-  const showNow = nowMin >= startHour * 60 && nowMin <= endHour * 60;
 
   const weekEndISO = addWallDays(weekStartISO, 6);
 
@@ -179,7 +183,7 @@ export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO, hours }: 
 
       <div className="overflow-x-auto">
         <div className="min-w-[640px]">
-          {/* Day headers */}
+          {/* Day headers (fixed above the scrolling grid) */}
           <div className="flex border-b border-gray-100">
             <div className="w-12 shrink-0" />
             {days.map((day) => (
@@ -204,100 +208,102 @@ export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO, hours }: 
             ))}
           </div>
 
-          {/* Time grid */}
-          <div className="flex">
-            {/* Hour gutter */}
-            <div className="relative w-12 shrink-0" style={{ height: gridHeight }}>
-              {axisHours.map((h, i) => (
-                <p
-                  key={h}
-                  className="absolute right-2 text-[9px] font-medium text-gray-400"
-                  style={{ top: i * HOUR_PX - 6 }}
-                >
-                  {i > 0 && hourLabel(h)}
-                </p>
-              ))}
-            </div>
+          {/* Scrollable full-day grid — opens on business hours ±1h */}
+          <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: viewportHeight }}>
+            <div className="flex">
+              {/* Hour gutter */}
+              <div className="relative w-12 shrink-0" style={{ height: gridHeight }}>
+                {Array.from({ length: GRID_HOURS }, (_, h) => (
+                  <p
+                    key={h}
+                    className="absolute right-2 text-[9px] font-medium text-gray-400"
+                    style={{ top: h * HOUR_PX - 6 }}
+                  >
+                    {h > 0 && hourLabel(h)}
+                  </p>
+                ))}
+              </div>
 
-            {/* Day columns */}
-            {days.map((day) => {
-              const open = day.hours?.isOpen
-                ? { start: toMin(day.hours.openTime), end: toMin(day.hours.closeTime) }
-                : null;
-              return (
-                <div
-                  key={day.iso}
-                  className="relative flex-1 border-l border-gray-50 bg-gray-50/60"
-                  style={{ height: gridHeight }}
-                >
-                  {/* Business-hours window (white = open) */}
-                  {open && (
-                    <div
-                      className="absolute inset-x-0 bg-white"
-                      style={{ top: Math.max(yOf(open.start), 0), height: yOf(open.end) - Math.max(yOf(open.start), 0) }}
-                    />
-                  )}
-                  {/* Hour gridlines */}
-                  {axisHours.map((h, i) => (
-                    <div
-                      key={h}
-                      className="pointer-events-none absolute inset-x-0 border-t border-gray-100/80"
-                      style={{ top: i * HOUR_PX }}
-                    />
-                  ))}
-                  {/* Today tint */}
-                  {day.isToday && (
-                    <div className="pointer-events-none absolute inset-0 bg-blue-500/[0.04]" />
-                  )}
-                  {/* Now marker */}
-                  {day.isToday && showNow && (
-                    <div
-                      className="pointer-events-none absolute inset-x-0 z-10 border-t border-red-400"
-                      style={{ top: yOf(nowMin) }}
-                    >
-                      <span className="absolute -left-0.5 -top-[3px] h-1.5 w-1.5 rounded-full bg-red-400" />
-                    </div>
-                  )}
-                  {/* Appointments */}
-                  {day.items.map((p) => {
-                    const top = yOf(p.startMin) + 1;
-                    const height = Math.max(yOf(p.endMin) - yOf(p.startMin) - 2, 18);
-                    const widthPct = 100 / p.lanes;
-                    const tall = height >= 34;
-                    return (
-                      <Link
-                        key={p.job.id}
-                        href={`/jobs/${p.job.id}`}
-                        className={cn(
-                          "absolute z-[5] overflow-hidden rounded-md border-l-2 px-1.5 py-0.5 transition-colors",
-                          STATUS_BLOCK[p.job.status] ?? "border-gray-400 bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        )}
-                        style={{
-                          top,
-                          height,
-                          left: `calc(${p.lane * widthPct}% + 2px)`,
-                          width: `calc(${widthPct}% - 4px)`,
-                        }}
+              {/* Day columns */}
+              {days.map((day) => {
+                const open = day.hours?.isOpen
+                  ? { start: toMin(day.hours.openTime), end: toMin(day.hours.closeTime) }
+                  : null;
+                return (
+                  <div
+                    key={day.iso}
+                    className="relative flex-1 border-l border-gray-50 bg-gray-50/80"
+                    style={{ height: gridHeight }}
+                  >
+                    {/* Business-hours window (white = open, gray = off-hours) */}
+                    {open && (
+                      <div
+                        className="absolute inset-x-0 bg-white"
+                        style={{ top: yOf(open.start), height: yOf(open.end) - yOf(open.start) }}
+                      />
+                    )}
+                    {/* Hour gridlines */}
+                    {Array.from({ length: GRID_HOURS }, (_, h) => (
+                      <div
+                        key={h}
+                        className="pointer-events-none absolute inset-x-0 border-t border-gray-100/80"
+                        style={{ top: h * HOUR_PX }}
+                      />
+                    ))}
+                    {/* Today tint */}
+                    {day.isToday && (
+                      <div className="pointer-events-none absolute inset-0 bg-blue-500/[0.04]" />
+                    )}
+                    {/* Now marker */}
+                    {day.isToday && (
+                      <div
+                        className="pointer-events-none absolute inset-x-0 z-10 border-t border-red-400"
+                        style={{ top: yOf(nowMin) }}
                       >
-                        <p className="truncate text-[9px] font-semibold leading-tight opacity-70">
-                          {p.job.scheduledAt && fmtInTz(p.job.scheduledAt, timezone, DISPLAY_TIME)}
-                        </p>
-                        {tall && (
-                          <p className="truncate text-[10px] font-semibold leading-tight">
-                            {p.job.propertyAddress}
+                        <span className="absolute -left-0.5 -top-[3px] h-1.5 w-1.5 rounded-full bg-red-400" />
+                      </div>
+                    )}
+                    {/* Appointments */}
+                    {day.items.map((p) => {
+                      const top = yOf(p.startMin) + 1;
+                      const height = Math.max(yOf(p.endMin) - yOf(p.startMin) - 2, 18);
+                      const widthPct = 100 / p.lanes;
+                      const tall = height >= 34;
+                      return (
+                        <Link
+                          key={p.job.id}
+                          href={`/jobs/${p.job.id}`}
+                          className={cn(
+                            "absolute z-[5] overflow-hidden rounded-md border-l-2 px-1.5 py-0.5 transition-colors",
+                            STATUS_BLOCK[p.job.status] ?? "border-gray-400 bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          )}
+                          style={{
+                            top,
+                            height,
+                            left: `calc(${p.lane * widthPct}% + 2px)`,
+                            width: `calc(${widthPct}% - 4px)`,
+                          }}
+                        >
+                          <p className="truncate text-[9px] font-semibold leading-tight opacity-70">
+                            {p.job.scheduledAt && fmtInTz(p.job.scheduledAt, timezone, DISPLAY_TIME)}
                           </p>
-                        )}
-                        {height >= 52 && (
-                          <p className="truncate text-[9px] leading-tight opacity-60">
-                            {p.job.client.firstName} {p.job.client.lastName}
-                          </p>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                          {tall && (
+                            <p className="truncate text-[10px] font-semibold leading-tight">
+                              {p.job.propertyAddress}
+                            </p>
+                          )}
+                          {height >= 52 && (
+                            <p className="truncate text-[9px] leading-tight opacity-60">
+                              {p.job.client.firstName} {p.job.client.lastName}
+                            </p>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
