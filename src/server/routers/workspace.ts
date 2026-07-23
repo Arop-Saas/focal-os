@@ -5,6 +5,13 @@ import { slugify } from "@/lib/utils";
 import { sendWelcomeEmail } from "@/lib/resend";
 import { type BookingFormSettings, type PortalSettings, DEFAULT_BOOKING_FORM_SETTINGS, DEFAULT_PORTAL_SETTINGS } from "@/lib/booking-form-types";
 
+// Subdomain-style slugs that can never be claimed by a workspace
+const RESERVED_SLUGS = new Set([
+  "www", "app", "api", "admin", "mail", "email", "portal", "book", "booking",
+  "help", "support", "status", "blog", "docs", "dashboard", "billing",
+  "staging", "dev", "test", "demo", "assets", "cdn", "static", "scalist",
+]);
+
 export const workspaceRouter = router({
   // Get current workspace
   getCurrent: workspaceProcedure.query(async ({ ctx }) => {
@@ -23,13 +30,23 @@ export const workspaceRouter = router({
     });
   }),
 
+  // Is a workspace slug (future subdomain) still available?
+  slugAvailable: protectedProcedure
+    .input(z.object({ slug: z.string().min(2).max(50) }))
+    .query(async ({ ctx, input }) => {
+      const slug = input.slug.toLowerCase();
+      if (RESERVED_SLUGS.has(slug)) return { available: false };
+      const existing = await ctx.prisma.workspace.findUnique({ where: { slug } });
+      return { available: !existing };
+    }),
+
   // Create workspace (during onboarding)
   create: protectedProcedure
     .input(
       z.object({
         name: z.string().min(2).max(100),
         slug: z.string().min(2).max(50).optional(),
-        phone: z.string().optional(),
+        phone: z.string().min(7, "Phone number is required"),
         email: z.string().email().optional(),
         timezone: z.string().default("America/New_York"),
         currency: z.string().default("USD"),
@@ -41,7 +58,14 @@ export const workspaceRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const slug = input.slug ?? slugify(input.name);
+      const slug = (input.slug ?? slugify(input.name)).toLowerCase();
+
+      if (RESERVED_SLUGS.has(slug)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This workspace address is reserved. Try a different company name.",
+        });
+      }
 
       // Check slug uniqueness
       const existing = await ctx.prisma.workspace.findUnique({
@@ -50,7 +74,7 @@ export const workspaceRouter = router({
       if (existing) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "This workspace URL is already taken. Try a different name.",
+          message: "A workspace with this address already exists. Add your city or region to the name to make it unique.",
         });
       }
 
@@ -145,6 +169,7 @@ export const workspaceRouter = router({
         reminderOverdueRepeat: z.number().int().min(0).max(90).optional(),
         showBranding: z.boolean().optional(),
         emailSubtitle: z.string().max(100).optional(),
+        estimatedShootsPerMonth: z.string().max(20).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

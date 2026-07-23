@@ -17,6 +17,11 @@ export async function GET(req: NextRequest) {
 
   const sessionToken = req.nextUrl.searchParams.get("session") || undefined;
 
+  // Optional ISO 3166-1 alpha-2 country restriction (e.g. "us", "ca")
+  const countryParam = req.nextUrl.searchParams.get("country")?.toLowerCase();
+  const includedRegionCodes =
+    countryParam && /^[a-z]{2}$/.test(countryParam) ? [countryParam] : ["us", "ca"];
+
   const body: Record<string, unknown> = {
     input: query,
     includedPrimaryTypes: [
@@ -25,7 +30,7 @@ export async function GET(req: NextRequest) {
       "administrative_area_level_3",
       "neighborhood",
     ],
-    includedRegionCodes: ["us", "ca"],
+    includedRegionCodes,
     languageCode: "en",
   };
   if (sessionToken) {

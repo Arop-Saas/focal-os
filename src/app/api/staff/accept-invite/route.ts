@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
           data: {
             workspaceId: invite.workspaceId,
             userId: user!.id,
-            role: invite.role as "ADMIN" | "MANAGER" | "PHOTOGRAPHER" | "EDITOR" | "VA" | "VIEWER",
+            role: invite.role as "OWNER" | "ADMIN" | "MANAGER" | "PHOTOGRAPHER" | "EDITOR" | "VA" | "VIEWER",
           },
         });
 

@@ -75,7 +75,7 @@ export const staffRouter = router({
       z.object({
         email: z.string().email(),
         role: z
-          .enum(["ADMIN", "MANAGER", "PHOTOGRAPHER", "EDITOR", "VA", "VIEWER"])
+          .enum(["OWNER", "ADMIN", "MANAGER", "PHOTOGRAPHER", "EDITOR", "VA", "VIEWER"])
           .default("PHOTOGRAPHER"),
         fullName: z.string().min(2),
       })

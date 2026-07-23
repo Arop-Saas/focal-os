@@ -66,7 +66,7 @@ export default function RegisterPage() {
       <div>
         <h2 className="text-xl font-bold text-white">Start your free trial</h2>
         <p className="mt-1 text-[13px] text-gray-500">
-          14 days free · No credit card required
+          3 months free · No credit card required
         </p>
       </div>
 

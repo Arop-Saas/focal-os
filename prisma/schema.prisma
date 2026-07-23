@@ -83,6 +83,7 @@ model Workspace {
   emailSubtitle         String   @default("Real Estate Photography") // Tagline shown in email header next to workspace name
   bookingFormSettings   Json?    // Serialized BookingFormSettings object
   portalSettings        Json?    // Serialized PortalSettings object
+  estimatedShootsPerMonth String? // Self-reported volume bucket from onboarding, e.g. "11-30"
 
   // Relations
   members          WorkspaceMember[]

@@ -8,6 +8,7 @@ type StaffInviteEmailProps = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
+  OWNER: "Owner",
   PHOTOGRAPHER: "Photographer",
   EDITOR: "Editor",
   MANAGER: "Manager",
