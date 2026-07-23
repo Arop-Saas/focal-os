@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Calendar, ChevronRight, Zap } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   addWallDays,
   DISPLAY_TIME,
   fmtInTz,
-  utcToWallDateISO,
+  utcToWallParts,
   wallDateDayOfWeek,
 } from "@/lib/scheduling/tz";
 
@@ -15,13 +15,14 @@ type Job = {
   scheduledAt: Date | null;
   estimatedDurationMins: number;
   status: string;
-  isRush?: boolean; // not in the Prisma schema yet — badge renders once it lands
   client: { firstName: string; lastName: string; phone: string | null };
   package: { name: string } | null;
   assignments: {
     staff: { member: { user: { fullName: string; avatarUrl: string | null } } };
   }[];
 };
+
+type DayHours = { dayOfWeek: number; isOpen: boolean; openTime: string; closeTime: string };
 
 interface WeekScheduleProps {
   /** Jobs scheduled within the current wall-clock week, ordered by time */
@@ -31,18 +32,31 @@ interface WeekScheduleProps {
   weekStartISO: string;
   /** "YYYY-MM-DD" of today in the workspace timezone */
   todayISO: string;
+  /** Workspace business hours (0=Sunday … 6=Saturday) */
+  hours: DayHours[];
 }
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const HOUR_PX = 40; // pixel height of one hour row
 
-const STATUS_DOT: Record<string, string> = {
-  PENDING: "bg-amber-400",
-  CONFIRMED: "bg-blue-500",
-  ASSIGNED: "bg-indigo-500",
-  IN_PROGRESS: "bg-violet-500",
-  COMPLETED: "bg-emerald-500",
-  DELIVERED: "bg-emerald-500",
+const STATUS_BLOCK: Record<string, string> = {
+  PENDING: "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100",
+  CONFIRMED: "border-blue-500 bg-blue-50 text-blue-900 hover:bg-blue-100",
+  ASSIGNED: "border-indigo-500 bg-indigo-50 text-indigo-900 hover:bg-indigo-100",
+  IN_PROGRESS: "border-violet-500 bg-violet-50 text-violet-900 hover:bg-violet-100",
+  COMPLETED: "border-emerald-500 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+  DELIVERED: "border-emerald-500 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
 };
+
+function toMin(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
+function hourLabel(h: number): string {
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12} ${h < 12 || h === 24 ? "AM" : "PM"}`;
+}
 
 /** "Jul 26" from a wall-date ISO string (timezone-independent) */
 function monthDay(iso: string): string {
@@ -54,74 +68,97 @@ function monthDay(iso: string): string {
   });
 }
 
-function AgendaItem({ job, timezone }: { job: Job; timezone: string }) {
-  const photographer = job.assignments[0]?.staff.member.user;
-  const start = job.scheduledAt ? fmtInTz(job.scheduledAt, timezone, DISPLAY_TIME) : null;
-  const end =
-    job.scheduledAt && job.estimatedDurationMins
-      ? fmtInTz(
-          new Date(new Date(job.scheduledAt).getTime() + job.estimatedDurationMins * 60_000),
-          timezone,
-          DISPLAY_TIME
-        )
-      : null;
+type Positioned = {
+  job: Job;
+  startMin: number;
+  endMin: number;
+  lane: number;
+  lanes: number;
+};
 
-  return (
-    <Link
-      href={`/jobs/${job.id}`}
-      className="group flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2 transition-colors hover:border-blue-200 hover:bg-blue-50/40"
-    >
-      <div className="w-[70px] shrink-0 pt-0.5">
-        <p className="text-[12px] font-semibold text-gray-700">{start ?? "—"}</p>
-        {end && <p className="text-[10px] text-gray-400">– {end}</p>}
-      </div>
-      <div className="w-px self-stretch bg-gray-200 transition-colors group-hover:bg-blue-300" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className="truncate text-[13px] font-semibold text-gray-900 transition-colors group-hover:text-blue-800">
-            {job.propertyAddress}
-          </p>
-          {job.isRush && (
-            <span className="flex shrink-0 items-center gap-0.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">
-              <Zap className="h-2.5 w-2.5" /> RUSH
-            </span>
-          )}
-        </div>
-        <p className="mt-0.5 truncate text-[11px] text-gray-500">
-          {job.client.firstName} {job.client.lastName}
-          {photographer && <span className="text-gray-400"> · {photographer.fullName.split(" ")[0]}</span>}
-          {job.package && <span className="text-gray-400"> · {job.package.name}</span>}
-        </p>
-      </div>
-      <span
-        className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[job.status] ?? "bg-gray-300")}
-      />
-    </Link>
-  );
+/** Assign overlapping jobs to side-by-side lanes within a day column. */
+function layoutDay(items: { job: Job; startMin: number; endMin: number }[]): Positioned[] {
+  const sorted = [...items].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+  const result: Positioned[] = [];
+  let cluster: Positioned[] = [];
+  let laneEnds: number[] = [];
+  let clusterEnd = -1;
+
+  const flush = () => {
+    for (const p of cluster) p.lanes = laneEnds.length;
+    cluster = [];
+    laneEnds = [];
+  };
+
+  for (const item of sorted) {
+    if (cluster.length && item.startMin >= clusterEnd) flush();
+    let lane = laneEnds.findIndex((end) => end <= item.startMin);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(item.endMin);
+    } else {
+      laneEnds[lane] = item.endMin;
+    }
+    const p: Positioned = { ...item, lane, lanes: 1 };
+    cluster.push(p);
+    result.push(p);
+    clusterEnd = Math.max(clusterEnd, item.endMin);
+  }
+  flush();
+  return result;
 }
 
-export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO }: WeekScheduleProps) {
-  // Group jobs onto wall-clock days in the workspace timezone
-  const byDay = new Map<string, Job[]>();
+export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO, hours }: WeekScheduleProps) {
+  const hoursByDay = new Map(hours.map((h) => [h.dayOfWeek, h]));
+
+  // Place each job on its wall-clock day in the workspace timezone
+  const byDay = new Map<string, { job: Job; startMin: number; endMin: number }[]>();
   for (const job of jobs) {
     if (!job.scheduledAt) continue;
-    const iso = utcToWallDateISO(new Date(job.scheduledAt), timezone);
-    (byDay.get(iso) ?? byDay.set(iso, []).get(iso)!).push(job);
+    const w = utcToWallParts(new Date(job.scheduledAt), timezone);
+    const iso = `${w.year.toString().padStart(4, "0")}-${w.month.toString().padStart(2, "0")}-${w.day.toString().padStart(2, "0")}`;
+    const startMin = w.hour * 60 + w.minute;
+    const endMin = Math.min(startMin + Math.max(job.estimatedDurationMins || 60, 30), 24 * 60);
+    (byDay.get(iso) ?? byDay.set(iso, []).get(iso)!).push({ job, startMin, endMin });
   }
+
+  // Time axis: span the business hours of all open days, extended to fit any
+  // job that falls outside them; fallback 8 AM – 6 PM.
+  const openDays = hours.filter((h) => h.isOpen);
+  let axisStart = openDays.length ? Math.min(...openDays.map((h) => toMin(h.openTime))) : 8 * 60;
+  let axisEnd = openDays.length ? Math.max(...openDays.map((h) => toMin(h.closeTime))) : 18 * 60;
+  for (const items of Array.from(byDay.values())) {
+    for (const it of items) {
+      axisStart = Math.min(axisStart, it.startMin);
+      axisEnd = Math.max(axisEnd, it.endMin);
+    }
+  }
+  const startHour = Math.floor(axisStart / 60);
+  const endHour = Math.min(Math.ceil(axisEnd / 60), 24);
+  const axisHours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
+  const gridHeight = axisHours.length * HOUR_PX;
+  const yOf = (min: number) => ((min - startHour * 60) / 60) * HOUR_PX;
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const iso = addWallDays(weekStartISO, i);
+    const dow = wallDateDayOfWeek(iso);
     return {
       iso,
-      dow: DOW_LABELS[wallDateDayOfWeek(iso)],
+      dow,
+      label: DOW_LABELS[dow],
       dayNum: Number(iso.split("-")[2]),
       isToday: iso === todayISO,
-      jobs: byDay.get(iso) ?? [],
+      hours: hoursByDay.get(dow),
+      items: layoutDay(byDay.get(iso) ?? []),
     };
   });
 
+  // "Now" marker, in the workspace timezone
+  const nowParts = utcToWallParts(new Date(), timezone);
+  const nowMin = nowParts.hour * 60 + nowParts.minute;
+  const showNow = nowMin >= startHour * 60 && nowMin <= endHour * 60;
+
   const weekEndISO = addWallDays(weekStartISO, 6);
-  const total = jobs.length;
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -140,53 +177,130 @@ export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO }: WeekSch
         </Link>
       </div>
 
-      {total === 0 ? (
-        <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-50">
-            <Calendar className="h-5 w-5 text-gray-300" />
-          </div>
-          <p className="text-sm font-medium text-gray-700">Nothing scheduled this week</p>
-          <p className="mb-4 mt-1 text-xs text-gray-400">Your week is wide open</p>
-          <Link
-            href="/jobs/new"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
-          >
-            Book a shoot <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
-      ) : (
-        <div className="divide-y divide-gray-50">
-          {days.map((day) => (
-            <div key={day.iso} className={cn("flex gap-4 px-5 py-3", day.isToday && "bg-blue-50/30")}>
-              <div className="w-10 shrink-0 pt-0.5 text-center">
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
+          {/* Day headers */}
+          <div className="flex border-b border-gray-100">
+            <div className="w-12 shrink-0" />
+            {days.map((day) => (
+              <div key={day.iso} className="flex-1 border-l border-gray-50 py-2 text-center">
                 <p
                   className={cn(
                     "text-[10px] font-bold uppercase tracking-wide",
                     day.isToday ? "text-blue-600" : "text-gray-400"
                   )}
                 >
-                  {day.dow}
+                  {day.label}
                 </p>
                 <p
                   className={cn(
-                    "mx-auto mt-0.5 grid h-7 w-7 place-items-center rounded-full text-[14px] font-bold",
+                    "mx-auto mt-0.5 grid h-6 w-6 place-items-center rounded-full text-[13px] font-bold",
                     day.isToday ? "bg-blue-600 text-white" : "text-gray-800"
                   )}
                 >
                   {day.dayNum}
                 </p>
               </div>
-              <div className="min-w-0 flex-1 space-y-1.5">
-                {day.jobs.length === 0 ? (
-                  <p className="pt-2.5 text-[12px] text-gray-300">No shoots</p>
-                ) : (
-                  day.jobs.map((job) => <AgendaItem key={job.id} job={job} timezone={timezone} />)
-                )}
-              </div>
+            ))}
+          </div>
+
+          {/* Time grid */}
+          <div className="flex">
+            {/* Hour gutter */}
+            <div className="relative w-12 shrink-0" style={{ height: gridHeight }}>
+              {axisHours.map((h, i) => (
+                <p
+                  key={h}
+                  className="absolute right-2 text-[9px] font-medium text-gray-400"
+                  style={{ top: i * HOUR_PX - 6 }}
+                >
+                  {i > 0 && hourLabel(h)}
+                </p>
+              ))}
             </div>
-          ))}
+
+            {/* Day columns */}
+            {days.map((day) => {
+              const open = day.hours?.isOpen
+                ? { start: toMin(day.hours.openTime), end: toMin(day.hours.closeTime) }
+                : null;
+              return (
+                <div
+                  key={day.iso}
+                  className="relative flex-1 border-l border-gray-50 bg-gray-50/60"
+                  style={{ height: gridHeight }}
+                >
+                  {/* Business-hours window (white = open) */}
+                  {open && (
+                    <div
+                      className="absolute inset-x-0 bg-white"
+                      style={{ top: Math.max(yOf(open.start), 0), height: yOf(open.end) - Math.max(yOf(open.start), 0) }}
+                    />
+                  )}
+                  {/* Hour gridlines */}
+                  {axisHours.map((h, i) => (
+                    <div
+                      key={h}
+                      className="pointer-events-none absolute inset-x-0 border-t border-gray-100/80"
+                      style={{ top: i * HOUR_PX }}
+                    />
+                  ))}
+                  {/* Today tint */}
+                  {day.isToday && (
+                    <div className="pointer-events-none absolute inset-0 bg-blue-500/[0.04]" />
+                  )}
+                  {/* Now marker */}
+                  {day.isToday && showNow && (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 z-10 border-t border-red-400"
+                      style={{ top: yOf(nowMin) }}
+                    >
+                      <span className="absolute -left-0.5 -top-[3px] h-1.5 w-1.5 rounded-full bg-red-400" />
+                    </div>
+                  )}
+                  {/* Appointments */}
+                  {day.items.map((p) => {
+                    const top = yOf(p.startMin) + 1;
+                    const height = Math.max(yOf(p.endMin) - yOf(p.startMin) - 2, 18);
+                    const widthPct = 100 / p.lanes;
+                    const tall = height >= 34;
+                    return (
+                      <Link
+                        key={p.job.id}
+                        href={`/jobs/${p.job.id}`}
+                        className={cn(
+                          "absolute z-[5] overflow-hidden rounded-md border-l-2 px-1.5 py-0.5 transition-colors",
+                          STATUS_BLOCK[p.job.status] ?? "border-gray-400 bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        )}
+                        style={{
+                          top,
+                          height,
+                          left: `calc(${p.lane * widthPct}% + 2px)`,
+                          width: `calc(${widthPct}% - 4px)`,
+                        }}
+                      >
+                        <p className="truncate text-[9px] font-semibold leading-tight opacity-70">
+                          {p.job.scheduledAt && fmtInTz(p.job.scheduledAt, timezone, DISPLAY_TIME)}
+                        </p>
+                        {tall && (
+                          <p className="truncate text-[10px] font-semibold leading-tight">
+                            {p.job.propertyAddress}
+                          </p>
+                        )}
+                        {height >= 52 && (
+                          <p className="truncate text-[9px] leading-tight opacity-60">
+                            {p.job.client.firstName} {p.job.client.lastName}
+                          </p>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

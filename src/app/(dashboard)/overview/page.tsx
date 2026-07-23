@@ -68,6 +68,7 @@ export default async function DashboardPage() {
     jobStatusCounts,
     activityLogs,
     revenueForSparkline,
+    workspaceHours,
   ] = await Promise.all([
     prisma.job.count({
       where: { workspaceId: workspace.id, scheduledAt: { gte: startOfMonth }, status: { not: "CANCELLED" } },
@@ -116,6 +117,10 @@ export default async function DashboardPage() {
     prisma.invoice.findMany({
       where: { workspaceId: workspace.id, status: "PAID", paidAt: { gte: subWeeks(now, 8) } },
       select: { paidAt: true, amountPaid: true },
+    }),
+    prisma.workspaceHours.findMany({
+      where: { workspaceId: workspace.id },
+      select: { dayOfWeek: true, isOpen: true, openTime: true, closeTime: true },
     }),
   ]);
 
@@ -192,6 +197,7 @@ export default async function DashboardPage() {
               timezone={workspace.timezone}
               weekStartISO={weekStartISO}
               todayISO={todayISO}
+              hours={workspaceHours}
             />
           </div>
           <div>
