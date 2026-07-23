@@ -29,13 +29,15 @@ export function OrderViews({
 }: {
   active: OrderViewKey;
   counts: Partial<Record<OrderViewKey, number>>;
-  searchParams: { search?: string; sort?: string };
+  /** current URL params — everything except view/page is preserved across view switches */
+  searchParams: Record<string, string | undefined>;
 }) {
   function hrefFor(view: OrderViewKey) {
     const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value && key !== "view" && key !== "page") params.set(key, value);
+    }
     if (view !== "needs_attention") params.set("view", view);
-    if (searchParams.search) params.set("search", searchParams.search);
-    if (searchParams.sort) params.set("sort", searchParams.sort);
     const qs = params.toString();
     return qs ? `/jobs?${qs}` : "/jobs";
   }

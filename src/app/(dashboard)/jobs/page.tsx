@@ -5,11 +5,11 @@ import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
 import { OrdersTable, type OrderRow } from "@/components/jobs/orders-table";
 import { OrderViews, ORDER_VIEWS, type OrderViewKey } from "@/components/jobs/order-views";
-import { JobFilters } from "@/components/jobs/job-filters";
+import { JobFilters, type OrderFilterValues } from "@/components/jobs/job-filters";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { computeOrderAttention } from "@/lib/orders/attention";
-import { utcToWallDateISO, wallDayUtcRange } from "@/lib/scheduling/tz";
+import { utcToWallDateISO, wallDayUtcRange, wallTimeToUtc } from "@/lib/scheduling/tz";
 
 export const metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -20,6 +20,15 @@ interface PageProps {
     view?: string;
     search?: string;
     sort?: string;
+    stage?: string;
+    pay?: string;
+    staffId?: string;
+    serviceId?: string;
+    priority?: string;
+    schedFrom?: string;
+    schedTo?: string;
+    createdFrom?: string;
+    createdTo?: string;
   };
 }
 
@@ -34,6 +43,9 @@ function resolveOrderBy(sort?: string): object[] {
 }
 
 const UNPAID = ["SENT", "VIEWED", "PARTIAL", "OVERDUE"];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"];
+const PAY_FILTERS = ["UNBILLED", "DRAFT", "DUE", "PARTIAL", "PAID", "OVERDUE"];
 const PAGE_SIZE = 20;
 /** Working-set cap for in-memory view derivation — revisit when volume demands */
 const FETCH_CAP = 500;
@@ -52,6 +64,25 @@ export default async function OrdersPage({ searchParams }: PageProps) {
     ? searchParams.view
     : "needs_attention") as OrderViewKey;
   const page = Math.max(1, parseInt(searchParams.page ?? "1"));
+  const tz = workspace?.timezone ?? "America/New_York";
+
+  // Advanced filters (all optional, validated; invalid values ignored)
+  const filters: OrderFilterValues = {
+    stage: searchParams.stage,
+    pay: PAY_FILTERS.includes(searchParams.pay ?? "") ? searchParams.pay : undefined,
+    staffId: searchParams.staffId,
+    serviceId: searchParams.serviceId,
+    priority: PRIORITIES.includes(searchParams.priority ?? "") ? searchParams.priority : undefined,
+    schedFrom: DATE_RE.test(searchParams.schedFrom ?? "") ? searchParams.schedFrom : undefined,
+    schedTo: DATE_RE.test(searchParams.schedTo ?? "") ? searchParams.schedTo : undefined,
+    createdFrom: DATE_RE.test(searchParams.createdFrom ?? "") ? searchParams.createdFrom : undefined,
+    createdTo: DATE_RE.test(searchParams.createdTo ?? "") ? searchParams.createdTo : undefined,
+  };
+  // Date bounds interpreted as wall-clock days in the workspace timezone
+  const schedGte = filters.schedFrom ? wallTimeToUtc(filters.schedFrom, "00:00", tz) : undefined;
+  const schedLt  = filters.schedTo ? wallDayUtcRange(filters.schedTo, tz).end : undefined;
+  const createdGte = filters.createdFrom ? wallTimeToUtc(filters.createdFrom, "00:00", tz) : undefined;
+  const createdLt  = filters.createdTo ? wallDayUtcRange(filters.createdTo, tz).end : undefined;
 
   const jobs = await prisma.job.findMany({
     where: {
@@ -66,6 +97,11 @@ export default async function OrdersPage({ searchParams }: PageProps) {
           ]}},
         ],
       }),
+      ...(filters.priority && { priority: filters.priority as never }),
+      ...((schedGte || schedLt) && { scheduledAt: { ...(schedGte && { gte: schedGte }), ...(schedLt && { lt: schedLt }) } }),
+      ...((createdGte || createdLt) && { createdAt: { ...(createdGte && { gte: createdGte }), ...(createdLt && { lt: createdLt }) } }),
+      ...(filters.staffId && { assignments: { some: { staffId: filters.staffId } } }),
+      ...(filters.serviceId && { services: { some: { serviceId: filters.serviceId } } }),
     },
     include: {
       client: { select: { firstName: true, lastName: true, company: true, brokerageGroup: { select: { name: true } } } },
@@ -83,12 +119,24 @@ export default async function OrdersPage({ searchParams }: PageProps) {
     take: FETCH_CAP,
   });
 
+  const [staffRows, serviceRows] = await Promise.all([
+    prisma.staffProfile.findMany({
+      where: { workspaceId, isActive: true },
+      select: { id: true, member: { select: { user: { select: { fullName: true } } } } },
+    }),
+    prisma.service.findMany({
+      where: { workspaceId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  const staffOptions = staffRows.map((s) => ({ id: s.id, name: s.member.user.fullName }));
+
   // Derive stage + next action once per row, then slice into views
   const now = new Date();
-  const tz = workspace?.timezone ?? "America/New_York";
   const { start: todayStart, end: todayEnd } = wallDayUtcRange(utcToWallDateISO(now, tz), tz);
 
-  const decorated = jobs.map((job) => ({
+  const decoratedAll = jobs.map((job) => ({
     job,
     ...computeOrderAttention({
       jobStatus: job.status,
@@ -103,6 +151,19 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       now,
     }),
   }));
+
+  // Stage + payment filters need derived/composite state — applied post-query,
+  // before view counts so the counts always reflect the active filters.
+  const decorated = decoratedAll.filter((d) => {
+    if (filters.stage && d.stage !== filters.stage) return false;
+    if (filters.pay) {
+      const inv = d.job.invoice?.status ?? null;
+      if (filters.pay === "UNBILLED" && inv !== null) return false;
+      if (filters.pay === "DUE" && inv !== "SENT" && inv !== "VIEWED") return false;
+      if (["DRAFT", "PARTIAL", "PAID", "OVERDUE"].includes(filters.pay) && inv !== filters.pay) return false;
+    }
+    return true;
+  });
 
   function inView(d: (typeof decorated)[number], v: OrderViewKey): boolean {
     const sched = d.job.scheduledAt;
@@ -161,12 +222,14 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         }
       />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
-        <OrderViews
-          active={view}
-          counts={counts}
-          searchParams={{ search: searchParams.search, sort: searchParams.sort }}
+        <OrderViews active={view} counts={counts} searchParams={searchParams} />
+        <JobFilters
+          currentSearch={searchParams.search}
+          currentSort={searchParams.sort}
+          filters={filters}
+          staffOptions={staffOptions}
+          serviceOptions={serviceRows}
         />
-        <JobFilters currentSearch={searchParams.search} currentSort={searchParams.sort} />
         <OrdersTable rows={rows} total={total} page={page} limit={PAGE_SIZE} view={view} timezone={tz} />
       </div>
     </div>
