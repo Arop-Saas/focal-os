@@ -90,16 +90,15 @@ const VOLUME_OPTIONS = [
   { value: "150+",   label: "150+ shoots",   caption: "High-volume operation" },
 ];
 
-// Displayed as Owner / Admin / Member; "Member" maps to the standard staff role
+// "Member" maps to the standard staff role
 const INVITE_ROLES = [
-  { label: "Owner",  value: "OWNER" },
-  { label: "Admin",  value: "ADMIN" },
   { label: "Member", value: "PHOTOGRAPHER" },
+  { label: "Admin",  value: "ADMIN" },
 ] as const;
 type InviteRoleValue = (typeof INVITE_ROLES)[number]["value"];
 
-type TeammateRow = { fullName: string; email: string; role: InviteRoleValue };
-const EMPTY_ROW: TeammateRow = { fullName: "", email: "", role: "PHOTOGRAPHER" };
+type TeammateRow = { firstName: string; lastName: string; email: string; role: InviteRoleValue };
+const EMPTY_ROW: TeammateRow = { firstName: "", lastName: "", email: "", role: "PHOTOGRAPHER" };
 
 const STEPS = [
   { label: "Studio info",    icon: Building2 },
@@ -237,11 +236,15 @@ export default function OnboardingPage() {
   async function onFinish(skip = false) {
     if (!skip) {
       const valid = teammates.filter(
-        (t) => t.fullName.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(t.email.trim())
+        (t) => t.firstName.trim() && t.lastName.trim() && /^\S+@\S+\.\S+$/.test(t.email.trim())
       );
       await Promise.allSettled(
         valid.map((t) =>
-          inviteStaff.mutateAsync({ fullName: t.fullName.trim(), email: t.email.trim(), role: t.role })
+          inviteStaff.mutateAsync({
+            fullName: `${t.firstName.trim()} ${t.lastName.trim()}`,
+            email: t.email.trim(),
+            role: t.role,
+          })
         )
       );
     }
@@ -516,40 +519,50 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-4">
                 {teammates.map((row, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      value={row.fullName}
-                      onChange={(e) => setTeammate(i, { fullName: e.target.value })}
-                      placeholder="Full name"
-                      className={`${inputBase} min-w-0 flex-1`}
-                    />
-                    <input
-                      value={row.email}
-                      onChange={(e) => setTeammate(i, { email: e.target.value })}
-                      type="email"
-                      placeholder="email@company.com"
-                      className={`${inputBase} min-w-0 flex-[1.2]`}
-                    />
-                    <select
-                      value={row.role}
-                      onChange={(e) => setTeammate(i, { role: e.target.value as InviteRoleValue })}
-                      className={`${inputBase} w-28 shrink-0`}
-                    >
-                      {INVITE_ROLES.map((r) => (
-                        <option key={r.label} value={r.value}>{r.label}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setTeammates((rows) => rows.filter((_, j) => j !== i))}
-                      disabled={teammates.length === 1}
-                      aria-label="Remove teammate"
-                      className="rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-50 hover:text-gray-500 disabled:invisible"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                  <div key={i} className={`space-y-2 ${i > 0 ? "border-t border-gray-100 pt-4" : ""}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={row.firstName}
+                        onChange={(e) => setTeammate(i, { firstName: e.target.value })}
+                        placeholder="First name"
+                        className={`${inputBase} min-w-0 flex-1`}
+                      />
+                      <input
+                        value={row.lastName}
+                        onChange={(e) => setTeammate(i, { lastName: e.target.value })}
+                        placeholder="Last name"
+                        className={`${inputBase} min-w-0 flex-1`}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={row.email}
+                        onChange={(e) => setTeammate(i, { email: e.target.value })}
+                        type="email"
+                        placeholder="jordan@gmail.com"
+                        className={`${inputBase} min-w-0 flex-1`}
+                      />
+                      <select
+                        value={row.role}
+                        onChange={(e) => setTeammate(i, { role: e.target.value as InviteRoleValue })}
+                        className={`${inputBase} w-28 shrink-0`}
+                      >
+                        {INVITE_ROLES.map((r) => (
+                          <option key={r.label} value={r.value}>{r.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setTeammates((rows) => rows.filter((_, j) => j !== i))}
+                        disabled={teammates.length === 1}
+                        aria-label="Remove teammate"
+                        className="rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-50 hover:text-gray-500 disabled:invisible"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
