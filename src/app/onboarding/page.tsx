@@ -112,8 +112,12 @@ function toSubdomain(name: string) {
   return name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]/g, "").slice(0, 50);
 }
 
-const inputClass =
-  "h-10 w-full rounded-lg border border-gray-200 bg-white px-3.5 text-sm placeholder:text-gray-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
+// Base has no width — callers add w-full / flex-1 / w-28 explicitly so width
+// utilities never conflict (conflicting ones resolve by stylesheet order, which
+// differs between builds).
+const inputBase =
+  "h-10 rounded-lg border border-gray-200 bg-white px-3.5 text-sm placeholder:text-gray-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
+const inputClass = `${inputBase} w-full`;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -519,19 +523,19 @@ export default function OnboardingPage() {
                       value={row.fullName}
                       onChange={(e) => setTeammate(i, { fullName: e.target.value })}
                       placeholder="Full name"
-                      className={`${inputClass} flex-1`}
+                      className={`${inputBase} min-w-0 flex-1`}
                     />
                     <input
                       value={row.email}
                       onChange={(e) => setTeammate(i, { email: e.target.value })}
                       type="email"
                       placeholder="email@company.com"
-                      className={`${inputClass} flex-[1.2]`}
+                      className={`${inputBase} min-w-0 flex-[1.2]`}
                     />
                     <select
                       value={row.role}
                       onChange={(e) => setTeammate(i, { role: e.target.value as InviteRoleValue })}
-                      className={`${inputClass} w-[110px] shrink-0`}
+                      className={`${inputBase} w-28 shrink-0`}
                     >
                       {INVITE_ROLES.map((r) => (
                         <option key={r.label} value={r.value}>{r.label}</option>
