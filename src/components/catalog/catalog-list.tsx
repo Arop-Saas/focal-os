@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc/client";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   Archive, Camera, ChevronDown, ChevronRight, Clock, Layers,
-  Loader2, MonitorPlay, Package as PackageIcon, Plus, Ruler, Trash2, X,
+  Loader2, Package as PackageIcon, Plus, Ruler, Trash2, X,
 } from "lucide-react";
 
 export interface CatalogRow {
@@ -47,12 +47,6 @@ const STATE_CLS = {
   DRAFT: "bg-gray-50 text-gray-500 border-gray-200",
   ARCHIVED: "bg-gray-100 text-gray-400 border-gray-200",
 };
-
-function visitLabel(r: CatalogRow): { icon: React.ComponentType<{ className?: string }>; text: string } {
-  if (r.fulfillmentMode === "PRODUCTION_ONLY") return { icon: MonitorPlay, text: "No visit" };
-  if (r.visitMode === "SEPARATE_VISIT") return { icon: Camera, text: "Separate visit" };
-  return { icon: Camera, text: "Same visit" };
-}
 
 const inputCls =
   "h-9 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-[13px] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
@@ -111,8 +105,6 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
         <div className="overflow-hidden rounded-xl border bg-white">
           <div className="divide-y divide-gray-50">
             {filtered.map((r) => {
-              const visit = visitLabel(r);
-              const VisitIcon = visit.icon;
               const isOpen = expanded === r.id;
               return (
                 <div key={r.id}>
@@ -148,11 +140,10 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
                         {r.ruleCount > 0 && ` · ${r.ruleCount} rule${r.ruleCount > 1 ? "s" : ""}`}
                       </p>
                     </div>
-                    <div className="hidden shrink-0 items-center gap-1.5 text-[11px] text-gray-500 sm:flex">
-                      <VisitIcon className="h-3 w-3 text-gray-300" /> {visit.text}
+                    <div className="hidden w-16 shrink-0 items-center justify-end gap-1 text-[11px] text-gray-500 sm:flex">
                       {r.fulfillmentMode !== "PRODUCTION_ONLY" && (
                         <>
-                          <Clock className="ml-2 h-3 w-3 text-gray-300" /> {r.baseDurationMins}m
+                          <Clock className="h-3 w-3 text-gray-300" /> {r.baseDurationMins}m
                         </>
                       )}
                     </div>
