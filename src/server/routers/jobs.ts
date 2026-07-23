@@ -2,6 +2,8 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loader";
 import { runDeliverySideEffects } from "@/lib/delivery";
+import { syncPrimaryAppointment, appointmentStatusForJobStatus, cancelAppointmentsForJob } from "@/lib/orders/appointments";
+import { findOrCreateProperty } from "@/lib/orders/property";
 import { notifyJobRescheduled } from "@/lib/notify";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
@@ -259,10 +261,27 @@ export const jobsRouter = router({
           wsCounter.jobNextNumber - 1
         );
 
+        const property = await findOrCreateProperty(tx, {
+          workspaceId: ctx.workspace.id,
+          address: jobData.propertyAddress,
+          unit: jobData.propertyUnit,
+          city: jobData.propertyCity,
+          state: jobData.propertyState,
+          zip: jobData.propertyZip,
+          propertyType: jobData.propertyType,
+          squareFootage: jobData.squareFootage,
+          bedrooms: jobData.bedrooms,
+          bathrooms: jobData.bathrooms,
+          mlsNumber: jobData.mlsNumber,
+          listingUrl: jobData.listingUrl || null,
+          accessNotes: jobData.accessNotes,
+        });
+
         const newJob = await tx.job.create({
           data: {
             workspaceId: ctx.workspace.id,
             jobNumber,
+            propertyId: property.id,
             clientId: jobData.clientId,
             packageId: jobData.packageId || null,
             propertyAddress: jobData.propertyAddress,
@@ -298,6 +317,14 @@ export const jobsRouter = router({
             },
           },
           include: { client: true, services: { include: { service: true } } },
+        });
+
+        // Mirror into the primary Appointment (orders architecture invariant)
+        await syncPrimaryAppointment(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: newJob.id,
+          scheduledAt: newJob.scheduledAt,
+          durationMins: newJob.estimatedDurationMins,
         });
 
         // Assign staff
@@ -448,6 +475,15 @@ export const jobsRouter = router({
             ...data,
             ...(status && { status }),
           },
+        });
+
+        // Keep the primary Appointment mirrored (orders architecture invariant)
+        await syncPrimaryAppointment(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: id,
+          scheduledAt: result.scheduledAt,
+          durationMins: result.estimatedDurationMins,
+          ...(status && { status: appointmentStatusForJobStatus(status) }),
         });
 
         // Track status change
@@ -746,6 +782,7 @@ export const jobsRouter = router({
       });
       if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
 
+      await cancelAppointmentsForJob(ctx.prisma, input.id);
       const cancelled = await ctx.prisma.job.update({
         where: { id: input.id },
         data: {
@@ -818,9 +855,6 @@ export const jobsRouter = router({
         // Delete invoice if linked
         await tx.invoice.deleteMany({ where: { jobId: input.id } });
 
-        // Delete order if linked
-        await tx.order.deleteMany({ where: { jobId: input.id } });
-
         // Cascade-handled: assignments, services, gallery, statusHistory
         // Delete the job itself (cascades take care of the rest)
         await tx.job.delete({ where: { id: input.id } });
@@ -850,7 +884,6 @@ export const jobsRouter = router({
         await tx.jobChecklistItem.deleteMany({ where: { jobId: { in: jobIds } } });
         await tx.notification.deleteMany({ where: { jobId: { in: jobIds } } });
         await tx.invoice.deleteMany({ where: { jobId: { in: jobIds } } });
-        await tx.order.deleteMany({ where: { jobId: { in: jobIds } } });
         await tx.job.deleteMany({ where: { id: { in: jobIds } } });
       });
 

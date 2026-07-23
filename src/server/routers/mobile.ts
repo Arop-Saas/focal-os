@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 
 import { startOfDay, endOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { generateJobNumber } from "@/lib/utils";
+import { syncPrimaryAppointment } from "@/lib/orders/appointments";
 
 // ─── Mobile procedure — requires logged-in user with a StaffProfile ──────────
 
@@ -785,7 +786,8 @@ export const mobileRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { assignedStaffIds, scheduledAt, ...jobData } = input;
+      // isRush/rushFee are not Job columns — map onto priority fields instead
+      const { assignedStaffIds, scheduledAt, isRush, rushFee, ...jobData } = input;
 
       // Resolve package price → subtotal
       let subtotal = 0;
@@ -796,7 +798,7 @@ export const mobileRouter = router({
         if (pkg) subtotal = pkg.price;
       }
       const taxAmount = (subtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
-      const totalAmount = subtotal + taxAmount + (jobData.rushFee ?? 0);
+      const totalAmount = subtotal + taxAmount + (rushFee ?? 0);
 
       const ws = await ctx.prisma.workspace.findUnique({
         where: { id: ctx.workspace.id },
@@ -820,11 +822,21 @@ export const mobileRouter = router({
             ...jobData,
             packageId: jobData.packageId || null,
             scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+            priority: isRush ? "URGENT" : jobData.priority,
+            priorityFee: rushFee ?? 0,
             subtotal,
             taxAmount,
             totalAmount,
             status: "PENDING",
           },
+        });
+
+        // Mirror into the primary Appointment (orders architecture invariant)
+        await syncPrimaryAppointment(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: newJob.id,
+          scheduledAt: newJob.scheduledAt,
+          durationMins: newJob.estimatedDurationMins,
         });
 
         if (assignedStaffIds.length > 0) {

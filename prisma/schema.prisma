@@ -107,6 +107,10 @@ model Workspace {
   workspaceRoles   WorkspaceRole[]
   portalSessions   PortalSession[]
   clientCredits    ClientCredit[]
+  properties       Property[]
+  appointments     Appointment[]
+  productionTasks  ProductionTask[]
+  jobNotes         JobNote[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -213,6 +217,7 @@ model User {
   activityLogs  ActivityLog[]
   featureRequestVotes    FeatureRequestVote[]
   featureRequestComments FeatureRequestComment[]
+  jobNotes      JobNote[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -305,6 +310,7 @@ model StaffProfile {
   homeTerritory   ServiceTerritory? @relation(fields: [homeTerritoryId], references: [id], onDelete: SetNull)
   jobRole         WorkspaceRole?    @relation(fields: [jobRoleId], references: [id], onDelete: SetNull)
   jobAssignments  JobAssignment[]
+  productionTasks ProductionTask[]
   availability    StaffAvailability[]
   timeOffEntries  StaffTimeOff[]
 
@@ -680,6 +686,7 @@ model Job {
   jobNumber       String
   clientId        String
   packageId       String?
+  propertyId      String?   // link to the Property record (new orders; legacy jobs keep inline fields)
 
   // Property Info
   propertyAddress String
@@ -728,6 +735,10 @@ model Job {
   notifications   Notification[]
   messages        JobMessage[]
   checklist       JobChecklistItem[]
+  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  appointments    Appointment[]
+  productionTasks ProductionTask[]
+  orderNotes      JobNote[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -737,6 +748,7 @@ model Job {
   @@index([clientId])
   @@index([scheduledAt])
   @@index([status])
+  @@index([propertyId])
 }
 
 enum JobStatus {
@@ -785,6 +797,7 @@ model JobAssignment {
   id        String   @id @default(cuid())
   jobId     String
   staffId   String
+  appointmentId String?   // scope this crew member to one appointment (null = whole order)
   role      AssignmentRole @default(PHOTOGRAPHER)
   isPrimary Boolean  @default(true)
   confirmedAt DateTime?
@@ -793,10 +806,12 @@ model JobAssignment {
 
   job       Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
   staff     StaffProfile @relation(fields: [staffId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
   @@unique([jobId, staffId])
   @@index([jobId])
   @@index([staffId])
+  @@index([appointmentId])
 }
 
 enum AssignmentRole {
@@ -822,8 +837,138 @@ model JobService {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ORDERS
+// ORDERS — connected records around a Job (the "order" hub).
+// Job.scheduledAt MUST mirror the primary Appointment; use
+// src/lib/orders/appointments.ts helpers, never write one alone.
 // ─────────────────────────────────────────────────────────────
+
+model Property {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  address       String
+  unit          String?
+  city          String?
+  state         String?
+  zip           String?
+  lat           Float?
+  lng           Float?
+  propertyType  PropertyType @default(RESIDENTIAL)
+  squareFootage Int?
+  bedrooms      Int?
+  bathrooms     Float?
+  mlsNumber     String?
+  listingUrl    String?
+  accessNotes   String?  // lockbox, alarm, parking, gate, pets
+  dedupeKey     String   // normalized "address|unit|city|state|zip", lowercase
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  jobs          Job[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([workspaceId, dedupeKey])
+  @@index([workspaceId])
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  EN_ROUTE
+  ARRIVED
+  CAPTURED
+  POSTPONED
+  CANCELLED
+}
+
+model Appointment {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  jobId        String
+  title        String?   // e.g. "Twilight shoot" — null for the main appointment
+  scheduledAt  DateTime?
+  durationMins Int       @default(90)
+  status       AppointmentStatus @default(SCHEDULED)
+  isPrimary    Boolean   @default(true)  // mirrored into Job.scheduledAt for legacy readers
+  notes        String?
+
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignments  JobAssignment[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([workspaceId, scheduledAt])
+  @@index([jobId])
+}
+
+enum ProductionTaskType {
+  PHOTO_EDITING
+  VIDEO_EDITING
+  FLOOR_PLAN
+  VIRTUAL_TOUR
+  QA
+  OTHER
+}
+
+enum ProductionStatus {
+  WAITING_FILES
+  QUEUED
+  IN_PROGRESS
+  QA
+  REVISION
+  READY
+}
+
+model ProductionTask {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  jobId           String
+  type            ProductionTaskType @default(OTHER)
+  title           String
+  status          ProductionStatus @default(WAITING_FILES)
+  assigneeStaffId String?
+  dueAt           DateTime?
+  notes           String?
+  sortOrder       Int      @default(0)
+
+  job             Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignee        StaffProfile? @relation(fields: [assigneeStaffId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([jobId])
+  @@index([assigneeStaffId])
+}
+
+enum JobNoteKind {
+  CUSTOMER_INSTRUCTIONS // from the customer, visible to them
+  INTERNAL              // team-only
+  FIELD                 // photographer field note
+  EDITOR                // instructions for the editor
+  QA_REVISION           // QA / revision note
+}
+
+model JobNote {
+  id           String      @id @default(cuid())
+  workspaceId  String
+  jobId        String
+  kind         JobNoteKind @default(INTERNAL)
+  body         String
+  authorUserId String?
+
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author       User?     @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+
+  @@index([jobId])
+  @@index([workspaceId])
+}
 
 // ─────────────────────────────────────────────────────────────
 // INVOICES

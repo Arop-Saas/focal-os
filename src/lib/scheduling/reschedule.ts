@@ -9,6 +9,7 @@ import type { PrismaClient, Prisma } from "@prisma/client";
 import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loader";
 import { notifyJobRescheduled } from "@/lib/notify";
 import { updateCalendarEvent } from "@/lib/gcal";
+import { syncPrimaryAppointment } from "@/lib/orders/appointments";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -74,6 +75,14 @@ export async function rescheduleJob(db: Db, args: RescheduleArgs) {
   const updated = await db.job.update({
     where: { id: job.id },
     data: { scheduledAt: args.newTime },
+  });
+
+  // Keep the primary Appointment mirrored (orders architecture invariant)
+  await syncPrimaryAppointment(db, {
+    workspaceId: args.workspaceId,
+    jobId: job.id,
+    scheduledAt: args.newTime,
+    durationMins: job.estimatedDurationMins,
   });
 
   await db.activityLog.create({

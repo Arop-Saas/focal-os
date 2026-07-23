@@ -6,6 +6,8 @@ import { notifyJobBooked } from "@/lib/notify";
 import { assertSlotBookable, getDayAvailability, takeSchedulingLock, SlotUnavailableError } from "@/lib/scheduling/loader";
 import { utcToWallDateISO } from "@/lib/scheduling/tz";
 import { verifyPortalToken, PORTAL_COOKIE } from "@/lib/portal-auth";
+import { syncPrimaryAppointment } from "@/lib/orders/appointments";
+import { findOrCreateProperty } from "@/lib/orders/property";
 
 // ─── Public Booking Router ────────────────────────────────────────────────────
 // No auth required — used by the client-facing booking form at /book/[slug]
@@ -549,11 +551,28 @@ export const bookingRouter = router({
           if (totalServiceMins > 0) estimatedDurationMins = totalServiceMins;
         }
 
+        const property = await findOrCreateProperty(tx, {
+          workspaceId: workspace.id,
+          address: input.propertyAddress,
+          city: input.propertyCity,
+          state: input.propertyState,
+          zip: input.propertyZip,
+          propertyType: input.propertyType,
+          squareFootage: input.squareFootage,
+          bedrooms: input.bedrooms,
+          bathrooms: input.bathrooms,
+          mlsNumber: input.mlsNumber,
+          accessNotes: input.accessNotes,
+          lat: input.propertyLat,
+          lng: input.propertyLng,
+        });
+
         // Create job
         const job = await tx.job.create({
           data: {
             workspaceId: workspace.id,
             jobNumber,
+            propertyId: property.id,
             clientId: client.id,
             packageId: input.packageId ?? null,
             propertyAddress: input.propertyAddress,
@@ -575,6 +594,14 @@ export const bookingRouter = router({
             subtotal,
             totalAmount: subtotal,
           },
+        });
+
+        // Mirror into the primary Appointment (orders architecture invariant)
+        await syncPrimaryAppointment(tx, {
+          workspaceId: workspace.id,
+          jobId: job.id,
+          scheduledAt: job.scheduledAt,
+          durationMins: job.estimatedDurationMins,
         });
 
         // If package has services, add them to the job
