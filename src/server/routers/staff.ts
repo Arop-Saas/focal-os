@@ -148,6 +148,8 @@ export const staffRouter = router({
         memberId: z.string(),
         title: z.string().optional(),
         bio: z.string().optional(),
+        employeeId: z.string().max(20).nullable().optional(),
+        jobRoleId: z.string().nullable().optional(),
         skills: z.array(z.string()).optional(),
         serviceRegions: z.array(z.string()).optional(),
         maxJobsPerDay: z.number().min(1).max(20).optional(),

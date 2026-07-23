@@ -34,7 +34,6 @@ type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  children?: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[];
 };
 
 const navGroups: { label: string | null; items: NavItem[] }[] = [
@@ -47,12 +46,8 @@ const navGroups: { label: string | null; items: NavItem[] }[] = [
   {
     label: "Operations",
     items: [
-      {
-        label: "Orders",
-        href: "/jobs",
-        icon: Briefcase,
-        children: [{ label: "Listings", href: "/gallery", icon: Image }],
-      },
+      { label: "Orders", href: "/jobs", icon: Briefcase },
+      { label: "Listings", href: "/gallery", icon: Image },
       { label: "Schedule", href: "/scheduling", icon: CalendarDays },
       { label: "Clients", href: "/clients", icon: Users },
       { label: "Team", href: "/staff", icon: UserCheck },
@@ -165,29 +160,6 @@ export function Sidebar({ workspaceName, userEmail, isSuperAdmin }: SidebarProps
                       {item.label}
                       {item.href === "/collaboration" && <MessagesUnreadBadge />}
                     </Link>
-                    {item.children?.map((child) => {
-                      const childActive = isActive(child.href);
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={cn(
-                            "relative ml-[22px] flex items-center gap-2.5 rounded-md border-l border-white/[0.06] px-2.5 py-1.5 text-[12.5px] font-medium transition-all duration-150",
-                            childActive
-                              ? "bg-white/[0.08] text-white"
-                              : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
-                          )}
-                        >
-                          <child.icon
-                            className={cn(
-                              "h-[14px] w-[14px] shrink-0 transition-colors",
-                              childActive ? "text-blue-400" : "text-slate-500"
-                            )}
-                          />
-                          {child.label}
-                        </Link>
-                      );
-                    })}
                   </div>
                 );
               })}
