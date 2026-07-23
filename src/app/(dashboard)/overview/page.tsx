@@ -7,7 +7,6 @@ import { Header } from "@/components/layout/header";
 import { DashboardStats } from "@/components/dashboard/stats";
 import { WeekSchedule } from "@/components/dashboard/week-schedule";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
-import { QuickActions } from "@/components/dashboard/quick-actions";
 import { JobPipeline } from "@/components/dashboard/job-pipeline";
 import { addWallDays, utcToWallDateISO, wallDateDayOfWeek, wallTimeToUtc } from "@/lib/scheduling/tz";
 import Link from "next/link";
@@ -187,8 +186,6 @@ export default async function DashboardPage() {
         />
 
         <JobPipeline statusCounts={jobStatusCounts} />
-
-        <QuickActions />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2">
