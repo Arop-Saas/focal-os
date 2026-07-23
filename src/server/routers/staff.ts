@@ -88,10 +88,10 @@ export const staffRouter = router({
         include: { workspaces: { where: { workspaceId: ctx.workspace.id } } },
       });
 
-      if (existingUser?.workspaces.length) {
+      if (existingUser?.workspaces.length && existingUser.supabaseId) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "This person is already a team member.",
+          message: "This person is already an active team member.",
         });
       }
 
@@ -142,6 +142,94 @@ export const staffRouter = router({
       });
 
       return { ok: true };
+    }),
+
+  // Create a member immediately (no invite required) so they can be fully
+  // configured — hours, pay, services, home base — before they ever log in.
+  // Optionally emails an invite; accepting simply links their login to the
+  // already-configured profile (accept-invite handles existing user/member).
+  createMember: adminProcedure
+    .input(
+      z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().min(7),
+        role: z.enum(["PHOTOGRAPHER", "ADMIN"]).default("PHOTOGRAPHER"),
+        sendInvite: z.boolean().default(true),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`;
+
+      const existingUser = await ctx.prisma.user.findUnique({
+        where: { email: input.email },
+        include: { workspaces: { where: { workspaceId: ctx.workspace.id } } },
+      });
+      if (existingUser?.workspaces.length) {
+        throw new TRPCError({ code: "CONFLICT", message: "This person is already a team member." });
+      }
+
+      const member = await ctx.prisma.$transaction(async (tx) => {
+        const user =
+          existingUser ??
+          (await tx.user.create({
+            data: {
+              email: input.email,
+              fullName,
+              firstName: input.firstName.trim(),
+              lastName: input.lastName.trim(),
+              phone: input.phone,
+            },
+          }));
+        if (existingUser && !existingUser.phone) {
+          await tx.user.update({ where: { id: user.id }, data: { phone: input.phone } });
+        }
+
+        const m = await tx.workspaceMember.create({
+          data: { workspaceId: ctx.workspace.id, userId: user.id, role: input.role },
+        });
+        await tx.staffProfile.create({
+          data: { workspaceId: ctx.workspace.id, memberId: m.id, skills: [], serviceRegions: [] },
+        });
+        return m;
+      });
+
+      if (input.sendInvite) {
+        await ctx.prisma.staffInvite.updateMany({
+          where: { workspaceId: ctx.workspace.id, email: input.email, usedAt: null },
+          data: { expiresAt: new Date() },
+        });
+        const token = randomBytes(32).toString("hex");
+        await ctx.prisma.staffInvite.create({
+          data: {
+            token,
+            workspaceId: ctx.workspace.id,
+            email: input.email,
+            fullName,
+            phone: input.phone,
+            role: input.role,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
+        const { html, subject } = staffInviteEmail({
+          fullName,
+          workspaceName: ctx.workspace.name,
+          workspaceLogo: ctx.workspace.logoUrl ?? null,
+          brandColor: ctx.workspace.brandColor ?? "#1B4F9E",
+          inviteUrl: `${baseUrl}/invite/${token}`,
+          role: input.role,
+        });
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM ?? `${ctx.workspace.name} <onboarding@resend.dev>`,
+          to: input.email,
+          subject,
+          html,
+        });
+      }
+
+      return { memberId: member.id, invited: input.sendInvite };
     }),
 
   updateProfile: workspaceProcedure

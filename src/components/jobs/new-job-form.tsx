@@ -386,6 +386,10 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
   const [ncLast, setNcLast] = useState("");
   const [ncEmail, setNcEmail] = useState("");
   const [ncPhone, setNcPhone] = useState("");
+  // Structured property access — composed into accessNotes on submit
+  const [accessType, setAccessType] = useState("");
+  const [accessDetail, setAccessDetail] = useState("");
+  const [clientSource, setClientSource] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
   const [mlsSearchValue, setMlsSearchValue] = useState("");
@@ -479,8 +483,20 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
   }
 
   async function onSubmit(data: FormData) {
+    const ACCESS_LABELS: Record<string, string> = {
+      REALTOR: "Realtor will meet you",
+      SELLER: "Sellers will meet you",
+      LOCKBOX: "Lockbox",
+      VACANT: "Vacant — go & shoot",
+      OTHER: "Other",
+    };
+    const accessNotes = accessType
+      ? [ACCESS_LABELS[accessType], accessDetail.trim()].filter(Boolean).join(" — ")
+      : undefined;
     await createJob.mutateAsync({
       ...data,
+      accessNotes,
+      clientSource: clientSource || undefined,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
       services: selectedServices.map((s) => ({
         serviceId: s.serviceId,
@@ -746,66 +762,53 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
             </div>
           </div>
 
-          {/* MLS + listing URL */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>MLS number</label>
-              <div className="relative">
-                <input
-                  {...register("mlsNumber")}
-                  placeholder="MLS-12345"
-                  className={inputCls}
-                  onChange={(e) => {
-                    setMlsSearchValue(e.target.value);
-                    setMlsAttached(false);
-                  }}
-                />
-                {mlsAttached && (
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-medium text-green-700">
-                    <Check className="w-3 h-3" /> Attached
-                  </div>
-                )}
-              </div>
-              {mlsSuggestion && !mlsAttached && (
-                <div className="mt-2 rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-blue-800">Listing found — auto-fill?</p>
-                    <p className="text-xs text-blue-600 truncate">
-                      {mlsSuggestion.propertyAddress}, {mlsSuggestion.propertyCity}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => applyListingSuggestion(mlsSuggestion)}
-                    className="shrink-0 px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Apply
-                  </button>
-                </div>
-              )}
+          {/* Property access */}
+          <div>
+            <label className={labelCls}>Access</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Property access">
+              {[
+                { value: "REALTOR", label: "Realtor will meet you" },
+                { value: "SELLER", label: "Sellers will meet you" },
+                { value: "LOCKBOX", label: "Lockbox" },
+                { value: "VACANT", label: "Vacant — go & shoot" },
+                { value: "OTHER", label: "Other" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={accessType === opt.value}
+                  onClick={() => setAccessType(accessType === opt.value ? "" : opt.value)}
+                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors text-left ${
+                    accessType === opt.value
+                      ? "border-blue-600 bg-blue-50 text-blue-700"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-            <div>
-              <label className={labelCls}>
-                <Link2 className="inline w-3 h-3 mr-1 text-gray-400" />
-                Listing URL
-              </label>
+            {(accessType === "LOCKBOX" || accessType === "OTHER") && (
               <input
-                {...register("listingUrl")}
-                placeholder="https://mls.com/listing/…"
-                className={inputCls}
+                value={accessDetail}
+                onChange={(e) => setAccessDetail(e.target.value)}
+                placeholder={accessType === "LOCKBOX" ? "Lockbox code & location" : "Describe how the photographer gets in"}
+                className={`${inputCls} mt-2`}
               />
-            </div>
+            )}
           </div>
 
+          {/* How did you hear about us */}
           <div>
-            <label className={labelCls}>Access notes</label>
-            <textarea
-              {...register("accessNotes")}
-              rows={2}
-              placeholder="Lockbox code, gate code, parking instructions…"
-              className={`${inputCls} resize-none`}
-            />
+            <label className={labelCls}>How did you hear about us? <span className="font-normal text-gray-400">(optional)</span></label>
+            <select value={clientSource} onChange={(e) => setClientSource(e.target.value)} className={inputCls}>
+              <option value="">Select…</option>
+              {["Google", "Referral", "Instagram", "Facebook", "Zillow", "Repeat client", "Other"].map((o) => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-400">Saved on the client&apos;s profile the first time it&apos;s answered.</p>
           </div>
         </div>
       )}
@@ -989,11 +992,11 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Internal notes</label>
+                <label className={labelCls}>Notes <span className="font-normal text-gray-400">(optional)</span></label>
                 <textarea
                   {...register("internalNotes")}
                   rows={4}
-                  placeholder="Internal team notes…"
+                  placeholder="Any specific requests or info the photographer should know?"
                   className={`${inputCls} resize-none`}
                 />
               </div>

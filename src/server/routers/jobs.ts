@@ -46,6 +46,7 @@ const JobCreateSchema = z.object({
   clientNotes: z.string().optional(),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
   priorityFee: z.number().default(0),
+  clientSource: z.string().max(50).optional(), // "How did you hear about us?" — saved to Client.source if empty
   services: z
     .array(
       z.object({
@@ -198,7 +199,6 @@ export const jobsRouter = router({
           },
           gallery: { include: { media: { orderBy: { sortOrder: "asc" } } } },
           invoice: { include: { lineItems: true, payments: true } },
-          order: { include: { items: true } },
           statusHistory: { orderBy: { createdAt: "desc" } },
           notifications: { orderBy: { createdAt: "desc" }, take: 10 },
         },
@@ -326,6 +326,18 @@ export const jobsRouter = router({
           scheduledAt: newJob.scheduledAt,
           durationMins: newJob.estimatedDurationMins,
         });
+
+        // "How did you hear about us?" — first answer sticks to the client
+        if (jobData.clientSource) {
+          await tx.client.updateMany({
+            where: {
+              id: jobData.clientId,
+              workspaceId: ctx.workspace.id,
+              OR: [{ source: null }, { source: "" }],
+            },
+            data: { source: jobData.clientSource },
+          });
+        }
 
         // Assign staff
         if (assignedStaffIds.length > 0) {

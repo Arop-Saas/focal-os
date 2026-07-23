@@ -198,7 +198,7 @@ enum SubscriptionTier {
 
 model User {
   id            String   @id @default(cuid())
-  supabaseId    String   @unique  // Maps to Supabase Auth user ID
+  supabaseId    String?  @unique  // Maps to Supabase Auth user ID; null until the member first logs in
   email         String   @unique
   fullName      String
   firstName     String?

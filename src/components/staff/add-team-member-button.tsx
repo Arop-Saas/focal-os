@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,15 +14,18 @@ const ROLE_OPTIONS = [
 ];
 
 export function AddTeamMemberButton() {
+  const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("PHOTOGRAPHER");
+  const [sendInvite, setSendInvite] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const inviteMutation = trpc.staff.invite.useMutation();
+  // Creates the member immediately — configurable before they ever log in
+  const inviteMutation = trpc.staff.createMember.useMutation();
 
   const valid =
     firstName.trim().length > 0 &&
@@ -36,10 +40,13 @@ export function AddTeamMemberButton() {
     try {
       await inviteMutation.mutateAsync({
         email: email.trim(),
-        fullName: `${firstName.trim()} ${lastName.trim()}`,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         phone: phone.trim(),
         role: role as never,
+        sendInvite,
       });
+      router.refresh();
       setShowModal(false);
       setFirstName("");
       setLastName("");
@@ -107,6 +114,20 @@ export function AddTeamMemberButton() {
                   ))}
                 </select>
               </div>
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={sendInvite}
+                  onChange={(e) => setSendInvite(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">
+                  Email an invite now
+                  <span className="mt-0.5 block text-xs text-gray-400">
+                    Either way the member is created immediately and you can set up their hours, pay and services right away. Without an invite they just can&apos;t log in yet.
+                  </span>
+                </span>
+              </label>
               {inviteMutation.error && (
                 <p className="text-sm text-red-600">{inviteMutation.error.message}</p>
               )}
@@ -117,7 +138,7 @@ export function AddTeamMemberButton() {
                 </button>
                 <button type="submit" disabled={isSubmitting || !valid}
                   className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                  {isSubmitting ? "Sending invite..." : "Send Invite"}
+                  {isSubmitting ? "Adding…" : sendInvite ? "Add & Send Invite" : "Add Member"}
                 </button>
               </div>
             </form>
