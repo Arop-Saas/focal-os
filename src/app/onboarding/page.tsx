@@ -541,7 +541,7 @@ export default function OnboardingPage() {
                         value={row.email}
                         onChange={(e) => setTeammate(i, { email: e.target.value })}
                         type="email"
-                        placeholder="jordan@gmail.com"
+                        placeholder="Email"
                         className={`${inputBase} min-w-0 flex-1`}
                       />
                       <select
