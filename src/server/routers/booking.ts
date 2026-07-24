@@ -14,29 +14,6 @@ import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/l
 // No auth required — used by the client-facing booking form at /book/[slug]
 
 export const bookingRouter = router({
-  /** Public: check a coupon code before checkout (form shows the discount). */
-  validateCoupon: publicProcedure
-    .input(z.object({ workspaceSlug: z.string(), code: z.string().min(1).max(40) }))
-    .query(async ({ ctx, input }) => {
-      const workspace = await ctx.prisma.workspace.findUnique({
-        where: { slug: input.workspaceSlug }, select: { id: true },
-      });
-      if (!workspace) return { valid: false as const };
-      const coupon = await ctx.prisma.coupon.findUnique({
-        where: { workspaceId_code: { workspaceId: workspace.id, code: input.code.trim().toUpperCase() } },
-      });
-      const valid =
-        !!coupon &&
-        coupon.isActive &&
-        (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
-        (coupon.maxUses == null || coupon.usedCount < coupon.maxUses);
-      if (!valid || !coupon) return { valid: false as const };
-      return {
-        valid: true as const,
-        discountType: coupon.discountType,
-        discountValue: coupon.discountValue,
-      };
-    }),
 
   // Get currently signed-in portal client (from cookie)
   getCurrentClient: publicProcedure

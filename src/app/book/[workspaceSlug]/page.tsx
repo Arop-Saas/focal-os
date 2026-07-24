@@ -2428,13 +2428,9 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
   );
   const reviewPhotographers = reviewPhotographersData?.photographers ?? [];
 
-  const recordCouponUsage = trpc.coupons.recordUsage.useMutation();
   const submitMutation = trpc.booking.submit.useMutation({
     onSuccess: (result) => {
-      // Record coupon usage so the same customer can't reuse it
-      if (appliedCouponData && form.email) {
-        recordCouponUsage.mutate({ couponId: appliedCouponData.couponId, email: form.email, orderId: (result as any).orderId });
-      }
+      // Coupon usage is recorded server-side inside the booking transaction
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const selectedPkg = data?.packages?.find((p: any) => p.id === form.packageId);
       const pkgName = selectedPkg?.name ?? "";
@@ -2564,6 +2560,7 @@ function BookingForm({ workspaceSlug, formId }: { workspaceSlug: string; formId:
       scheduledAt: form.scheduledTime, // UTC instant straight from the engine slot
       clientNotes: form.clientNotes || undefined,
       formId: formId || undefined,
+      couponCode: appliedCouponData?.code || undefined,
     });
   };
 
