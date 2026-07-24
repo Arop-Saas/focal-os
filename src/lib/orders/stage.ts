@@ -43,12 +43,12 @@ export const ORDER_STAGE_LABELS: Record<OrderStage, string> = {
 export const ORDER_STAGE_COLORS: Record<OrderStage, string> = {
   NEEDS_SCHEDULING: "bg-amber-50 text-amber-700 border-amber-200",
   SCHEDULED: "bg-blue-50 text-blue-700 border-blue-200",
-  CAPTURE: "bg-violet-50 text-violet-700 border-violet-200",
-  PRODUCTION: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  QA: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  CAPTURE: "bg-gray-100 text-gray-600 border-gray-200",
+  PRODUCTION: "bg-gray-100 text-gray-600 border-gray-200",
+  QA: "bg-blue-50 text-blue-700 border-blue-200",
   DELIVERED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   CLOSED: "bg-gray-100 text-gray-600 border-gray-200",
-  ON_HOLD: "bg-orange-50 text-orange-700 border-orange-200",
+  ON_HOLD: "bg-amber-50 text-amber-700 border-amber-200",
   CANCELLED: "bg-gray-100 text-gray-400 border-gray-200",
 };
 

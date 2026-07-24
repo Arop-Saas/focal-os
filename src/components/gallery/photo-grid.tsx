@@ -186,7 +186,7 @@ export function PhotoGrid({
               )}
 
               {idx === 0 && (
-                <span className="absolute left-2 top-2 rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-900">
+                <span className="absolute left-2 top-2 rounded bg-gray-900/75 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                   Cover
                 </span>
               )}

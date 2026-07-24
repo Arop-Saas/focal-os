@@ -72,7 +72,7 @@ function WeatherChip({ forecast, unit }: { forecast: { tempHighF: number; icon: 
   const temp = unit === "F" ? Math.round(forecast.tempHighF) : Math.round(((forecast.tempHighF - 32) * 5) / 9);
   return (
     <span
-      className="flex shrink-0 items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[12px] font-medium text-sky-700"
+      className="flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[12px] font-medium text-gray-600"
       title={forecast.label}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -159,8 +159,8 @@ function ApptModal({
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {twilight.data?.hasSolar && (
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                  <p className="text-[11px] leading-relaxed text-amber-800">
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
+                  <p className="text-[11px] leading-relaxed text-blue-900">
                     On this date, sunset at the property is{" "}
                     <span className="font-semibold">{fmtT(twilight.data.sunset)}</span>; golden hour
                     starts <span className="font-semibold">{fmtT(twilight.data.suggestedStart)}</span>.
@@ -174,7 +174,7 @@ function ApptModal({
                         const pad = (n: number) => String(n).padStart(2, "0");
                         setDateValue(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                       }}
-                      className="shrink-0 rounded-lg bg-amber-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-amber-700"
+                      className="shrink-0 rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-700"
                     >
                       Use
                     </button>
@@ -217,7 +217,7 @@ function ApptModal({
               "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-60",
               saved ? "bg-green-600" :
               mode === "cancel" ? "bg-red-600 hover:bg-red-700" :
-              mode === "postpone" ? "bg-amber-600 hover:bg-amber-700" :
+              mode === "postpone" ? "bg-gray-900 hover:bg-gray-800" :
               "bg-blue-600 hover:bg-blue-700"
             )}
           >
@@ -278,7 +278,7 @@ export function OrderAppointments({
               <p className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
                 {a.title}
                 {a.solar && (
-                  <span className={cn(DIM_BADGE, "border-amber-200 bg-amber-50 text-amber-700")}>Twilight</span>
+                  <span className={cn(DIM_BADGE, "border-gray-200 bg-gray-50 text-gray-500")}>Twilight</span>
                 )}
                 <span className={cn(DIM_BADGE, meta.cls)}>{meta.label}</span>
               </p>
@@ -322,7 +322,7 @@ export function OrderAppointments({
               <div className="mt-3 flex gap-2 border-t border-gray-50 pt-3">
                 <button
                   onClick={() => setModal({ appt: a, mode: "reschedule" })}
-                  className="flex items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                 >
                   <Pencil className="h-3 w-3" />
                   {start ? "Reschedule" : "Schedule"}
@@ -330,7 +330,7 @@ export function OrderAppointments({
                 {start && (
                   <button
                     onClick={() => setModal({ appt: a, mode: "postpone" })}
-                    className="flex items-center gap-1.5 rounded-lg border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                   >
                     <CalendarX className="h-3 w-3" />
                     Postpone
@@ -338,7 +338,7 @@ export function OrderAppointments({
                 )}
                 <button
                   onClick={() => setModal({ appt: a, mode: "cancel" })}
-                  className="flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:border-red-200 hover:bg-red-50"
                 >
                   <XCircle className="h-3 w-3" />
                   Cancel

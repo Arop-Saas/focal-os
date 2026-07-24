@@ -2,6 +2,9 @@
 
 _Important decisions and why. Newest first. Remove entries only when genuinely reversed (note the reversal)._
 
+## 2026-07-24 — Color system: five colors, each with ONE meaning
+Owner rejected the per-state rainbow. The rule: **blue** = primary action / active / informational accent (progress bar, links, Scheduled, selected states); **gray** = neutral informational states (Completed, Twilight, weather, Editing, note kinds); **amber** = warnings that need a human (Needs attention, Unassigned, Postponed, Rush, On hold); **red** = destructive actions and overdue money only; **emerald** = Paid and Delivered only. Violet/indigo/fuchsia/sky/teal/orange/yellow are banned. In-card primary buttons are gray-900; the page-level primary (Deliver) is blue-600. Differentiate states by label, not by hue.
+
 ## 2026-07-24 — Availability warns, never blocks (interim)
 The working-hours configuration UI isn't actually wired to StaffAvailability, so enforcement read every photographer as "not scheduled to work". Until the scheduling/permissions cluster lands: unconfigured photographers default to available all day, hours issues render as informational warnings, and admin assignment proceeds despite availability errors (logged). `TODO(booking-permissions)` markers sit at each softened site. The end-state design (owner): customers can never book outside a photographer's territory/hours; only full-booking-permission users can override, with explicit warnings.
 

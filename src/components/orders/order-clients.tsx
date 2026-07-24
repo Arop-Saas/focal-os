@@ -90,7 +90,7 @@ export function OrderClientsCard({
         /* ── Team mode — the team is the client ── */
         <>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
               <Users className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -360,9 +360,9 @@ function ClientPickerModal({
                         key={t.id}
                         onClick={() => setTeam.mutate({ jobId, customerTeamId: t.id })}
                         disabled={busy}
-                        className="flex w-full items-center gap-2.5 rounded-lg border border-gray-100 px-3 py-2.5 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50/40"
+                        className="flex w-full items-center gap-2.5 rounded-lg border border-gray-100 px-3 py-2.5 text-left transition-colors hover:border-blue-300 hover:bg-blue-50/40"
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
                           <Users className="h-4 w-4" />
                         </div>
                         <p className="text-sm font-medium text-gray-900">{t.name}</p>

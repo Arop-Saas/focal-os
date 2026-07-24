@@ -95,7 +95,7 @@ export function OrderTabs({
                   </h1>
                   {titleAction}
                   {isRush && (
-                    <span className={cn(DIM_BADGE, "border-red-200 bg-red-50 text-red-700 shrink-0")}>
+                    <span className={cn(DIM_BADGE, "border-amber-200 bg-amber-50 text-amber-700 shrink-0")}>
                       <Zap className="h-2.5 w-2.5" /> Rush
                     </span>
                   )}

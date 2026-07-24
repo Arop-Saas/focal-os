@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 
 const KIND_META: Record<string, { label: string; cls: string }> = {
   CUSTOMER_INSTRUCTIONS: { label: "Customer", cls: "border-blue-200 bg-blue-50 text-blue-700" },
-  INTERNAL:              { label: "Internal", cls: "border-gray-200 bg-gray-100 text-gray-600" },
-  FIELD:                 { label: "Field",    cls: "border-violet-200 bg-violet-50 text-violet-700" },
-  EDITOR:                { label: "Editor",   cls: "border-indigo-200 bg-indigo-50 text-indigo-700" },
-  QA_REVISION:           { label: "QA",       cls: "border-amber-200 bg-amber-50 text-amber-700" },
+  INTERNAL:              { label: "Internal", cls: "border-gray-300 bg-gray-100 text-gray-700" },
+  FIELD:                 { label: "Field",    cls: "border-gray-300 bg-gray-100 text-gray-700" },
+  EDITOR:                { label: "Editor",   cls: "border-gray-300 bg-gray-100 text-gray-700" },
+  QA_REVISION:           { label: "QA",       cls: "border-gray-300 bg-gray-100 text-gray-700" },
 };
 
 const KIND_KEYS = ["INTERNAL", "FIELD", "EDITOR", "QA_REVISION", "CUSTOMER_INSTRUCTIONS"] as const;
