@@ -14,6 +14,30 @@ import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/l
 // No auth required — used by the client-facing booking form at /book/[slug]
 
 export const bookingRouter = router({
+  /** Public: check a coupon code before checkout (form shows the discount). */
+  validateCoupon: publicProcedure
+    .input(z.object({ workspaceSlug: z.string(), code: z.string().min(1).max(40) }))
+    .query(async ({ ctx, input }) => {
+      const workspace = await ctx.prisma.workspace.findUnique({
+        where: { slug: input.workspaceSlug }, select: { id: true },
+      });
+      if (!workspace) return { valid: false as const };
+      const coupon = await ctx.prisma.coupon.findUnique({
+        where: { workspaceId_code: { workspaceId: workspace.id, code: input.code.trim().toUpperCase() } },
+      });
+      const valid =
+        !!coupon &&
+        coupon.isActive &&
+        (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
+        (coupon.maxUses == null || coupon.usedCount < coupon.maxUses);
+      if (!valid || !coupon) return { valid: false as const };
+      return {
+        valid: true as const,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+      };
+    }),
+
   // Get currently signed-in portal client (from cookie)
   getCurrentClient: publicProcedure
     .input(z.object({ slug: z.string() }))
@@ -404,6 +428,7 @@ export const bookingRouter = router({
         staffProfileId: z.string().optional(), // assigned photographer
         scheduledAt: z.string(), // ISO datetime string
         clientNotes: z.string().optional(),
+        couponCode: z.string().max(40).optional(),
         formId: z.string().optional(), // order form ID to check confirmation mode
       })
     )
@@ -566,6 +591,30 @@ export const bookingRouter = router({
         });
         const subtotal = adjusted.adjustedSubtotal;
 
+        // Coupon (validated + atomically counted; silently skipped if invalid
+        // so a stale code never blocks a booking — the form validates upfront)
+        let discountAmount = 0;
+        if (input.couponCode) {
+          const coupon = await tx.coupon.findUnique({
+            where: { workspaceId_code: { workspaceId: workspace.id, code: input.couponCode.trim().toUpperCase() } },
+          });
+          const valid =
+            coupon &&
+            coupon.isActive &&
+            (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
+            (coupon.maxUses == null || coupon.usedCount < coupon.maxUses);
+          if (valid && coupon) {
+            discountAmount =
+              coupon.discountType === "PERCENTAGE"
+                ? Math.round(subtotal * coupon.discountValue) / 100
+                : Math.min(coupon.discountValue, subtotal);
+            await tx.coupon.update({
+              where: { id: coupon.id },
+              data: { usedCount: { increment: 1 } },
+            });
+          }
+        }
+
         // Auto-calculate estimated duration: prefer package.durationMins, fallback to sum of service durations
         let estimatedDurationMins = 60; // default fallback
         if (pkg && input.packageId) {
@@ -639,9 +688,22 @@ export const bookingRouter = router({
             clientNotes: input.clientNotes,
             status: confirmationMode === "IMMEDIATE" ? "CONFIRMED" : "PENDING",
             subtotal,
-            totalAmount: subtotal,
+            discountAmount,
+            totalAmount: Math.max(0, subtotal - discountAmount),
           },
         });
+
+        if (discountAmount > 0 && input.couponCode) {
+          const coupon = await tx.coupon.findUnique({
+            where: { workspaceId_code: { workspaceId: workspace.id, code: input.couponCode.trim().toUpperCase() } },
+            select: { id: true },
+          });
+          if (coupon) {
+            await tx.couponUsage.create({
+              data: { couponId: coupon.id, orderId: job.id, email: client.email },
+            });
+          }
+        }
 
         // Mirror into the primary Appointment (orders architecture invariant)
         await syncPrimaryAppointment(tx, {
