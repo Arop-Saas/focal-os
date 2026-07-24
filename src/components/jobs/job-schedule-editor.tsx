@@ -57,6 +57,15 @@ export function JobScheduleEditor({ jobId, scheduledAt, estimatedDurationMins }:
     }
   };
 
+  // Golden-hour hint when this order has a twilight visit
+  const dateISO = dateValue?.slice(0, 10) ?? "";
+  const twilight = trpc.jobs.twilightWindow.useQuery(
+    { jobId, dateISO },
+    { enabled: showModal && mode === "schedule" && /^\d{4}-\d{2}-\d{2}$/.test(dateISO) }
+  );
+  const fmtT = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
   const openSchedule = () => {
     setMode("schedule");
     setDateValue(scheduledAt ? toLocalInput(new Date(scheduledAt)) : defaultValue);
@@ -144,6 +153,29 @@ export function JobScheduleEditor({ jobId, scheduledAt, estimatedDurationMins }:
                     onChange={(e) => setDateValue(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  {twilight.data?.hasSolar && (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <p className="text-[11px] leading-relaxed text-amber-800">
+                        This order includes a twilight visit — on this date, sunset at the
+                        property is <span className="font-semibold">{fmtT(twilight.data.sunset)}</span>;
+                        golden hour starts <span className="font-semibold">{fmtT(twilight.data.suggestedStart)}</span>.
+                      </p>
+                      {twilight.data.primaryIsSolar && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!twilight.data?.hasSolar) return;
+                            const d = new Date(twilight.data.suggestedStart);
+                            const pad = (n: number) => String(n).padStart(2, "0");
+                            setDateValue(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                          }}
+                          className="shrink-0 rounded-lg bg-amber-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-amber-700"
+                        >
+                          Use
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {dateValue && (
                     <p className="text-xs text-gray-500">
                       {(() => {

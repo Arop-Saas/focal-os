@@ -5,6 +5,8 @@ import { runDeliverySideEffects } from "@/lib/delivery";
 import { syncPrimaryAppointment, appointmentStatusForJobStatus, cancelAppointmentsForJob } from "@/lib/orders/appointments";
 import { findOrCreateProperty } from "@/lib/orders/property";
 import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/lib/orders/pricing";
+import { twilightWindow } from "@/lib/scheduling/solar";
+import { z as zod } from "zod";
 import { notifyJobRescheduled } from "@/lib/notify";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
@@ -819,6 +821,38 @@ export const jobsRouter = router({
   }),
 
   // Delete (soft delete / cancel)
+  /** Golden-hour window for a job's property on a date (twilight scheduling). */
+  twilightWindow: workspaceProcedure
+    .input(zod.object({ jobId: zod.string(), dateISO: zod.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
+    .query(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        select: {
+          propertyLat: true,
+          propertyLng: true,
+          property: { select: { lat: true, lng: true } },
+          appointments: { select: { isPrimary: true, timeConstraint: true } },
+        },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const solarAppts = job.appointments.filter((a) => a.timeConstraint === "SOLAR");
+      const lat = job.propertyLat ?? job.property?.lat ?? null;
+      const lng = job.propertyLng ?? job.property?.lng ?? null;
+      if (solarAppts.length === 0 || lat == null || lng == null) {
+        return { hasSolar: false as const };
+      }
+      const w = twilightWindow(input.dateISO, lat, lng);
+      if (!w) return { hasSolar: false as const };
+      return {
+        hasSolar: true as const,
+        primaryIsSolar: solarAppts.some((a) => a.isPrimary),
+        sunset: w.sunset.toISOString(),
+        suggestedStart: w.suggestedStart.toISOString(),
+        windowEnd: w.windowEnd.toISOString(),
+      };
+    }),
+
   cancel: workspaceProcedure
     .input(z.object({ id: z.string(), reason: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
