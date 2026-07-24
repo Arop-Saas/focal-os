@@ -8,7 +8,7 @@ import { utcToWallDateISO } from "@/lib/scheduling/tz";
 import { verifyPortalToken, PORTAL_COOKIE } from "@/lib/portal-auth";
 import { syncPrimaryAppointment } from "@/lib/orders/appointments";
 import { findOrCreateProperty } from "@/lib/orders/property";
-import { quoteOrderLines, snapshotAndGenerate } from "@/lib/orders/pricing";
+import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/lib/orders/pricing";
 
 // ─── Public Booking Router ────────────────────────────────────────────────────
 // No auth required — used by the client-facing booking form at /book/[slug]
@@ -555,9 +555,16 @@ export const bookingRouter = router({
             : alaCarteServices.map((svc) => ({ serviceId: svc.id, quantity: 1 })),
         });
         const quoteResolved = quoted.lines.length > 0 && quoted.lines.every((l) => l.source !== "CUSTOM");
-        const subtotal = quoteResolved
+        const baseSubtotal = quoteResolved
           ? quoted.subtotal
           : (pkg?.price ?? alaCarteServices.reduce((sum, s) => sum + s.basePrice, 0));
+        // Order-level adjustments (after-hours / weekend / minimum order)
+        const adjusted = await applyOrderAdjustments(tx, {
+          workspaceId: workspace.id,
+          subtotal: baseSubtotal,
+          scheduledAt,
+        });
+        const subtotal = adjusted.adjustedSubtotal;
 
         // Auto-calculate estimated duration: prefer package.durationMins, fallback to sum of service durations
         let estimatedDurationMins = 60; // default fallback

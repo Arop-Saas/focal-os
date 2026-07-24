@@ -117,6 +117,7 @@ model Workspace {
   productRules     ProductRule[]
   orderLineSnapshots OrderLineSnapshot[]
   pricingPlans     PricingPlan[]
+  adjustmentPolicies AdjustmentPolicy[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1148,6 +1149,32 @@ model OrderLineSnapshot {
 
   @@index([jobId])
   @@index([workspaceId])
+}
+
+enum AdjustmentType {
+  RUSH
+  AFTER_HOURS
+  WEEKEND
+  MINIMUM_ORDER
+}
+
+model AdjustmentPolicy {
+  id                 String  @id @default(cuid())
+  workspaceId        String
+  type               AdjustmentType
+  active             Boolean @default(false)
+  amountType         String  @default("FLAT") // FLAT | PERCENT (of subtotal)
+  amount             Float   @default(0)
+  afterHoursStart    Int?    // AFTER_HOURS: hour (0-23, workspace wall clock) evening threshold, e.g. 18
+  afterHoursEnd      Int?    // AFTER_HOURS: morning threshold, e.g. 8
+  minimumOrderAmount Float?  // MINIMUM_ORDER: floor the subtotal up to this
+
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([workspaceId, type])
 }
 
 model PricingPlan {

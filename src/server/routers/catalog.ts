@@ -424,6 +424,33 @@ export const catalogRouter = router({
     });
   }),
 
+  // ── Order-level adjustments (rush / after-hours / weekend / minimum) ──
+  listAdjustments: workspaceProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.adjustmentPolicy.findMany({
+      where: { workspaceId: ctx.workspace!.id },
+      orderBy: { type: "asc" },
+    });
+  }),
+
+  upsertAdjustment: adminProcedure
+    .input(z.object({
+      type: z.enum(["RUSH", "AFTER_HOURS", "WEEKEND", "MINIMUM_ORDER"]),
+      active: z.boolean(),
+      amountType: z.enum(["FLAT", "PERCENT"]).default("FLAT"),
+      amount: z.number().min(0).default(0),
+      afterHoursStart: z.number().int().min(0).max(23).nullable().optional(),
+      afterHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
+      minimumOrderAmount: z.number().min(0).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { type, ...data } = input;
+      return ctx.prisma.adjustmentPolicy.upsert({
+        where: { workspaceId_type: { workspaceId: ctx.workspace!.id, type } },
+        create: { workspaceId: ctx.workspace!.id, type, ...data },
+        update: data,
+      });
+    }),
+
   /** Test console: quote a hypothetical order and see the explanation. */
   quotePreview: workspaceProcedure
     .input(

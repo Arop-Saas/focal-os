@@ -4,7 +4,7 @@ import { assertSlotBookable, SlotUnavailableError } from "@/lib/scheduling/loade
 import { runDeliverySideEffects } from "@/lib/delivery";
 import { syncPrimaryAppointment, appointmentStatusForJobStatus, cancelAppointmentsForJob } from "@/lib/orders/appointments";
 import { findOrCreateProperty } from "@/lib/orders/property";
-import { quoteOrderLines, snapshotAndGenerate } from "@/lib/orders/pricing";
+import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/lib/orders/pricing";
 import { notifyJobRescheduled } from "@/lib/notify";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
@@ -246,8 +246,17 @@ export const jobsRouter = router({
         }
       }
 
-      const taxAmount = (subtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
-      const totalAmount = subtotal + taxAmount + (jobData.priorityFee ?? 0);
+      // Order-level adjustments (rush / after-hours / weekend / minimum order)
+      // before tax; manual priorityFee still adds on top when set.
+      const adjusted = await applyOrderAdjustments(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        subtotal,
+        scheduledAt: jobData.scheduledAt ?? null,
+        isRush: jobData.priority === "URGENT",
+      });
+      const adjustedSubtotal = adjusted.adjustedSubtotal;
+      const taxAmount = (adjustedSubtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
+      const totalAmount = adjustedSubtotal + taxAmount + (jobData.priorityFee ?? 0);
 
       const job = await ctx.prisma.$transaction(async (tx) => {
         // Atomic JOB counter — separate from invoices (R11), race-free:

@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Loader2, MapPin, Percent, Ruler } from "lucide-react";
 import { PricingPlans } from "./pricing-plans";
+import { AdjustmentsPanel } from "./adjustments-panel";
 
 /**
  * Pricing home (plan §3 "Pricing"): rule-based pricing opt-in, taxes, travel.
@@ -75,6 +76,9 @@ export function PricingPanel({
       {/* Pricing plans */}
       <PricingPlans />
 
+      {/* Order adjustments */}
+      <AdjustmentsPanel />
+
       {/* Taxes */}
       <section className="rounded-xl border bg-white p-5">
         <div className="flex items-center justify-between">
@@ -129,8 +133,8 @@ export function PricingPanel({
       </section>
 
       <p className="text-[11px] text-gray-400">
-        Coming to this section: rush and after-hours adjustments, and coupons — applied
-        through the same pricing pipeline as everything above.
+        Coming to this section: coupons through the pricing pipeline, and payout margin
+        warnings.
       </p>
     </div>
   );

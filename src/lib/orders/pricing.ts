@@ -247,3 +247,87 @@ export async function snapshotAndGenerate(
     }
   }
 }
+
+/**
+ * Order-level adjustments (plan §11): rush, after-hours, weekend, minimum
+ * order. Applied to the line subtotal AFTER plans/rules, BEFORE tax. Time
+ * conditions are evaluated on the workspace's wall clock.
+ */
+export interface OrderAdjustment {
+  type: "RUSH" | "AFTER_HOURS" | "WEEKEND" | "MINIMUM_ORDER";
+  label: string;
+  amount: number;
+}
+
+export async function applyOrderAdjustments(
+  db: Db,
+  args: {
+    workspaceId: string;
+    subtotal: number;
+    scheduledAt?: Date | null;
+    isRush?: boolean;
+  }
+): Promise<{ adjustments: OrderAdjustment[]; adjustedSubtotal: number }> {
+  const policies = await db.adjustmentPolicy.findMany({
+    where: { workspaceId: args.workspaceId, active: true },
+  });
+  if (policies.length === 0) return { adjustments: [], adjustedSubtotal: args.subtotal };
+
+  const ws = await db.workspace.findUnique({
+    where: { id: args.workspaceId },
+    select: { timezone: true },
+  });
+  const tz = ws?.timezone ?? "America/New_York";
+
+  // Wall-clock hour/day of the shoot in the workspace timezone
+  let wallHour: number | null = null;
+  let wallDow: number | null = null;
+  if (args.scheduledAt) {
+    const { utcToWallParts, wallDateDayOfWeek, utcToWallDateISO } = await import("@/lib/scheduling/tz");
+    const parts = utcToWallParts(new Date(args.scheduledAt), tz);
+    wallHour = parts.hour;
+    wallDow = wallDateDayOfWeek(utcToWallDateISO(new Date(args.scheduledAt), tz));
+  }
+
+  const adjustments: OrderAdjustment[] = [];
+  policies.sort((a, b) => (a.type === "MINIMUM_ORDER" ? 1 : 0) - (b.type === "MINIMUM_ORDER" ? 1 : 0));
+  const fee = (p: { amountType: string; amount: number }) =>
+    p.amountType === "PERCENT" ? (args.subtotal * p.amount) / 100 : p.amount;
+
+  for (const p of policies) {
+    switch (p.type) {
+      case "RUSH":
+        if (args.isRush) {
+          adjustments.push({ type: "RUSH", label: "Rush fee", amount: fee(p) });
+        }
+        break;
+      case "AFTER_HOURS": {
+        if (wallHour == null) break;
+        const start = p.afterHoursStart ?? 18;
+        const end = p.afterHoursEnd ?? 8;
+        if (wallHour >= start || wallHour < end) {
+          adjustments.push({ type: "AFTER_HOURS", label: "After-hours fee", amount: fee(p) });
+        }
+        break;
+      }
+      case "WEEKEND":
+        if (wallDow === 0 || wallDow === 6) {
+          adjustments.push({ type: "WEEKEND", label: "Weekend fee", amount: fee(p) });
+        }
+        break;
+      case "MINIMUM_ORDER": {
+        const min = p.minimumOrderAmount ?? 0;
+        const runningTotal = args.subtotal + adjustments.reduce((s, a) => s + a.amount, 0);
+        if (min > 0 && runningTotal < min) {
+          adjustments.push({ type: "MINIMUM_ORDER", label: "Minimum order", amount: min - runningTotal });
+        }
+        break;
+      }
+    }
+  }
+
+  return {
+    adjustments,
+    adjustedSubtotal: args.subtotal + adjustments.reduce((s, a) => s + a.amount, 0),
+  };
+}
