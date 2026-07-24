@@ -94,7 +94,7 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
             onClick={() => setShowConsole(true)}
             className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
           >
-            <Calculator className="h-3.5 w-3.5" /> Test pricing
+            <Calculator className="h-3.5 w-3.5" /> Price quote
           </button>
           <button
             onClick={() => setShowNew(true)}

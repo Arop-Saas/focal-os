@@ -43,7 +43,7 @@ export function QuoteConsole({
       <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b p-5">
           <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
-            <Calculator className="h-4 w-4 text-gray-400" /> Test pricing
+            <Calculator className="h-4 w-4 text-gray-400" /> Price quote
           </h2>
           <button onClick={onClose} aria-label="Close" className="rounded p-1 hover:bg-gray-100">
             <X className="h-4 w-4" />

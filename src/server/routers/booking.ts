@@ -8,6 +8,7 @@ import { utcToWallDateISO } from "@/lib/scheduling/tz";
 import { verifyPortalToken, PORTAL_COOKIE } from "@/lib/portal-auth";
 import { syncPrimaryAppointment } from "@/lib/orders/appointments";
 import { findOrCreateProperty } from "@/lib/orders/property";
+import { quoteOrderLines, snapshotAndGenerate } from "@/lib/orders/pricing";
 
 // ─── Public Booking Router ────────────────────────────────────────────────────
 // No auth required — used by the client-facing booking form at /book/[slug]
@@ -173,8 +174,27 @@ export const bookingRouter = router({
           return !ids || ids.length === 0 || ids.includes(input.formId!);
         });
       };
-      const packages = filterByForm(allPackages as any[]) as typeof allPackages;
-      const services = filterByForm(allServices as any[]) as typeof allServices;
+      // Catalog offerings take over the form's selection when any exist for it
+      // (opt-in per form via Services & Pricing → "Offered on"); otherwise the
+      // legacy formIds filter keeps working unchanged.
+      let packages = filterByForm(allPackages as any[]) as typeof allPackages;
+      let services = filterByForm(allServices as any[]) as typeof allServices;
+      if (input.formId) {
+        const offerings = await ctx.prisma.offering.findMany({
+          where: {
+            orderFormId: input.formId,
+            visible: true,
+            item: { state: "PUBLISHED" },
+          },
+          select: { item: { select: { legacyServiceId: true, legacyPackageId: true } } },
+        });
+        if (offerings.length > 0) {
+          const offeredServiceIds = new Set(offerings.map((o) => o.item.legacyServiceId).filter(Boolean));
+          const offeredPackageIds = new Set(offerings.map((o) => o.item.legacyPackageId).filter(Boolean));
+          packages = allPackages.filter((pk) => offeredPackageIds.has(pk.id));
+          services = allServices.filter((sv) => offeredServiceIds.has(sv.id));
+        }
+      }
 
       // Load territories relevant to this form (all workspace territories, or filtered by form's territoryIds)
       const formTerritoryIds = orderForm?.territoryIds as string[] | null | undefined;
@@ -523,8 +543,20 @@ export const bookingRouter = router({
           wsCounter.jobNextNumber - 1
         );
 
-        // Determine financials from package or à la carte services
-        const subtotal = pkg?.price ?? alaCarteServices.reduce((sum, s) => sum + s.basePrice, 0);
+        // Price through THE pricing service (sqft rules + explanations).
+        // If any line has no catalog identity (unbridged), fall back to the
+        // legacy sum so a half-migrated catalog can never misprice a booking.
+        const quoted = await quoteOrderLines(tx, {
+          workspaceId: workspace.id,
+          squareFootage: input.squareFootage ?? null,
+          lines: input.packageId
+            ? [{ packageId: input.packageId, quantity: 1 }]
+            : alaCarteServices.map((svc) => ({ serviceId: svc.id, quantity: 1 })),
+        });
+        const quoteResolved = quoted.lines.length > 0 && quoted.lines.every((l) => l.source !== "CUSTOM");
+        const subtotal = quoteResolved
+          ? quoted.subtotal
+          : (pkg?.price ?? alaCarteServices.reduce((sum, s) => sum + s.basePrice, 0));
 
         // Auto-calculate estimated duration: prefer package.durationMins, fallback to sum of service durations
         let estimatedDurationMins = 60; // default fallback
@@ -549,6 +581,13 @@ export const bookingRouter = router({
             0
           );
           if (totalServiceMins > 0) estimatedDurationMins = totalServiceMins;
+        }
+        // Rule-adjusted durations from the quote win when fully resolved
+        if (quoteResolved) {
+          const quotedMins = quoted.lines
+            .filter((l) => l.visitMode === "SAME_VISIT" && l.fulfillmentMode !== "PRODUCTION_ONLY")
+            .reduce((sum, l) => sum + l.durationMins, 0);
+          if (quotedMins > 0) estimatedDurationMins = quotedMins;
         }
 
         const property = await findOrCreateProperty(tx, {
@@ -603,6 +642,15 @@ export const bookingRouter = router({
           scheduledAt: job.scheduledAt,
           durationMins: job.estimatedDurationMins,
         });
+
+        // Frozen order lines + generated work (tasks / separate visits)
+        if (quoteResolved) {
+          await snapshotAndGenerate(tx, {
+            workspaceId: workspace.id,
+            jobId: job.id,
+            lines: quoted.lines,
+          });
+        }
 
         // If package has services, add them to the job
         if (pkg && input.packageId) {
