@@ -549,6 +549,7 @@ export const bookingRouter = router({
         const quoted = await quoteOrderLines(tx, {
           workspaceId: workspace.id,
           squareFootage: input.squareFootage ?? null,
+          clientId: client.id,
           lines: input.packageId
             ? [{ packageId: input.packageId, quantity: 1 }]
             : alaCarteServices.map((svc) => ({ serviceId: svc.id, quantity: 1 })),

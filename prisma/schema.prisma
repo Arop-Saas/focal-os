@@ -116,6 +116,7 @@ model Workspace {
   offerings        Offering[]
   productRules     ProductRule[]
   orderLineSnapshots OrderLineSnapshot[]
+  pricingPlans     PricingPlan[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -494,6 +495,7 @@ model Client {
 
   @@index([workspaceId])
   @@index([email, workspaceId])
+  pricingPlans  PricingPlan[]
 }
 
 enum ClientType {
@@ -532,6 +534,7 @@ model BrokerageGroup {
   updatedAt     DateTime     @updatedAt
 
   @@index([workspaceId])
+  pricingPlans PricingPlan[]
 }
 
 model CustomerTeam {
@@ -1032,6 +1035,7 @@ model CatalogItem {
   usedInPackages   PackageComponent[]  @relation("PackageChild")
   rules            ProductRule[]
   snapshots        OrderLineSnapshot[]
+  planEntries      PricingPlanEntry[]
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -1144,6 +1148,40 @@ model OrderLineSnapshot {
 
   @@index([jobId])
   @@index([workspaceId])
+}
+
+model PricingPlan {
+  id               String  @id @default(cuid())
+  workspaceId      String
+  name             String
+  active           Boolean @default(true)
+  priority         Int     @default(100) // lower wins; first matching plan with an entry applies
+  // Targeting: brokerage group, specific client, or neither (= every customer)
+  brokerageGroupId String?
+  clientId         String?
+
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brokerageGroup   BrokerageGroup? @relation(fields: [brokerageGroupId], references: [id], onDelete: Cascade)
+  client           Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  entries          PricingPlanEntry[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([workspaceId, active])
+}
+
+model PricingPlanEntry {
+  id            String  @id @default(cuid())
+  planId        String
+  catalogItemId String
+  overridePrice Float?  // exact unit price
+  percentAdjust Float?  // e.g. -10 = 10% off computed price
+
+  plan          PricingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  item          CatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, catalogItemId])
 }
 
 // ─────────────────────────────────────────────────────────────

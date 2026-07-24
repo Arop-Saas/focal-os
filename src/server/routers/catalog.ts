@@ -319,11 +319,117 @@ export const catalogRouter = router({
       return ctx.prisma.packageComponent.delete({ where: { id: comp.id } });
     }),
 
+  // ── Pricing plans (Phase 2 §11) ──────────────────────────────────────────
+  listPlans: workspaceProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.pricingPlan.findMany({
+      where: { workspaceId: ctx.workspace!.id },
+      include: {
+        brokerageGroup: { select: { name: true } },
+        client: { select: { firstName: true, lastName: true } },
+        entries: {
+          include: { item: { include: { currentVersion: { select: { name: true, basePrice: true } } } } },
+        },
+      },
+      orderBy: [{ active: "desc" }, { priority: "asc" }],
+    });
+  }),
+
+  createPlan: adminProcedure
+    .input(z.object({
+      name: z.string().min(2).max(80),
+      brokerageGroupId: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.brokerageGroupId) {
+        const grp = await ctx.prisma.brokerageGroup.findFirst({
+          where: { id: input.brokerageGroupId, workspaceId: ctx.workspace!.id }, select: { id: true },
+        });
+        if (!grp) throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      return ctx.prisma.pricingPlan.create({
+        data: {
+          workspaceId: ctx.workspace!.id,
+          name: input.name,
+          brokerageGroupId: input.brokerageGroupId ?? null,
+        },
+      });
+    }),
+
+  setPlanActive: adminProcedure
+    .input(z.object({ planId: z.string(), active: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await ctx.prisma.pricingPlan.findFirst({
+        where: { id: input.planId, workspaceId: ctx.workspace!.id },
+      });
+      if (!plan) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.pricingPlan.update({ where: { id: plan.id }, data: { active: input.active } });
+    }),
+
+  deletePlan: adminProcedure
+    .input(z.object({ planId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await ctx.prisma.pricingPlan.findFirst({
+        where: { id: input.planId, workspaceId: ctx.workspace!.id },
+      });
+      if (!plan) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.pricingPlan.delete({ where: { id: plan.id } });
+    }),
+
+  upsertPlanEntry: adminProcedure
+    .input(z.object({
+      planId: z.string(),
+      catalogItemId: z.string(),
+      overridePrice: z.number().min(0).nullable().optional(),
+      percentAdjust: z.number().min(-100).max(500).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [plan, item] = await Promise.all([
+        ctx.prisma.pricingPlan.findFirst({ where: { id: input.planId, workspaceId: ctx.workspace!.id }, select: { id: true } }),
+        ctx.prisma.catalogItem.findFirst({ where: { id: input.catalogItemId, workspaceId: ctx.workspace!.id }, select: { id: true } }),
+      ]);
+      if (!plan || !item) throw new TRPCError({ code: "NOT_FOUND" });
+      if (input.overridePrice == null && input.percentAdjust == null) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Set a price or a percentage." });
+      }
+      return ctx.prisma.pricingPlanEntry.upsert({
+        where: { planId_catalogItemId: { planId: input.planId, catalogItemId: input.catalogItemId } },
+        create: {
+          planId: input.planId,
+          catalogItemId: input.catalogItemId,
+          overridePrice: input.overridePrice ?? null,
+          percentAdjust: input.overridePrice != null ? null : input.percentAdjust ?? null,
+        },
+        update: {
+          overridePrice: input.overridePrice ?? null,
+          percentAdjust: input.overridePrice != null ? null : input.percentAdjust ?? null,
+        },
+      });
+    }),
+
+  deletePlanEntry: adminProcedure
+    .input(z.object({ entryId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const entry = await ctx.prisma.pricingPlanEntry.findFirst({
+        where: { id: input.entryId, plan: { workspaceId: ctx.workspace!.id } },
+      });
+      if (!entry) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.pricingPlanEntry.delete({ where: { id: entry.id } });
+    }),
+
+  listBrokerageGroups: workspaceProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.brokerageGroup.findMany({
+      where: { workspaceId: ctx.workspace!.id },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }),
+
   /** Test console: quote a hypothetical order and see the explanation. */
   quotePreview: workspaceProcedure
     .input(
       z.object({
         squareFootage: z.number().min(0).nullable().optional(),
+        clientId: z.string().nullable().optional(),
         lines: z
           .array(
             z.object({
@@ -338,6 +444,7 @@ export const catalogRouter = router({
       return quoteOrderLines(ctx.prisma, {
         workspaceId: ctx.workspace!.id,
         squareFootage: input.squareFootage ?? null,
+        clientId: input.clientId ?? null,
         lines: input.lines,
       });
     }),

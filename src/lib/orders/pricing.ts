@@ -43,7 +43,7 @@ export interface QuotedLine {
 
 export async function quoteOrderLines(
   db: Db,
-  args: { workspaceId: string; squareFootage?: number | null; lines: QuoteLineInput[] }
+  args: { workspaceId: string; squareFootage?: number | null; clientId?: string | null; lines: QuoteLineInput[] }
 ): Promise<{ lines: QuotedLine[]; subtotal: number }> {
   const sqft = args.squareFootage ?? null;
   const out: QuotedLine[] = [];
@@ -54,6 +54,39 @@ export async function quoteOrderLines(
     select: { pricingRulesEnabled: true },
   });
   const rulesEnabled = ws?.pricingRulesEnabled ?? false;
+
+  // Pricing plans (plan §11): plans targeting this client, their brokerage
+  // group, or everyone — lowest priority number wins; the first matching
+  // plan that has an entry for an item applies to it.
+  let plans: {
+    name: string;
+    entries: { catalogItemId: string; overridePrice: number | null; percentAdjust: number | null }[];
+  }[] = [];
+  if (args.clientId) {
+    const client = await db.client.findFirst({
+      where: { id: args.clientId, workspaceId: args.workspaceId },
+      select: { id: true, brokerageGroupId: true },
+    });
+    plans = await db.pricingPlan.findMany({
+      where: {
+        workspaceId: args.workspaceId,
+        active: true,
+        OR: [
+          { clientId: args.clientId },
+          ...(client?.brokerageGroupId ? [{ brokerageGroupId: client.brokerageGroupId }] : []),
+          { clientId: null, brokerageGroupId: null },
+        ],
+      },
+      orderBy: { priority: "asc" },
+      select: { name: true, entries: { select: { catalogItemId: true, overridePrice: true, percentAdjust: true } } },
+    });
+  } else {
+    plans = await db.pricingPlan.findMany({
+      where: { workspaceId: args.workspaceId, active: true, clientId: null, brokerageGroupId: null },
+      orderBy: { priority: "asc" },
+      select: { name: true, entries: { select: { catalogItemId: true, overridePrice: true, percentAdjust: true } } },
+    });
+  }
 
   for (const input of args.lines) {
     const quantity = Math.max(1, input.quantity ?? 1);
@@ -116,6 +149,21 @@ export async function quoteOrderLines(
         if (rule.durationAddMins !== 0) parts.push(`${rule.durationAddMins > 0 ? "+" : "−"}${Math.abs(rule.durationAddMins)} min`);
         explanation.push(`${rule.name}: ${parts.join(", ") || "applied"}`);
       }
+    }
+
+    // First matching pricing plan with an entry for this item
+    for (const plan of plans) {
+      const entry = plan.entries.find((e) => e.catalogItemId === item.id);
+      if (!entry) continue;
+      if (entry.overridePrice != null) {
+        explanation.push(`${plan.name}: price set to $${entry.overridePrice.toFixed(2)}`);
+        unitPrice = entry.overridePrice;
+      } else if (entry.percentAdjust != null && entry.percentAdjust !== 0) {
+        const adjusted = Math.max(0, unitPrice * (1 + entry.percentAdjust / 100));
+        explanation.push(`${plan.name}: ${entry.percentAdjust > 0 ? "+" : ""}${entry.percentAdjust}% → $${adjusted.toFixed(2)}`);
+        unitPrice = adjusted;
+      }
+      break;
     }
 
     if (input.unitPriceOverride != null && input.unitPriceOverride !== unitPrice) {

@@ -798,6 +798,7 @@ export const mobileRouter = router({
         const quoted = await quoteOrderLines(ctx.prisma, {
           workspaceId: ctx.workspace.id,
           squareFootage: jobData.squareFootage ?? null,
+          clientId: jobData.clientId,
           lines: [{ packageId: jobData.packageId, quantity: 1 }],
         });
         if (quoted.lines.length > 0 && quoted.lines.every((l) => l.source !== "CUSTOM")) {

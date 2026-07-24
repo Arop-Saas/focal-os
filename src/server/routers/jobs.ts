@@ -334,6 +334,7 @@ export const jobsRouter = router({
         const quoted = await quoteOrderLines(tx, {
           workspaceId: ctx.workspace.id,
           squareFootage: jobData.squareFootage ?? null,
+          clientId: jobData.clientId,
           lines: [
             ...(jobData.packageId
               ? [{ packageId: jobData.packageId, quantity: 1 }]
