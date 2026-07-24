@@ -8,9 +8,9 @@ import { z } from "zod";
 import { trpc } from "@/lib/trpc/client";
 import { formatCurrency } from "@/lib/utils";
 import {
-  Loader2, Plus, X, Search, Link2, Sparkles, Check,
+  Loader2, Plus, X, Search, Check,
   ChevronLeft, ChevronRight, User, Calendar,
-  Building2, ListChecks, FileText, Clock,
+  Building2, ListChecks, Clock,
 } from "lucide-react";
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete";
 import {
@@ -51,6 +51,15 @@ type Client = { id: string; firstName: string; lastName: string; email: string; 
 type Package = { id: string; name: string; price: number; items: { service: { name: string } }[] };
 type Service = { id: string; name: string; category: string; basePrice: number };
 type Staff = { id: string; member: { user: { fullName: string } } };
+type CatalogListItem = {
+  id: string;
+  role: string; // MAIN | ADDON | PACKAGE
+  currentVersion: {
+    name: string;
+    basePrice: number;
+    visitMode: string;
+  } | null;
+};
 
 interface SelectedService {
   serviceId: string;
@@ -64,6 +73,8 @@ interface NewJobFormProps {
   packages: Package[];
   services: Service[];
   staff: Staff[];
+  /** published catalog items — when non-empty the Services step is catalog-native */
+  catalogItems: CatalogListItem[];
   defaultClientId?: string;
 }
 
@@ -108,8 +119,7 @@ const STEPS = [
   { key: "client",   label: "Client",   icon: User },
   { key: "property", label: "Property", icon: Building2 },
   { key: "services", label: "Services", icon: ListChecks },
-  { key: "schedule", label: "Schedule", icon: Calendar },
-  { key: "notes",    label: "Notes",    icon: FileText },
+  { key: "schedule", label: "Schedule & Review", icon: Calendar },
 ];
 
 const STEP_VALIDATE_FIELDS: (keyof FormData)[][] = [
@@ -117,8 +127,13 @@ const STEP_VALIDATE_FIELDS: (keyof FormData)[][] = [
   ["propertyAddress", "propertyCity", "propertyState"],
   [],
   [],
-  [],
 ];
+
+function fmtMins(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+}
 
 const inputCls =
   "w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white";
@@ -375,7 +390,7 @@ function CalendarPicker({
 
 // ─── Main form ────────────────────────────────────────────────────────────────
 
-export function NewJobForm({ clients, packages, services, staff, defaultClientId }: NewJobFormProps) {
+export function NewJobForm({ clients, packages, services, staff, catalogItems, defaultClientId }: NewJobFormProps) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [clientSearch, setClientSearch] = useState("");
@@ -392,8 +407,9 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
   const [clientSource, setClientSource] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
-  const [mlsSearchValue, setMlsSearchValue] = useState("");
-  const [mlsAttached, setMlsAttached] = useState(false);
+  // Catalog-native selection — priced live by the server, no client-side prices
+  const catalogMode = catalogItems.length > 0;
+  const [selectedCatalog, setSelectedCatalog] = useState<{ catalogItemId: string; quantity: number }[]>([]);
 
   const createJob = trpc.jobs.create.useMutation({
     onSuccess: (job) => router.push(`/jobs/${job.id}`),
@@ -423,24 +439,30 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
   const scheduledAt = watch("scheduledAt") ?? "";
   const pkg = packages.find((p) => p.id === selectedPackageId);
 
-  // MLS auto-attach
-  const { data: mlsSearchResult } = trpc.jobs.list.useQuery(
-    { search: mlsSearchValue, limit: 5, sortBy: "scheduledAt", sortDir: "desc" },
-    { enabled: mlsSearchValue.length >= 3 }
+  // Live server quote for the catalog selection — surfaces sqft rules and
+  // client pricing plans exactly as they will price at creation.
+  const sqftRaw = Number(watch("squareFootage")); // RHF yields strings for number inputs
+  const sqft = Number.isFinite(sqftRaw) && sqftRaw > 0 ? sqftRaw : null;
+  const quote = trpc.catalog.quotePreview.useQuery(
+    { squareFootage: sqft, clientId: clientId || null, lines: selectedCatalog },
+    { enabled: catalogMode && selectedCatalog.length > 0, placeholderData: (prev) => prev }
   );
-  const mlsSuggestion =
-    mlsSearchResult?.jobs.find(
-      (j) => j.mlsNumber?.toLowerCase() === mlsSearchValue.toLowerCase()
-    ) ?? null;
+  const quotedOnSiteMins = (quote.data?.lines ?? [])
+    .filter((l) => l.visitMode === "SAME_VISIT" && l.fulfillmentMode !== "PRODUCTION_ONLY")
+    .reduce((sum, l) => sum + l.durationMins, 0);
 
-  function applyListingSuggestion(job: NonNullable<typeof mlsSuggestion>) {
-    setValue("propertyAddress", job.propertyAddress, { shouldValidate: true });
-    setValue("propertyCity", job.propertyCity, { shouldValidate: true });
-    setValue("propertyState", job.propertyState, { shouldValidate: true });
-    if (job.propertyZip) setValue("propertyZip", job.propertyZip);
-    if (job.squareFootage) setValue("squareFootage", job.squareFootage);
-    setValue("propertyType", job.propertyType as FormData["propertyType"]);
-    setMlsAttached(true);
+  function addCatalogItem(id: string) {
+    setSelectedCatalog((prev) =>
+      prev.some((l) => l.catalogItemId === id) ? prev : [...prev, { catalogItemId: id, quantity: 1 }]
+    );
+  }
+  function removeCatalogItem(id: string) {
+    setSelectedCatalog((prev) => prev.filter((l) => l.catalogItemId !== id));
+  }
+  function updateCatalogQty(id: string, qty: number) {
+    setSelectedCatalog((prev) =>
+      prev.map((l) => (l.catalogItemId === id ? { ...l, quantity: Math.max(1, qty) } : l))
+    );
   }
 
   function addService(s: Service) {
@@ -498,11 +520,15 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
       accessNotes,
       clientSource: clientSource || undefined,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
-      services: selectedServices.map((s) => ({
-        serviceId: s.serviceId,
-        quantity: s.quantity,
-        unitPrice: s.unitPrice,
-      })),
+      services: catalogMode
+        ? []
+        : selectedServices.map((s) => ({
+            serviceId: s.serviceId,
+            quantity: s.quantity,
+            unitPrice: s.unitPrice,
+          })),
+      catalogLines: catalogMode ? selectedCatalog : [],
+      packageId: catalogMode ? undefined : data.packageId,
       assignedStaffIds: selectedStaff,
     });
   }
@@ -814,7 +840,121 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
       )}
 
       {/* ── Step 2: Services ───────────────────────────────────────────────── */}
-      {step === 2 && (
+      {step === 2 && catalogMode && (
+        <div className="bg-white rounded-xl border p-6 space-y-5">
+          <div>
+            <h3 className="font-semibold text-gray-900">Services</h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              What will be delivered for this shoot? Prices come from your catalog
+              {sqft ? ` for ${sqft.toLocaleString()} sq ft` : ""}.
+            </p>
+          </div>
+
+          {[
+            { role: "PACKAGE", title: "Packages" },
+            { role: "MAIN", title: "Services" },
+            { role: "ADD_ON", title: "Add-ons" },
+          ].map((group) => {
+            const items = catalogItems.filter((i) => i.role === group.role && i.currentVersion);
+            if (items.length === 0) return null;
+            return (
+              <div key={group.role}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{group.title}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {items.map((item) => {
+                    const sel = selectedCatalog.find((l) => l.catalogItemId === item.id);
+                    const v = item.currentVersion!;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors ${
+                          sel ? "border-blue-400 bg-blue-50/50" : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => (sel ? removeCatalogItem(item.id) : addCatalogItem(item.id))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <p className="truncate text-sm font-medium text-gray-800">{v.name}</p>
+                          <p className="text-xs text-gray-400">
+                            {formatCurrency(v.basePrice)}
+                            {v.visitMode === "SEPARATE_VISIT" && " · separate visit"}
+                          </p>
+                        </button>
+                        {sel ? (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <input
+                              type="number"
+                              min={1}
+                              value={sel.quantity}
+                              onChange={(e) => updateCatalogQty(item.id, Number(e.target.value))}
+                              className="w-12 rounded-lg border border-gray-200 px-1 py-1 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeCatalogItem(item.id)}
+                              className="rounded p-1 text-gray-300 transition-colors hover:text-red-400"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <Plus className="h-4 w-4 shrink-0 text-gray-300" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Live quote */}
+          {selectedCatalog.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400">
+              Nothing selected yet — pick a package or services above.
+            </p>
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Quote</p>
+                {quote.isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-300" />}
+              </div>
+              {quote.data ? (
+                <div className="space-y-2">
+                  {quote.data.lines.map((l, i) => (
+                    <div key={i} className="border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">
+                          {l.name}
+                          {l.quantity > 1 && <span className="text-gray-400"> × {l.quantity}</span>}
+                        </span>
+                        <span className="font-medium text-gray-900">{formatCurrency(l.totalPrice)}</span>
+                      </div>
+                      {l.explanation.length > 0 && (
+                        <p className="mt-0.5 text-[11px] text-gray-400">{l.explanation.join(" · ")}</p>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between pt-1 text-sm font-semibold text-gray-900">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(quote.data.subtotal)}</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Tax and any rush, after-hours or minimum-order adjustments are applied when the order is created.
+                  </p>
+                </div>
+              ) : (
+                <p className="py-2 text-sm text-gray-400">Calculating…</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Legacy services picker — workspaces without a published catalog */}
+      {step === 2 && !catalogMode && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           <div>
             <h3 className="font-semibold text-gray-900">Services</h3>
@@ -902,7 +1042,7 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
         </div>
       )}
 
-      {/* ── Step 3: Schedule ───────────────────────────────────────────────── */}
+      {/* ── Step 3: Schedule & Review ──────────────────────────────────── */}
       {step === 3 && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl border p-6">
@@ -926,7 +1066,22 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
                   {DURATION_OPTIONS.map((d) => (
                     <option key={d.value} value={d.value}>{d.label}</option>
                   ))}
+                  {quotedOnSiteMins > 0 && !DURATION_OPTIONS.some((d) => d.value === quotedOnSiteMins) && (
+                    <option value={quotedOnSiteMins}>{fmtMins(quotedOnSiteMins)}</option>
+                  )}
                 </select>
+                {quotedOnSiteMins > 0 && Number(watch("estimatedDurationMins")) !== quotedOnSiteMins && (
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    Selected services suggest ~{fmtMins(quotedOnSiteMins)} on site.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setValue("estimatedDurationMins", quotedOnSiteMins)}
+                      className="font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Use
+                    </button>
+                  </p>
+                )}
               </div>
               <div className="self-end pb-1">
                 {scheduledAt ? (
@@ -979,23 +1134,19 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* ── Step 4: Notes + Review ─────────────────────────────────────────── */}
-      {step === 4 && (
-        <div className="space-y-4">
+          {/* Notes */}
           <div className="bg-white rounded-xl border p-6 space-y-4">
             <div>
               <h3 className="font-semibold text-gray-900">Notes</h3>
-              <p className="text-sm text-gray-500 mt-0.5">Any final details before creating the job.</p>
+              <p className="text-sm text-gray-500 mt-0.5">Any final details before creating the order.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Notes <span className="font-normal text-gray-400">(optional)</span></label>
                 <textarea
                   {...register("internalNotes")}
-                  rows={4}
+                  rows={3}
                   placeholder="Any specific requests or info the photographer should know?"
                   className={`${inputCls} resize-none`}
                 />
@@ -1004,7 +1155,7 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
                 <label className={labelCls}>Client-facing notes</label>
                 <textarea
                   {...register("clientNotes")}
-                  rows={4}
+                  rows={3}
                   placeholder="Notes visible to the client…"
                   className={`${inputCls} resize-none`}
                 />
@@ -1012,9 +1163,9 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
             </div>
           </div>
 
-          {/* Summary card */}
+          {/* Review */}
           <div className="bg-white rounded-xl border p-5">
-            <h3 className="font-semibold text-gray-900 text-sm mb-3">Summary</h3>
+            <h3 className="font-semibold text-gray-900 text-sm mb-3">Review</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {selectedClient && (
                 <div>
@@ -1046,7 +1197,16 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
                   </p>
                 </div>
               )}
-              {(pkg || selectedServices.length > 0) && (
+              {catalogMode && selectedCatalog.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-400">Services</p>
+                  <p className="font-medium text-gray-800">
+                    {selectedCatalog.length} item{selectedCatalog.length !== 1 ? "s" : ""}
+                    {quote.data ? ` — ${formatCurrency(quote.data.subtotal)}` : ""}
+                  </p>
+                </div>
+              )}
+              {!catalogMode && (pkg || selectedServices.length > 0) && (
                 <div>
                   <p className="text-xs text-gray-400">Services</p>
                   <p className="font-medium text-gray-800">
@@ -1061,7 +1221,7 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
                   <p className="text-xs text-gray-400">Assigned to</p>
                   <p className="font-medium text-gray-800">
                     {selectedStaff
-                      .map((id) => staff.find((s) => s.id === id)?.member.user.fullName)
+                      .map((id) => staff.find((st) => st.id === id)?.member.user.fullName)
                       .filter(Boolean)
                       .join(", ")}
                   </p>
@@ -1103,7 +1263,7 @@ export function NewJobForm({ clients, packages, services, staff, defaultClientId
             className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 text-sm transition-colors disabled:opacity-60"
           >
             {createJob.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {createJob.isPending ? "Creating…" : "Create job"}
+            {createJob.isPending ? "Creating…" : "Create order"}
           </button>
         )}
 

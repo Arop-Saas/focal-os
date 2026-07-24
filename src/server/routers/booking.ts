@@ -731,12 +731,18 @@ export const bookingRouter = router({
           });
         }
 
-        // Assign photographer if selected
+        // Assign photographer if selected — linked to the primary appointment
+        // so the command center's appointment rows show the crew.
         if (input.staffProfileId) {
+          const primaryAppt = await tx.appointment.findFirst({
+            where: { jobId: job.id, isPrimary: true },
+            select: { id: true },
+          });
           await tx.jobAssignment.create({
             data: {
               jobId: job.id,
               staffId: input.staffProfileId,
+              appointmentId: primaryAppt?.id ?? null,
               role: "PHOTOGRAPHER",
               isPrimary: true,
             },

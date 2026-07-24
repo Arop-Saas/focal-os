@@ -59,6 +59,16 @@ const JobCreateSchema = z.object({
       })
     )
     .default([]),
+  // Catalog-native lines (new order creator). When present they are priced
+  // server-side via quoteOrderLines and `services` is ignored.
+  catalogLines: z
+    .array(
+      z.object({
+        catalogItemId: z.string(),
+        quantity: z.number().int().min(1).default(1),
+      })
+    )
+    .default([]),
   assignedStaffIds: z.array(z.string()).default([]),
 });
 
@@ -218,7 +228,46 @@ export const jobsRouter = router({
   create: workspaceProcedure
     .input(JobCreateSchema)
     .mutation(async ({ ctx, input }) => {
-      const { services, assignedStaffIds, ...jobData } = input;
+      const { services, catalogLines, assignedStaffIds, ...jobData } = input;
+
+      // Catalog-native path: price entirely on the server (rules, plans,
+      // manual edits happen in the catalog — the client sends no prices).
+      const catalogQuote = catalogLines.length
+        ? await quoteOrderLines(ctx.prisma, {
+            workspaceId: ctx.workspace.id,
+            squareFootage: jobData.squareFootage ?? null,
+            clientId: jobData.clientId,
+            lines: catalogLines,
+          })
+        : null;
+
+      // Legacy JobService bridge rows + Job.packageId for catalog lines whose
+      // items are bridged, so invoices and older list readers keep working.
+      let bridgedServiceItems: { serviceId: string; quantity: number; unitPrice: number; totalPrice: number }[] = [];
+      if (catalogQuote) {
+        const quotedItemIds = catalogQuote.lines.map((l) => l.catalogItemId).filter((id): id is string => !!id);
+        const bridgeItems = quotedItemIds.length
+          ? await ctx.prisma.catalogItem.findMany({
+              where: { id: { in: quotedItemIds }, workspaceId: ctx.workspace.id },
+              select: { id: true, legacyServiceId: true, legacyPackageId: true },
+            })
+          : [];
+        const byId = new Map(bridgeItems.map((b) => [b.id, b]));
+        for (const line of catalogQuote.lines) {
+          const bridge = line.catalogItemId ? byId.get(line.catalogItemId) : undefined;
+          if (bridge?.legacyServiceId) {
+            bridgedServiceItems.push({
+              serviceId: bridge.legacyServiceId,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              totalPrice: line.totalPrice,
+            });
+          }
+          if (bridge?.legacyPackageId && !jobData.packageId) {
+            jobData.packageId = bridge.legacyPackageId;
+          }
+        }
+      }
 
       // Calculate totals and auto-calculate duration from services
       let subtotal = 0;
@@ -246,6 +295,18 @@ export const jobsRouter = router({
           subtotal = pkg.price;
           if (pkg.durationMins && pkg.durationMins > 0) packageDurationMins = pkg.durationMins;
         }
+      }
+
+      if (catalogQuote) {
+        subtotal = catalogQuote.subtotal;
+        // Primary-visit duration = same-visit lines only; separate-visit
+        // lines get their own generated appointment with their own length.
+        // The quote's rule-adjusted duration wins over any bridged legacy
+        // package duration.
+        packageDurationMins = null;
+        calculatedDurationMins = catalogQuote.lines
+          .filter((l) => l.visitMode === "SAME_VISIT" && l.fulfillmentMode !== "PRODUCTION_ONLY")
+          .reduce((sum, l) => sum + l.durationMins, 0);
       }
 
       // Order-level adjustments (rush / after-hours / weekend / minimum order)
@@ -320,7 +381,7 @@ export const jobsRouter = router({
             totalAmount,
             status: "PENDING",
             services: {
-              create: serviceItems.map((s) => ({
+              create: (catalogQuote ? bridgedServiceItems : serviceItems).map((s) => ({
                 serviceId: s.serviceId,
                 quantity: s.quantity,
                 unitPrice: s.unitPrice,
@@ -342,7 +403,7 @@ export const jobsRouter = router({
         // Snapshot the purchased lines with explained pricing, and generate
         // downstream work (production tasks, separate-visit appointments).
         // Admin-entered prices win but the computed price is recorded.
-        const quoted = await quoteOrderLines(tx, {
+        const quoted = catalogQuote ?? await quoteOrderLines(tx, {
           workspaceId: ctx.workspace.id,
           squareFootage: jobData.squareFootage ?? null,
           clientId: jobData.clientId,
@@ -375,12 +436,18 @@ export const jobsRouter = router({
           });
         }
 
-        // Assign staff
+        // Assign staff — linked to the primary appointment so the command
+        // center's appointment rows show the crew.
         if (assignedStaffIds.length > 0) {
+          const primaryAppt = await tx.appointment.findFirst({
+            where: { jobId: newJob.id, isPrimary: true },
+            select: { id: true },
+          });
           await tx.jobAssignment.createMany({
             data: assignedStaffIds.map((staffId, i) => ({
               jobId: newJob.id,
               staffId,
+              appointmentId: primaryAppt?.id ?? null,
               isPrimary: i === 0,
             })),
           });
@@ -713,15 +780,21 @@ export const jobsRouter = router({
         }
       }
 
-      // Upsert assignment
+      // Upsert assignment — linked to the primary appointment so the command
+      // center's appointment rows show the crew.
+      const primaryApptForAssign = await ctx.prisma.appointment.findFirst({
+        where: { jobId: input.jobId, isPrimary: true },
+        select: { id: true },
+      });
       const assignment = await ctx.prisma.jobAssignment.upsert({
         where: {
           jobId_staffId: { jobId: input.jobId, staffId: input.staffId },
         },
-        update: { isPrimary: input.isPrimary, role: input.role },
+        update: { isPrimary: input.isPrimary, role: input.role, appointmentId: primaryApptForAssign?.id ?? null },
         create: {
           jobId: input.jobId,
           staffId: input.staffId,
+          appointmentId: primaryApptForAssign?.id ?? null,
           isPrimary: input.isPrimary,
           role: input.role,
         },

@@ -12,7 +12,7 @@ export default async function NewJobPage({ searchParams }: { searchParams: { cli
 
   const workspaceId = await resolveWorkspaceId(supabaseUser!.id);
 
-  const [clients, packages, services, staff] = await Promise.all([
+  const [clients, packages, services, staff, catalogItems] = await Promise.all([
     prisma.client.findMany({
       where: { workspaceId, status: "ACTIVE" },
       select: { id: true, firstName: true, lastName: true, email: true, company: true },
@@ -32,6 +32,18 @@ export default async function NewJobPage({ searchParams }: { searchParams: { cli
       include: { member: { include: { user: { select: { id: true, fullName: true } } } } },
       orderBy: { member: { user: { fullName: "asc" } } },
     }),
+    // Published catalog — when non-empty the Services step goes catalog-native
+    prisma.catalogItem.findMany({
+      where: { workspaceId, state: "PUBLISHED" },
+      select: {
+        id: true,
+        role: true,
+        currentVersion: {
+          select: { name: true, basePrice: true, visitMode: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   return (
@@ -43,6 +55,7 @@ export default async function NewJobPage({ searchParams }: { searchParams: { cli
           packages={packages}
           services={services}
           staff={staff}
+          catalogItems={catalogItems}
           defaultClientId={searchParams.clientId}
         />
       </div>
