@@ -551,13 +551,13 @@ export const jobsRouter = router({
       });
 
       // Fire-and-forget: booking confirmation email to client
-      if (job.client.email && job.scheduledAt) {
+      if (job.client?.email && job.scheduledAt) {
         void notifyJobBooked({
           workspaceId: ctx.workspace.id,
           jobId: job.id,
           userId: ctx.user.id,
-          clientEmail: job.client.email,
-          clientName: `${job.client.firstName} ${job.client.lastName}`,
+          clientEmail: job.client?.email,
+          clientName: `${job.client?.firstName} ${job.client?.lastName}`,
           jobNumber: job.jobNumber,
           propertyAddress: job.propertyAddress,
           scheduledAt: job.scheduledAt,
@@ -702,8 +702,8 @@ export const jobsRouter = router({
       });
 
       // Fire-and-forget notifications on status transitions
-      const clientEmail = fullJob.client.email;
-      const clientName = `${fullJob.client.firstName} ${fullJob.client.lastName}`;
+      const clientEmail = fullJob.client?.email;
+      const clientName = `${fullJob.client?.firstName} ${fullJob.client?.lastName}`;
 
       if (status && status !== job.status && clientEmail) {
         if (status === "CONFIRMED" && fullJob.scheduledAt) {
@@ -916,7 +916,7 @@ export const jobsRouter = router({
             title: `📷 Shoot — ${jobForNotify.propertyAddress}`,
             description: [
               `Job #${jobForNotify.jobNumber}`,
-              `Client: ${jobForNotify.client.firstName} ${jobForNotify.client.lastName}`,
+              `Client: ${jobForNotify.client?.firstName} ${jobForNotify.client?.lastName}`,
               jobForNotify.accessNotes ? `Access: ${jobForNotify.accessNotes}` : "",
             ]
               .filter(Boolean)
@@ -948,7 +948,7 @@ export const jobsRouter = router({
           jobNumber: jobForNotify.jobNumber,
           propertyAddress: jobForNotify.propertyAddress,
           scheduledAt: jobForNotify.scheduledAt,
-          clientName: `${jobForNotify.client.firstName} ${jobForNotify.client.lastName}`,
+          clientName: `${jobForNotify.client?.firstName} ${jobForNotify.client?.lastName}`,
           accessNotes: jobForNotify.accessNotes,
         });
       }
@@ -1049,7 +1049,7 @@ export const jobsRouter = router({
         });
         await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
         await tx.couponUsage.create({
-          data: { couponId: coupon.id, orderId: job.id, email: job.client.email },
+          data: { couponId: coupon.id, orderId: job.id, email: job.client?.email ?? "" },
         });
         await mirrorInvoiceFromJob(tx, job.id);
         await logOrderActivity(tx, {
@@ -1151,9 +1151,9 @@ export const jobsRouter = router({
       return {
         subject: `Your media is ready — ${job.propertyAddress}`,
         message:
-          `Hi ${job.client.firstName},\n` +
+          `Hi ${job.client?.firstName ?? "there"},\n` +
           `The media for ${job.propertyAddress} (Order #${orderNo}) is ready to view and download.`,
-        to: job.client.email,
+        to: job.client?.email ?? null,
         defaultCc: job.additionalClients.map((x) => x.client.email).filter(Boolean),
         mediaCount: job.gallery?.mediaCount ?? 0,
         hasGallery: !!job.gallery,
@@ -1231,17 +1231,17 @@ export const jobsRouter = router({
         });
       });
 
-      if (!input.silent && job.client.email) {
+      if (!input.silent && job.client?.email) {
         const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
         const galleryUrl = job.gallery?.slug ? `${base}/g/${job.gallery.slug}` : `${base}/portal`;
         void sendCustomDeliveryEmail({
           workspaceId: ctx.workspace.id,
-          to: job.client.email,
+          to: job.client?.email,
           cc: input.cc,
           subject: input.subject?.trim() || `Your media is ready — ${job.propertyAddress}`,
           messageText:
             input.message?.trim() ||
-            `Hi ${job.client.firstName},\nThe media for ${job.propertyAddress} is ready to view and download.`,
+            `Hi ${job.client?.firstName ?? "there"},\nThe media for ${job.propertyAddress} is ready to view and download.`,
           galleryUrl,
         });
         void ctx.prisma.notification.create({
@@ -1252,7 +1252,7 @@ export const jobsRouter = router({
             channel: "IN_APP",
             status: "DELIVERED",
             title: `Media delivered — ${job.jobNumber}`,
-            body: `Delivery email sent to ${job.client.email}`,
+            body: `Delivery email sent to ${job.client?.email}`,
           },
         }).catch(() => {});
       }
@@ -1307,6 +1307,45 @@ export const jobsRouter = router({
         message: `Client removed — ${c?.firstName ?? ""} ${c?.lastName ?? ""}`.trim(),
       });
       return { ok: true };
+    }),
+
+  /** Remove the order's primary client. If other clients are on the order,
+   * the first one is promoted to primary; otherwise the order has no client. */
+  removePrimaryClient: workspaceProcedure
+    .input(zod.object({ jobId: zod.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        include: {
+          client: { select: { firstName: true, lastName: true } },
+          additionalClients: {
+            orderBy: { createdAt: "asc" },
+            include: { client: { select: { id: true, firstName: true, lastName: true } } },
+          },
+        },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      const removedName = job.client ? `${job.client.firstName} ${job.client.lastName}` : null;
+      const promote = job.additionalClients[0]?.client ?? null;
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.job.update({
+          where: { id: job.id },
+          data: { clientId: promote?.id ?? null },
+        });
+        if (promote) {
+          await tx.jobClient.deleteMany({ where: { jobId: job.id, clientId: promote.id } });
+        }
+        await logOrderActivity(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: job.id,
+          userId: ctx.user.id,
+          message: promote
+            ? `Client removed — ${removedName ?? "client"}; ${promote.firstName} ${promote.lastName} is now primary`
+            : `Client removed — ${removedName ?? "client"}. Order has no client`,
+        });
+      });
+      return { ok: true, promotedClientId: promote?.id ?? null };
     }),
 
   /** Attach/detach a client team to the order. */
@@ -1878,13 +1917,13 @@ export const jobsRouter = router({
       });
 
       // Fire-and-forget: notify client
-      if (job.client.email) {
+      if (job.client?.email) {
         void notifyJobCancelled({
           workspaceId: ctx.workspace.id,
           jobId: input.id,
           userId: ctx.user.id,
-          clientEmail: job.client.email,
-          clientName: `${job.client.firstName} ${job.client.lastName}`,
+          clientEmail: job.client?.email,
+          clientName: `${job.client?.firstName} ${job.client?.lastName}`,
           jobNumber: job.jobNumber,
           propertyAddress: job.propertyAddress,
           reason: input.reason,

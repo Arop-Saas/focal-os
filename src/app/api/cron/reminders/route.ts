@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   await Promise.allSettled(
     upcomingJobs.map(async (job) => {
-      if (!job.client.email || !job.scheduledAt) {
+      if (!job.client?.email || !job.scheduledAt) {
         skipped++;
         return;
       }
@@ -66,8 +66,8 @@ export async function GET(req: NextRequest) {
       await notifyJobReminder({
         workspaceId: job.workspaceId,
         jobId: job.id,
-        clientEmail: job.client.email,
-        clientName: `${job.client.firstName} ${job.client.lastName}`,
+        clientEmail: job.client?.email,
+        clientName: `${job.client?.firstName} ${job.client?.lastName}`,
         jobNumber: job.jobNumber,
         propertyAddress: job.propertyAddress,
         scheduledAt: job.scheduledAt,

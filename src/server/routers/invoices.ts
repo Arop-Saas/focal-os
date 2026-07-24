@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { logOrderActivity } from "@/lib/orders/activity";
+import { notifyInvoiceReminder } from "@/lib/notify";
 import { router, workspaceProcedure, managerProcedure } from "../trpc";
 import { generateInvoiceNumber } from "@/lib/utils";
 import { randomUUID } from "crypto";
@@ -250,6 +251,115 @@ export const invoicesRouter = router({
       }
 
       return updated;
+    }),
+
+  /** Payment reminder email to the client. */
+  remind: workspaceProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const invoice = await ctx.prisma.invoice.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspace.id },
+        include: { client: true },
+      });
+      if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
+      if (invoice.amountDue <= 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nothing is due on this invoice" });
+      }
+      if (!invoice.client?.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The invoice's client has no email" });
+      }
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.scalist.io";
+      const paymentLink = `${APP_URL}/pay/${invoice.payToken ?? invoice.id}`;
+      const due = invoice.dueAt ?? new Date();
+      void notifyInvoiceReminder({
+        workspaceId: ctx.workspace.id,
+        jobId: invoice.jobId ?? undefined,
+        userId: ctx.user.id,
+        clientEmail: invoice.client.email,
+        clientName: `${invoice.client.firstName} ${invoice.client.lastName}`,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: invoice.amountDue,
+        dueDate: due,
+        paymentLink,
+        daysUntilDue: Math.ceil((due.getTime() - Date.now()) / 86400000),
+      });
+      if (invoice.jobId) {
+        await logOrderActivity(ctx.prisma, {
+          workspaceId: ctx.workspace.id,
+          jobId: invoice.jobId,
+          userId: ctx.user.id,
+          message: `Payment reminder sent — invoice ${invoice.invoiceNumber}`,
+        });
+      }
+      return { ok: true };
+    }),
+
+  /** Apply the client's credit balance to the invoice. */
+  applyCredit: workspaceProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const invoice = await ctx.prisma.invoice.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspace.id },
+        include: { client: { select: { id: true, firstName: true, lastName: true } } },
+      });
+      if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
+      if (invoice.amountDue <= 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nothing is due on this invoice" });
+      }
+      if (!invoice.client) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The invoice has no client to draw credit from" });
+      }
+      const agg = await ctx.prisma.clientCredit.aggregate({
+        where: { workspaceId: ctx.workspace.id, clientId: invoice.client.id },
+        _sum: { amount: true },
+      });
+      const available = agg._sum.amount ?? 0;
+      if (available <= 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This client has no credit balance" });
+      }
+      const applied = Math.min(available, invoice.amountDue);
+      const newPaid = invoice.amountPaid + applied;
+      const newDue = Math.max(0, invoice.totalAmount - newPaid);
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.clientCredit.create({
+          data: {
+            workspaceId: ctx.workspace.id,
+            clientId: invoice.client!.id,
+            amount: -applied,
+            reason: `Applied to invoice ${invoice.invoiceNumber}`,
+            invoiceId: invoice.id,
+            createdById: ctx.user.id,
+          },
+        });
+        await tx.payment.create({
+          data: {
+            invoiceId: invoice.id,
+            amount: applied,
+            method: "OTHER",
+            status: "SUCCEEDED",
+            notes: "Client credit applied",
+          },
+        });
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            amountPaid: newPaid,
+            amountDue: newDue,
+            status: newDue <= 0 ? "PAID" : "PARTIAL",
+            ...(newDue <= 0 ? { paidAt: new Date() } : {}),
+          },
+        });
+        if (invoice.jobId) {
+          await logOrderActivity(tx, {
+            workspaceId: ctx.workspace.id,
+            jobId: invoice.jobId,
+            userId: ctx.user.id,
+            message: `Credit applied — $${applied.toFixed(2)} from ${invoice.client!.firstName} ${invoice.client!.lastName}'s balance`,
+          });
+        }
+      });
+      return { applied, remaining: Math.max(0, available - applied) };
     }),
 
   resend: workspaceProcedure

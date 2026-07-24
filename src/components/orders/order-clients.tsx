@@ -32,7 +32,7 @@ export interface TeamInfo {
 
 interface OrderClientsCardProps {
   jobId: string;
-  primary: OrderClientInfo;
+  primary: OrderClientInfo | null;
   additional: { clientId: string; name: string; email: string }[];
   /** unpaid balance — the team's combined balance in team mode */
   balance: number;
@@ -63,6 +63,9 @@ export function OrderClientsCard({
   const setPrimary = trpc.jobs.updateDetails.useMutation({
     onSuccess: () => router.refresh(),
   });
+  const removePrimary = trpc.jobs.removePrimaryClient.useMutation({
+    onSuccess: () => router.refresh(),
+  });
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
@@ -75,9 +78,11 @@ export function OrderClientsCard({
           >
             Change
           </button>
-          <Link href={`/clients/${primary.id}`} className="text-[12px] font-medium text-blue-600 hover:text-blue-700">
-            View client
-          </Link>
+          {primary && (
+            <Link href={`/clients/${primary.id}`} className="text-[12px] font-medium text-blue-600 hover:text-blue-700">
+              View client
+            </Link>
+          )}
         </div>
       </div>
 
@@ -97,11 +102,11 @@ export function OrderClientsCard({
           </div>
 
           <div className="mt-3 space-y-1">
-            {(team.members.some((m) => m.id === primary.id)
+            {(!primary || team.members.some((m) => m.id === primary.id)
               ? team.members
               : [{ id: primary.id, name: primary.name, email: primary.email }, ...team.members]
             ).map((m) => {
-              const isPrimary = m.id === primary.id;
+              const isPrimary = m.id === primary?.id;
               return (
                 <div
                   key={m.id}
@@ -153,12 +158,24 @@ export function OrderClientsCard({
         </>
       ) : (
         /* ── Individual mode ── */
+        !primary ? (
+          <div className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center">
+            <p className="text-[13px] font-medium text-gray-500">No client on this order</p>
+            <p className="mt-0.5 text-[11px] text-gray-400">Invoicing and delivery emails need a client.</p>
+            <button
+              onClick={() => setChanging(true)}
+              className="mt-2.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              Add client
+            </button>
+          </div>
+        ) : (
         <>
-          <div className="flex items-center gap-3">
+          <div className="group/primary flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
               {primary.initials}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[13px] font-semibold text-gray-900">{primary.name}</p>
               {primary.company && (
                 <p className="flex items-center gap-1 text-[11px] text-gray-400">
@@ -166,6 +183,18 @@ export function OrderClientsCard({
                 </p>
               )}
             </div>
+            <button
+              onClick={() => {
+                if (confirm(`Remove ${primary.name} from this order?${additional.length > 0 ? " The next client becomes primary." : " The order will have no client."}`)) {
+                  removePrimary.mutate({ jobId });
+                }
+              }}
+              disabled={removePrimary.isPending}
+              title="Remove client from order"
+              className="shrink-0 rounded p-1 text-gray-200 opacity-0 transition-all hover:text-red-500 group-hover/primary:opacity-100"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
 
           <div className="mt-3 space-y-1.5 text-[12px] text-gray-500">
@@ -222,12 +251,13 @@ export function OrderClientsCard({
             )}
           </div>
         </>
+        )
       )}
 
       {addingClient && (
         <ClientPickerModal
           title="Add a client to this order"
-          excludeIds={[primary.id, ...additional.map((a) => a.clientId)]}
+          excludeIds={[...(primary ? [primary.id] : []), ...additional.map((a) => a.clientId)]}
           onPick={(clientId) => ({ kind: "ADD" as const, clientId })}
           jobId={jobId}
           teams={[]}

@@ -201,8 +201,8 @@ export default async function OrdersPage({ searchParams }: PageProps) {
     propertyCity: job.propertyCity,
     propertyState: job.propertyState,
     scheduledAt: job.scheduledAt ? job.scheduledAt.toISOString() : null,
-    clientName: `${job.client.firstName} ${job.client.lastName}`,
-    clientCompany: job.client.company ?? job.client.brokerageGroup?.name ?? null,
+    clientName: `${job.client?.firstName} ${job.client?.lastName}`,
+    clientCompany: job.client?.company ?? job.client?.brokerageGroup?.name ?? null,
     photographer: job.assignments[0]?.staff.member.user.fullName ?? null,
     services: job.services.length > 0
       ? job.services.map((s) => (s.quantity > 1 ? `${s.service.name} ×${s.quantity}` : s.service.name))

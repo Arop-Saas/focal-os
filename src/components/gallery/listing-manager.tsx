@@ -309,7 +309,7 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
           <div>
             <h1 className="font-semibold text-gray-900">{gallery.name}</h1>
             <p className="text-xs text-gray-500">
-              {gallery.job.client.firstName} {gallery.job.client.lastName} · {gallery.job.propertyAddress}
+              {gallery.job.client?.firstName} {gallery.job.client?.lastName} · {gallery.job.propertyAddress}
             </p>
           </div>
         </div>
@@ -827,8 +827,8 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
             {/* Client */}
             <div className="bg-white border rounded-xl p-4 space-y-2">
               <h3 className="text-sm font-semibold text-gray-900">Client</h3>
-              <p className="text-sm text-gray-700">{gallery.job.client.firstName} {gallery.job.client.lastName}</p>
-              <p className="text-xs text-gray-500">{gallery.job.client.email}</p>
+              <p className="text-sm text-gray-700">{gallery.job.client?.firstName} {gallery.job.client?.lastName}</p>
+              <p className="text-xs text-gray-500">{gallery.job.client?.email}</p>
             </div>
           </div>
         </div>

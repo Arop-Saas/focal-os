@@ -98,6 +98,13 @@ export function ServicesBilling({
   const setTax = trpc.jobs.setOrderTax.useMutation({
     onSuccess: () => router.refresh(),
   });
+  const applyCredit = trpc.invoices.applyCredit.useMutation({
+    onSuccess: () => router.refresh(),
+  });
+  const [reminded, setReminded] = useState(false);
+  const remind = trpc.invoices.remind.useMutation({
+    onSuccess: () => setReminded(true),
+  });
 
   const addLine = trpc.jobs.addOrderLine.useMutation({
     onSuccess: () => {
@@ -389,10 +396,7 @@ export function ServicesBilling({
         {invoice ? (
           <div>
             <div className="flex items-center justify-between text-[12px]">
-              <span className="font-mono text-gray-500">
-                Invoice #{invoice.number}
-                <span className="ml-1.5 font-sans text-[10px] text-gray-400">updates with the order</span>
-              </span>
+              <span className="font-mono text-gray-500">Invoice #{invoice.number}</span>
               <span className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                 invoice.status === "PAID" ? "bg-emerald-100 text-emerald-700" :
@@ -417,7 +421,26 @@ export function ServicesBilling({
               </div>
             </div>
             {invoice.amountDue > 0 && invoice.status !== "VOID" && (
-              <div className="mt-2 flex justify-end">
+              <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => applyCredit.mutate({ id: invoice.id })}
+                  disabled={applyCredit.isPending}
+                  title="Apply the client's credit balance"
+                  className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {applyCredit.isPending ? "Applying…" : "Apply credit"}
+                </button>
+                {["SENT", "VIEWED", "PARTIAL", "OVERDUE"].includes(invoice.status) && (
+                  <button
+                    type="button"
+                    onClick={() => remind.mutate({ id: invoice.id })}
+                    disabled={remind.isPending || reminded}
+                    className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {reminded ? "Reminder sent" : remind.isPending ? "Sending…" : "Reminder"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setCollecting(true)}
@@ -426,6 +449,9 @@ export function ServicesBilling({
                   <CreditCard className="h-3 w-3" /> Collect payment
                 </button>
               </div>
+            )}
+            {(applyCredit.error || remind.error) && (
+              <p className="mt-1.5 text-right text-[11px] text-red-600">{applyCredit.error?.message ?? remind.error?.message}</p>
             )}
           </div>
         ) : (

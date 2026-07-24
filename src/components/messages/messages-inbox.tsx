@@ -65,7 +65,7 @@ export function MessagesInbox() {
     if (filter === "unread" && c.unreadCount === 0) return false;
     if (search) {
       const q = search.toLowerCase();
-      const name = `${c.client.firstName} ${c.client.lastName}`.toLowerCase();
+      const name = `${c.client?.firstName} ${c.client?.lastName}`.toLowerCase();
       return name.includes(q) || c.propertyAddress.toLowerCase().includes(q) || c.jobNumber.toLowerCase().includes(q);
     }
     return true;
@@ -157,14 +157,14 @@ export function MessagesInbox() {
                   {/* Avatar + name */}
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold shrink-0">
-                      {conv.client.firstName[0]}{conv.client.lastName[0]}
+                      {conv.client?.firstName[0]}{conv.client?.lastName[0]}
                     </div>
                     <div className="min-w-0">
                       <p className={cn(
                         "text-sm leading-tight truncate",
                         conv.unreadCount > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-700"
                       )}>
-                        {conv.client.firstName} {conv.client.lastName}
+                        {conv.client?.firstName} {conv.client?.lastName}
                       </p>
                       <p className="text-[10px] text-gray-400 truncate leading-tight">{conv.propertyAddress}</p>
                     </div>
@@ -208,7 +208,7 @@ export function MessagesInbox() {
           <div className="bg-white border-b px-5 py-3 flex items-center justify-between shrink-0">
             <div>
               <p className="text-sm font-semibold text-gray-900">
-                {selectedConversation.client.firstName} {selectedConversation.client.lastName}
+                {selectedConversation.client?.firstName} {selectedConversation.client?.lastName}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-xs text-gray-500">{selectedConversation.propertyAddress}</p>
@@ -239,7 +239,7 @@ export function MessagesInbox() {
                 >
                   {!isStaff && (
                     <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold shrink-0 mt-0.5">
-                      {selectedConversation.client.firstName[0]}
+                      {selectedConversation.client?.firstName[0]}
                     </div>
                   )}
                   <div className={cn(

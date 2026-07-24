@@ -34,7 +34,7 @@ export default function GalleryPage() {
         (g) =>
           g.name.toLowerCase().includes(q) ||
           g.job.propertyAddress?.toLowerCase().includes(q) ||
-          `${g.job.client.firstName} ${g.job.client.lastName}`.toLowerCase().includes(q)
+          `${g.job.client?.firstName} ${g.job.client?.lastName}`.toLowerCase().includes(q)
       );
     }
 
@@ -172,7 +172,7 @@ export default function GalleryPage() {
                     <div>
                       <h3 className="font-semibold text-gray-900 truncate">{gallery.name}</h3>
                       <p className="text-xs text-gray-500 truncate">
-                        {gallery.job.client.firstName} {gallery.job.client.lastName}
+                        {gallery.job.client?.firstName} {gallery.job.client?.lastName}
                       </p>
                       <p className="text-xs text-gray-400 truncate mt-0.5">
                         {gallery.job.propertyAddress}

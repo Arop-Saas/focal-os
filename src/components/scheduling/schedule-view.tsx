@@ -109,7 +109,7 @@ type BaseJob = {
     lastName: string;
     email?: string;
     phone?: string | null;
-  };
+  } | null;
   package?: { name: string } | null;
   assignments: Array<{
     staff: { member: { user: { fullName: string; avatarUrl?: string | null } } };
@@ -128,7 +128,7 @@ type DispatchJob = {
   travelToNextMins?: number;
   travelFromPreviousMins?: number;
   hasConflict?: boolean;
-  client: { firstName: string; lastName: string; phone?: string | null };
+  client: { firstName: string; lastName: string; phone?: string | null } | null;
   package?: { name: string } | null;
 };
 
@@ -302,7 +302,7 @@ function DispatchJobBlock({
         )}
         {width > 100 && (
           <p className="text-[10px] leading-tight truncate opacity-75">
-            {job.client.firstName} {job.client.lastName}
+            {job.client?.firstName} {job.client?.lastName}
           </p>
         )}
       </button>
@@ -499,7 +499,7 @@ function JobSidePanel({
                   )}
                 </div>
                 <h3 className="text-[15px] font-semibold text-gray-900 leading-tight">
-                  {job.client.firstName} {job.client.lastName}
+                  {job.client?.firstName} {job.client?.lastName}
                 </h3>
                 <span className={cn("inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wide", statusColor)}>
                   {job.status.replace(/_/g, " ")}
@@ -569,16 +569,16 @@ function JobSidePanel({
               {/* Client */}
               <PanelRow icon={User}>
                 <p className="text-[13px] font-semibold text-gray-900">
-                  {job.client.firstName} {job.client.lastName}
+                  {job.client?.firstName} {job.client?.lastName}
                 </p>
-                {job.client.phone && (
-                  <a href={`tel:${job.client.phone}`} className="block text-[12px] text-blue-600 hover:underline mt-0.5">
-                    {job.client.phone}
+                {job.client?.phone && (
+                  <a href={`tel:${job.client?.phone}`} className="block text-[12px] text-blue-600 hover:underline mt-0.5">
+                    {job.client?.phone}
                   </a>
                 )}
-                {(job.client as BaseJob["client"]).email && (
-                  <a href={`mailto:${(job.client as BaseJob["client"]).email}`} className="block text-[12px] text-blue-600 hover:underline mt-0.5 truncate">
-                    {(job.client as BaseJob["client"]).email}
+                {(job.client as NonNullable<BaseJob["client"]>)?.email && (
+                  <a href={`mailto:${(job.client as NonNullable<BaseJob["client"]>)?.email}`} className="block text-[12px] text-blue-600 hover:underline mt-0.5 truncate">
+                    {(job.client as NonNullable<BaseJob["client"]>)?.email}
                   </a>
                 )}
               </PanelRow>
@@ -877,7 +877,7 @@ function WeekGridView({
                       )}
                     >
                       <span className="font-semibold">#{formatOrderNumber(job.jobNumber)}</span>
-                      <span className="ml-1 opacity-70">{job.client.firstName}</span>
+                      <span className="ml-1 opacity-70">{job.client?.firstName}</span>
                     </button>
                   ))}
                 </div>
@@ -920,7 +920,7 @@ function ListView({ jobs, onJobClick }: { jobs: BaseJob[]; onJobClick: (job: Bas
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-gray-900">#{formatOrderNumber(job.jobNumber)}</p>
               <p className="text-sm text-gray-600">
-                {job.client.firstName} {job.client.lastName}
+                {job.client?.firstName} {job.client?.lastName}
               </p>
               <p className="text-xs text-gray-400 mt-0.5 truncate">{job.propertyAddress}</p>
             </div>
@@ -1079,7 +1079,7 @@ function MonthGridView({
                         {format(new Date(job.scheduledAt), "h:mma")}
                       </span>
                       <span className="truncate text-[11px] font-medium opacity-80">
-                        {job.client.firstName} {job.client.lastName}
+                        {job.client?.firstName} {job.client?.lastName}
                       </span>
                     </div>
                     <div className="text-[10px] opacity-60 truncate mt-0.5">

@@ -18,7 +18,7 @@ interface MapJob {
   scheduledAt: Date;
   estimatedDurationMins: number;
   status: string;
-  client: { firstName: string; lastName: string };
+  client: { firstName: string; lastName: string } | null;
   package?: { name: string } | null;
 }
 
@@ -142,7 +142,7 @@ export function JobsMapView({ jobs, onJobClick }: JobsMapViewProps) {
 
             const popup = new mapboxgl.Popup({ offset: 25, maxWidth: "260px" }).setHTML(
               `<div style="font-size:13px;line-height:1.6;font-family:system-ui,-apple-system,sans-serif;">
-                <div style="font-weight:700;color:#111;margin-bottom:2px;">${job.client.firstName} ${job.client.lastName}</div>
+                <div style="font-weight:700;color:#111;margin-bottom:2px;">${job.client?.firstName} ${job.client?.lastName}</div>
                 <div style="color:#6b7280;font-size:12px;">${job.propertyAddress}</div>
                 <div style="color:#6b7280;font-size:12px;">${job.propertyCity}, ${job.propertyState}</div>
                 <div style="margin-top:6px;display:flex;gap:8px;align-items:center;">

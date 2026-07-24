@@ -18,7 +18,7 @@ type Job = {
   scheduledAt: Date | null;
   estimatedDurationMins: number;
   status: string;
-  client: { firstName: string; lastName: string; phone: string | null };
+  client: { firstName: string; lastName: string; phone: string | null } | null;
   package: { name: string } | null;
   assignments: {
     staff: { member: { user: { fullName: string; avatarUrl: string | null } } };
@@ -294,7 +294,7 @@ export function WeekSchedule({ jobs, timezone, weekStartISO, todayISO, hours }: 
                           )}
                           {height >= 52 && (
                             <p className="truncate text-[9px] leading-tight opacity-60">
-                              {p.job.client.firstName} {p.job.client.lastName}
+                              {p.job.client?.firstName} {p.job.client?.lastName}
                             </p>
                           )}
                         </Link>

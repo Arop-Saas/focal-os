@@ -718,7 +718,7 @@ model Job {
   id              String   @id @default(cuid())
   workspaceId     String
   jobNumber       String
-  clientId        String
+  clientId        String?
   packageId       String?
   propertyId      String?   // link to the Property record (new orders; legacy jobs keep inline fields)
 
@@ -759,7 +759,7 @@ model Job {
   priorityFee     Float    @default(0)
 
   workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client          Client          @relation(fields: [clientId], references: [id])
+  client          Client?          @relation(fields: [clientId], references: [id])
   package         Package?        @relation(fields: [packageId], references: [id])
   assignments     JobAssignment[]
   services        JobService[]

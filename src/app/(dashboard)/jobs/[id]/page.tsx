@@ -134,13 +134,15 @@ export default async function JobDetailPage({
       take: 60,
       include: { user: { select: { fullName: true } } },
     }),
-    prisma.job.count({ where: { workspaceId, clientId: job.clientId } }),
+    job.clientId
+      ? prisma.job.count({ where: { workspaceId, clientId: job.clientId } })
+      : Promise.resolve(0),
     prisma.invoice.aggregate({
       where: {
         workspaceId,
         clientId: job.customerTeam
           ? { in: job.customerTeam.members.map((m) => m.id) }
-          : job.clientId,
+          : job.clientId ?? "__none__",
         status: { in: ["SENT", "VIEWED", "PARTIAL", "OVERDUE"] },
       },
       _sum: { amountDue: true },
@@ -357,14 +359,14 @@ export default async function JobDetailPage({
       <div className="space-y-4">
         <OrderClientsCard
           jobId={job.id}
-          primary={{
+          primary={job.client && job.clientId ? {
             id: job.clientId,
             name: `${job.client.firstName} ${job.client.lastName}`,
             initials: `${job.client.firstName?.[0] ?? ""}${job.client.lastName?.[0] ?? ""}`,
             company: job.client.company,
             email: job.client.email,
             phone: job.client.phone,
-          }}
+          } : null}
           additional={job.additionalClients.map((x) => ({
             clientId: x.client.id,
             name: `${x.client.firstName} ${x.client.lastName}`,
@@ -493,7 +495,7 @@ export default async function JobDetailPage({
   const metaLine = [
     `${job.propertyCity}, ${job.propertyState}${job.propertyZip ? ` ${job.propertyZip}` : ""}`,
     `Order #${formatOrderNumber(job.jobNumber)}`,
-    `${job.client.firstName} ${job.client.lastName}${job.client.company ? `, ${job.client.company}` : ""}`,
+    ...(job.client ? [`${job.client.firstName} ${job.client.lastName}${job.client.company ? `, ${job.client.company}` : ""}`] : []),
   ].join(" · ");
 
   return (

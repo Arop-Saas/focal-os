@@ -64,6 +64,7 @@ function DeliverModal({
       setSubject(preview.data.subject);
       setMessage(preview.data.message);
       setCc(preview.data.defaultCc.join(", "));
+      if (!preview.data.to) setSilent(true); // no client — nothing to email
       setSeeded(true);
     }
   }, [preview.data, seeded]);
@@ -133,7 +134,9 @@ function DeliverModal({
             <div className={cn("space-y-3", silent && "pointer-events-none opacity-40")}>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">To</label>
-                <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-600">{p.to}</p>
+                <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  {p.to ?? <span className="italic text-amber-600">No client on this order — silent delivery only</span>}
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">CC <span className="font-normal text-gray-400">(comma-separated)</span></label>
@@ -167,7 +170,7 @@ function DeliverModal({
             {/* Final options */}
             <div className="space-y-2.5 border-t border-gray-100 pt-3">
               <label className="flex cursor-pointer items-start gap-2.5">
-                <input type="checkbox" checked={silent} onChange={(e) => setSilent(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600" />
+                <input type="checkbox" checked={silent} disabled={!p.to} onChange={(e) => setSilent(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 disabled:opacity-40" />
                 <span className="text-[13px] text-gray-700">
                   Deliver silently
                   <span className="block text-[11px] text-gray-400">Available on the client portal — no email is sent.</span>
