@@ -8,7 +8,8 @@ import { computeOrderStage, type OrderStage, type StageInput } from "./stage";
  * Every reason is backed by real data — nothing speculative.
  */
 
-export interface AttentionInput extends Omit<StageInput, "productionTasks"> {
+export interface AttentionInput extends StageInput {
+  /** production pipeline tasks — attention-only (overdue nudges) */
   productionTasks?: { status: ProductionStatus; dueAt?: Date | string | null }[];
   hasAssignment: boolean;
   accessNotes?: string | null;
@@ -55,10 +56,6 @@ export function computeOrderAttention(input: AttentionInput): OrderAttention {
       if (!input.hasAssignment) {
         attention.push("No photographer assigned");
         nextAction = "Assign photographer";
-      } else if (hoursUntilShoot != null && hoursUntilShoot < -4) {
-        // shoot time passed but nothing marked captured
-        attention.push("Shoot time passed — confirm capture");
-        nextAction = "Confirm capture";
       } else if (hoursUntilShoot != null && hoursUntilShoot <= 48 && !input.accessNotes) {
         attention.push("Missing access info");
         nextAction = "Add access info";
@@ -69,7 +66,8 @@ export function computeOrderAttention(input: AttentionInput): OrderAttention {
     }
 
     case "CAPTURE":
-      nextAction = "Shoot in progress";
+      // Shoot wrapped — waiting on capture files
+      nextAction = "Awaiting raw files";
       break;
 
     case "PRODUCTION": {
@@ -80,27 +78,14 @@ export function computeOrderAttention(input: AttentionInput): OrderAttention {
         attention.push("Production overdue");
         nextAction = "Chase production";
       } else {
-        nextAction = "In production";
+        nextAction = "In editing";
       }
       break;
     }
 
-    case "QA":
-      attention.push("QA review required");
-      nextAction = "Review QA";
-      break;
-
-    case "READY": {
-      if (invoiceOverdue) {
-        attention.push("Ready — invoice overdue");
-        nextAction = "Collect payment";
-      } else if (invoiceUnpaid) {
-        attention.push("Ready — awaiting payment");
-        nextAction = "Collect payment";
-      } else {
-        attention.push("Ready to deliver");
-        nextAction = "Deliver to client";
-      }
+    case "QA": {
+      attention.push("Quality check — review and deliver");
+      nextAction = "Review & deliver";
       break;
     }
 

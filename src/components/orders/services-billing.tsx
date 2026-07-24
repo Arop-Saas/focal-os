@@ -114,7 +114,7 @@ export function ServicesBilling({
           {rows.map((l) => (
             <div key={l.id} className="border-b border-gray-50 pb-2 last:border-0 last:pb-0">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-gray-900">
+                <span className="font-medium text-gray-900">
                   {l.name}
                   {l.quantity > 1 && <span className="font-normal text-gray-400"> × {l.quantity}</span>}
                 </span>

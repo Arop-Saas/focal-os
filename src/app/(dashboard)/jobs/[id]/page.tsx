@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
-import { formatCurrency, cn, JOB_STATUS_LABELS } from "@/lib/utils";
+import { formatCurrency, formatOrderNumber, cn, JOB_STATUS_LABELS } from "@/lib/utils";
 import { fmtInTz } from "@/lib/scheduling/tz";
 import { computeOrderAttention } from "@/lib/orders/attention";
 import type { OrderStage } from "@/lib/orders/stage";
@@ -15,11 +15,11 @@ import { OrderTabs } from "@/components/orders/order-tabs";
 import { OrderNotes, type OrderNoteRow } from "@/components/orders/order-notes";
 import { OrderAppointments, type AppointmentRow } from "@/components/orders/order-appointments";
 import { ServicesBilling } from "@/components/orders/services-billing";
-import { Property3DMap } from "@/components/orders/property-3d-map";
+import { PropertyAreaMap } from "@/components/orders/property-area-map";
 import { RawFilesTab } from "@/components/orders/raw-files-tab";
 import { DeliverButton } from "@/components/orders/deliver-button";
+import { EditAddressButton, ChangeClientButton, EditPropertyButton } from "@/components/orders/order-edit";
 import { DIM_BADGE } from "@/components/orders/status-meta";
-import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
 import { JobDeleteButton } from "@/components/jobs/job-delete-button";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
 import { ListingManager } from "@/components/gallery/listing-manager";
@@ -27,7 +27,7 @@ import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-but
 
 export const dynamic = "force-dynamic";
 
-const PROGRESS_STEPS = ["Scheduled", "Captured", "Editing", "Quality Check", "Ready", "Delivered"];
+const PROGRESS_STEPS = ["Scheduled", "Captured", "Editing", "Quality Check", "Delivered"];
 
 const STAGE_TO_STEP: Record<OrderStage, number> = {
   NEEDS_SCHEDULING: -1,
@@ -35,12 +35,18 @@ const STAGE_TO_STEP: Record<OrderStage, number> = {
   CAPTURE: 1,
   PRODUCTION: 2,
   QA: 3,
-  READY: 4,
-  DELIVERED: 5,
-  CLOSED: 5,
+  DELIVERED: 4,
+  CLOSED: 4,
   ON_HOLD: -1,
   CANCELLED: -1,
 };
+
+// US properties read °F; everywhere else °C
+const US_STATES = new Set([
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC","PR",
+]);
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -94,6 +100,7 @@ export default async function JobDetailPage({
       gallery: { select: { id: true, slug: true, status: true, mediaCount: true } },
       invoice: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true, amountDue: true, payToken: true } },
       statusHistory: { orderBy: { createdAt: "desc" }, take: 15 },
+      _count: { select: { rawFiles: true } },
     },
   });
 
@@ -135,8 +142,11 @@ export default async function JobDetailPage({
   const { stage, nextAction, attention } = computeOrderAttention({
     jobStatus: job.status,
     scheduledAt: job.scheduledAt,
-    appointments: job.appointments.map((a) => ({ status: a.status, scheduledAt: a.scheduledAt })),
+    appointments: job.appointments.map((a) => ({ status: a.status, scheduledAt: a.scheduledAt, durationMins: a.durationMins })),
     productionTasks: job.productionTasks,
+    rawFileCount: job._count.rawFiles,
+    galleryMediaCount: job.gallery?.mediaCount ?? 0,
+    timeZone: tz,
     invoiceStatus: job.invoice?.status ?? null,
     deliveredAt: job.deliveredAt,
     hasAssignment: job.assignments.length > 0,
@@ -144,6 +154,12 @@ export default async function JobDetailPage({
     createdAt: job.createdAt,
     now,
   });
+
+  const tzLabel =
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" })
+      .formatToParts(now)
+      .find((part) => part.type === "timeZoneName")?.value ?? tz;
+  const tempUnit: "F" | "C" = US_STATES.has(job.propertyState.trim().toUpperCase()) ? "F" : "C";
 
   const primaryAssignment = job.assignments.find((a) => a.isPrimary);
   const primaryPhotographer = primaryAssignment?.staff.member.user;
@@ -251,23 +267,6 @@ export default async function JobDetailPage({
           </section>
         )}
 
-        <OrderAppointments
-          jobId={job.id}
-          appointments={appointmentRows}
-          lat={lat}
-          lng={lng}
-          primaryStaffProfileId={primaryAssignment?.staff.id}
-          primaryAssigneeName={primaryPhotographer?.fullName}
-          schedulingData={job.scheduledAt ? {
-            propertyAddress: job.propertyAddress,
-            propertyCity: job.propertyCity,
-            propertyState: job.propertyState,
-            propertyZip: job.propertyZip,
-            scheduledAt: new Date(job.scheduledAt),
-            estimatedDurationMins: job.estimatedDurationMins ?? 90,
-          } : undefined}
-        />
-
         <ServicesBilling
           jobId={job.id}
           lines={billingLines}
@@ -301,8 +300,27 @@ export default async function JobDetailPage({
           }
         />
 
+        <OrderAppointments
+          jobId={job.id}
+          appointments={appointmentRows}
+          lat={lat}
+          lng={lng}
+          tzLabel={tzLabel}
+          tempUnit={tempUnit}
+          primaryStaffProfileId={primaryAssignment?.staff.id}
+          primaryAssigneeName={primaryPhotographer?.fullName}
+          schedulingData={job.scheduledAt ? {
+            propertyAddress: job.propertyAddress,
+            propertyCity: job.propertyCity,
+            propertyState: job.propertyState,
+            propertyZip: job.propertyZip,
+            scheduledAt: new Date(job.scheduledAt),
+            estimatedDurationMins: job.estimatedDurationMins ?? 90,
+          } : undefined}
+        />
+
         {lat != null && lng != null && (
-          <Property3DMap
+          <PropertyAreaMap
             lat={lat}
             lng={lng}
             address={`${job.propertyAddress}, ${job.propertyCity}, ${job.propertyState}`}
@@ -315,9 +333,12 @@ export default async function JobDetailPage({
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[13px] font-semibold text-gray-900">Customer</h2>
-            <Link href={`/clients/${job.clientId}`} className="text-[12px] font-medium text-blue-600 hover:text-blue-700">
-              View client
-            </Link>
+            <div className="flex items-center gap-3">
+              <ChangeClientButton jobId={job.id} />
+              <Link href={`/clients/${job.clientId}`} className="text-[12px] font-medium text-blue-600 hover:text-blue-700">
+                View client
+              </Link>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
@@ -352,7 +373,17 @@ export default async function JobDetailPage({
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Property</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[13px] font-semibold text-gray-900">Property</h2>
+            <EditPropertyButton
+              jobId={job.id}
+              propertyType={job.propertyType}
+              squareFootage={job.squareFootage}
+              bedrooms={job.bedrooms}
+              bathrooms={job.bathrooms}
+              accessNotes={job.accessNotes}
+            />
+          </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             {[
               [job.bedrooms != null ? String(job.bedrooms) : "—", "Beds"],
@@ -449,7 +480,7 @@ export default async function JobDetailPage({
   // ── Shell ────────────────────────────────────────────────────────────────
   const metaLine = [
     `${job.propertyCity}, ${job.propertyState}${job.propertyZip ? ` ${job.propertyZip}` : ""}`,
-    `Order #${job.jobNumber}`,
+    `Order #${formatOrderNumber(job.jobNumber)}`,
     `${job.client.firstName} ${job.client.lastName}${job.client.company ? `, ${job.client.company}` : ""}`,
   ].join(" · ");
 
@@ -469,9 +500,19 @@ export default async function JobDetailPage({
         raw: rawPanel,
         activity: activityPanel,
       }}
+      titleAction={
+        <EditAddressButton
+          jobId={job.id}
+          address={job.propertyAddress}
+          unit={job.propertyUnit}
+          city={job.propertyCity}
+          state={job.propertyState}
+          zip={job.propertyZip}
+        />
+      }
+      wideTabs={["files"]}
       headerActions={
         <>
-          <JobStatusUpdater jobId={job.id} currentStatus={job.status} />
           <DeliverButton jobId={job.id} delivered={!!job.deliveredAt || job.status === "DELIVERED"} />
           <JobDeleteButton jobId={job.id} jobNumber={job.jobNumber} />
         </>

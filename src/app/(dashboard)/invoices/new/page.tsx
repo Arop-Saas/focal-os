@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { formatOrderNumber } from "@/lib/utils";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
 import { Header } from "@/components/layout/header";
@@ -62,7 +63,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
     <div className="flex flex-col flex-1 overflow-hidden">
       <Header
         title="New Invoice"
-        description={prefillJob ? `From Job #${prefillJob.jobNumber}` : "Create a new invoice"}
+        description={prefillJob ? `From Order #${formatOrderNumber(prefillJob.jobNumber)}` : "Create a new invoice"}
         actions={
           <Link
             href="/invoices"

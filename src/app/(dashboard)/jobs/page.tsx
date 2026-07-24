@@ -112,8 +112,10 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         select: { staff: { select: { member: { select: { user: { select: { fullName: true } } } } } } },
       },
       invoice: { select: { status: true } },
-      appointments: { select: { status: true, scheduledAt: true } },
+      appointments: { select: { status: true, scheduledAt: true, durationMins: true } },
       productionTasks: { select: { status: true, dueAt: true } },
+      gallery: { select: { mediaCount: true } },
+      _count: { select: { rawFiles: true } },
     },
     orderBy: resolveOrderBy(searchParams.sort) as never,
     take: FETCH_CAP,
@@ -143,6 +145,9 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       scheduledAt: job.scheduledAt,
       appointments: job.appointments,
       productionTasks: job.productionTasks,
+      rawFileCount: job._count.rawFiles,
+      galleryMediaCount: job.gallery?.mediaCount ?? 0,
+      timeZone: tz,
       invoiceStatus: job.invoice?.status ?? null,
       deliveredAt: job.deliveredAt,
       hasAssignment: job.assignments.length > 0,
@@ -174,7 +179,6 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       case "unscheduled": return d.stage === "NEEDS_SCHEDULING";
       case "production":  return d.stage === "PRODUCTION" || d.stage === "CAPTURE";
       case "qa":          return d.stage === "QA";
-      case "ready":       return d.stage === "READY";
       case "unpaid":      return d.job.invoice != null && UNPAID.includes(d.job.invoice.status);
       case "delivered":   return d.stage === "DELIVERED" || d.stage === "CLOSED";
       case "cancelled":   return d.stage === "CANCELLED";

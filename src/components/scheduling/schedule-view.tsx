@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, formatOrderNumber } from "@/lib/utils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -294,7 +294,7 @@ function DispatchJobBlock({
         {job.hasConflict && (
           <AlertTriangle className="h-2.5 w-2.5 text-red-600 absolute top-1 right-1" />
         )}
-        <p className="text-[10px] font-bold leading-tight truncate">{job.jobNumber}</p>
+        <p className="text-[10px] font-bold leading-tight truncate">#{formatOrderNumber(job.jobNumber)}</p>
         {width > 60 && (
           <p className="text-[10px] leading-tight truncate opacity-75">
             {format(new Date(job.scheduledAt), "h:mma")}
@@ -485,7 +485,7 @@ function JobSidePanel({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest font-mono">
-                    #{job.jobNumber}
+                    #{formatOrderNumber(job.jobNumber)}
                   </span>
                   {baseJob?.isRush && (
                     <span className="flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
@@ -746,7 +746,7 @@ function DispatchDayView({
                 className="flex items-start gap-2 p-2.5 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors text-left"
               >
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-gray-800 truncate">{job.jobNumber}</p>
+                  <p className="text-xs font-bold text-gray-800 truncate">#{formatOrderNumber(job.jobNumber)}</p>
                   <p className="text-[10px] text-gray-500 truncate">
                     {format(new Date(job.scheduledAt), "h:mm a")} · {job.estimatedDurationMins}m
                   </p>
@@ -876,7 +876,7 @@ function WeekGridView({
                         JOB_STATUS_COLORS[job.status] ?? "bg-gray-100 border-gray-300"
                       )}
                     >
-                      <span className="font-semibold">{job.jobNumber}</span>
+                      <span className="font-semibold">#{formatOrderNumber(job.jobNumber)}</span>
                       <span className="ml-1 opacity-70">{job.client.firstName}</span>
                     </button>
                   ))}
@@ -918,7 +918,7 @@ function ListView({ jobs, onJobClick }: { jobs: BaseJob[]; onJobClick: (job: Bas
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-gray-900">{job.jobNumber}</p>
+              <p className="font-semibold text-sm text-gray-900">#{formatOrderNumber(job.jobNumber)}</p>
               <p className="text-sm text-gray-600">
                 {job.client.firstName} {job.client.lastName}
               </p>

@@ -31,10 +31,10 @@ async function loadMapboxGL(): Promise<any> {
 }
 
 /**
- * Tilted 3D property map (Mapbox Standard style renders 3D buildings and
- * terrain natively). Sits under Services & Billing on the order Overview.
+ * Area map — 2D, zoomed out to city level so photographers can see the
+ * neighborhood at a glance. Sits under Services & Billing on the Overview.
  */
-export function Property3DMap({ lat, lng, address }: { lat: number; lng: number; address: string }) {
+export function PropertyAreaMap({ lat, lng, address }: { lat: number; lng: number; address: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -51,16 +51,13 @@ export function Property3DMap({ lat, lng, address }: { lat: number; lng: number;
 
         const map = new mapboxgl.Map({
           container: containerRef.current,
-          style: "mapbox://styles/mapbox/standard",
+          style: "mapbox://styles/mapbox/streets-v12",
           center: [lng, lat],
-          zoom: 16.5,
-          pitch: 58,
-          bearing: -18,
-          antialias: true,
+          zoom: 11.5,
           attributionControl: false,
         });
         mapRef.current = map;
-        map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
+        map.addControl(new mapboxgl.NavigationControl(), "top-right");
         new mapboxgl.Marker({ color: "#2563EB" })
           .setLngLat([lng, lat])
           .setPopup(new mapboxgl.Popup({ offset: 24 }).setHTML(

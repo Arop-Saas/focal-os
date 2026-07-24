@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatRelative, JOB_STATUS_COLORS, JOB_STATUS_LABELS } from "@/lib/utils";
+import { formatRelative, JOB_STATUS_COLORS, JOB_STATUS_LABELS, formatOrderNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Activity, ChevronRight } from "lucide-react";
 
@@ -48,7 +48,7 @@ export function RecentActivity({ jobs }: { jobs: Job[] }) {
                 </p>
                 <p className="text-[11px] text-gray-400 mt-0.5 truncate">
                   {job.client.firstName} {job.client.lastName}
-                  <span className="text-gray-300"> · #{job.jobNumber}</span>
+                  <span className="text-gray-300"> · #{formatOrderNumber(job.jobNumber)}</span>
                 </p>
                 <p className="text-[10px] text-gray-300 mt-0.5">{formatRelative(job.updatedAt)}</p>
               </div>

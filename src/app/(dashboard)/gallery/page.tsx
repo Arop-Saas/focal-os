@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc/client";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatOrderNumber } from "@/lib/utils";
 import { Camera, LinkIcon, Eye, Plus, Check, Search, ArrowUpDown } from "lucide-react";
 
 const GALLERY_STATUS_COLORS: Record<string, string> = {
@@ -286,7 +286,7 @@ function CreateGalleryModal({ onClose }: { onClose: () => void }) {
                     }}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
                   >
-                    <span className="font-medium">{job.jobNumber}</span>{" "}
+                    <span className="font-medium">#{formatOrderNumber(job.jobNumber)}</span>{" "}
                     <span className="text-gray-500">· {job.propertyAddress}</span>
                   </button>
                 ))}

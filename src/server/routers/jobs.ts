@@ -933,6 +933,83 @@ export const jobsRouter = router({
       };
     }),
 
+  /** Edit order identity details — address, client, property facts. Address
+   * changes re-link the deduped Property and clear coords for re-geocode. */
+  updateDetails: workspaceProcedure
+    .input(zod.object({
+      jobId: zod.string(),
+      clientId: zod.string().optional(),
+      propertyAddress: zod.string().min(5).optional(),
+      propertyUnit: zod.string().nullable().optional(),
+      propertyCity: zod.string().min(1).optional(),
+      propertyState: zod.string().min(1).optional(),
+      propertyZip: zod.string().nullable().optional(),
+      propertyType: zod.enum(["RESIDENTIAL", "COMMERCIAL", "LAND", "MULTI_FAMILY", "RENTAL", "NEW_CONSTRUCTION"]).optional(),
+      squareFootage: zod.number().int().min(0).nullable().optional(),
+      bedrooms: zod.number().int().min(0).nullable().optional(),
+      bathrooms: zod.number().min(0).nullable().optional(),
+      accessNotes: zod.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { jobId, clientId, ...fields } = input;
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: jobId, workspaceId: ctx.workspace.id },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (clientId) {
+        const client = await ctx.prisma.client.findFirst({
+          where: { id: clientId, workspaceId: ctx.workspace.id },
+          select: { id: true },
+        });
+        if (!client) throw new TRPCError({ code: "NOT_FOUND", message: "Client not found" });
+      }
+
+      const addressChanged =
+        (fields.propertyAddress != null && fields.propertyAddress !== job.propertyAddress) ||
+        (fields.propertyCity != null && fields.propertyCity !== job.propertyCity) ||
+        (fields.propertyState != null && fields.propertyState !== job.propertyState) ||
+        (fields.propertyZip !== undefined && fields.propertyZip !== job.propertyZip);
+
+      return ctx.prisma.$transaction(async (tx) => {
+        let propertyId = job.propertyId;
+        if (addressChanged) {
+          const property = await findOrCreateProperty(tx, {
+            workspaceId: ctx.workspace.id,
+            address: fields.propertyAddress ?? job.propertyAddress,
+            unit: fields.propertyUnit === undefined ? job.propertyUnit ?? undefined : fields.propertyUnit ?? undefined,
+            city: fields.propertyCity ?? job.propertyCity,
+            state: fields.propertyState ?? job.propertyState,
+            zip: (fields.propertyZip === undefined ? job.propertyZip : fields.propertyZip) ?? undefined,
+            propertyType: fields.propertyType ?? job.propertyType,
+            squareFootage: (fields.squareFootage === undefined ? job.squareFootage : fields.squareFootage) ?? undefined,
+            bedrooms: (fields.bedrooms === undefined ? job.bedrooms : fields.bedrooms) ?? undefined,
+            bathrooms: (fields.bathrooms === undefined ? job.bathrooms : fields.bathrooms) ?? undefined,
+            accessNotes: (fields.accessNotes === undefined ? job.accessNotes : fields.accessNotes) ?? undefined,
+          });
+          propertyId = property.id;
+        }
+
+        return tx.job.update({
+          where: { id: job.id },
+          data: {
+            ...(clientId && { clientId }),
+            ...(fields.propertyAddress != null && { propertyAddress: fields.propertyAddress }),
+            ...(fields.propertyUnit !== undefined && { propertyUnit: fields.propertyUnit }),
+            ...(fields.propertyCity != null && { propertyCity: fields.propertyCity }),
+            ...(fields.propertyState != null && { propertyState: fields.propertyState }),
+            ...(fields.propertyZip !== undefined && { propertyZip: fields.propertyZip }),
+            ...(fields.propertyType != null && { propertyType: fields.propertyType }),
+            ...(fields.squareFootage !== undefined && { squareFootage: fields.squareFootage }),
+            ...(fields.bedrooms !== undefined && { bedrooms: fields.bedrooms }),
+            ...(fields.bathrooms !== undefined && { bathrooms: fields.bathrooms }),
+            ...(fields.accessNotes !== undefined && { accessNotes: fields.accessNotes }),
+            ...(addressChanged && { propertyId, propertyLat: null, propertyLng: null }),
+          },
+        });
+      });
+    }),
+
   /** Per-appointment scheduling actions. Primary appointments keep the
    * Job.scheduledAt mirror in sync (orders architecture invariant). */
   updateAppointment: workspaceProcedure

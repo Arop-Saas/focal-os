@@ -69,7 +69,6 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [publishing, setPublishing] = useState(false);
   const [tourUrl, setTourUrl] = useState("");
   const [tourLabel, setTourLabel] = useState("");
   const [addingTour, setAddingTour] = useState(false);
@@ -93,10 +92,6 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
   });
   const updateMutation = trpc.gallery.update.useMutation({
     onSuccess: () => utils.gallery.getById.invalidate({ id: galleryId }),
-  });
-  const publishMutation = trpc.gallery.publish.useMutation({
-    onSuccess: () => { utils.gallery.getById.invalidate({ id: galleryId }); setPublishing(false); },
-    onError: (err) => { alert(err.message); setPublishing(false); },
   });
   const archiveMutation = trpc.gallery.archive.useMutation({
     onSuccess: () => router.refresh(),
@@ -345,17 +340,6 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
             className="p-1.5 text-gray-500 hover:text-gray-700 border rounded-lg transition-colors" title="Preview gallery">
             <Eye className="h-4 w-4" />
           </a>
-
-          {!isArchived && (
-            <button
-              onClick={() => { setPublishing(true); publishMutation.mutate({ id: galleryId }); }}
-              disabled={publishing || gallery.mediaCount === 0}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
-            >
-              <Send className="h-3.5 w-3.5" />
-              {publishing ? "Publishing…" : isDelivered ? "Re-deliver" : "Publish & Deliver"}
-            </button>
-          )}
 
           {!isArchived && (
             <button

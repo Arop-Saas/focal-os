@@ -23,10 +23,18 @@ export async function runDeliverySideEffects(
     where: { id: args.jobId, workspaceId: args.workspaceId },
     include: {
       client: { select: { firstName: true, lastName: true, email: true } },
-      gallery: { select: { slug: true } },
+      gallery: { select: { id: true, slug: true, isPublic: true, status: true } },
     },
   });
   if (!job) return;
+
+  // The delivery email links the gallery — make sure the customer can open it.
+  if (job.gallery && (!job.gallery.isPublic || job.gallery.status !== "DELIVERED")) {
+    await db.gallery.update({
+      where: { id: job.gallery.id },
+      data: { isPublic: true, status: "DELIVERED" },
+    });
+  }
 
   // SLA timestamp — first delivery only
   if (!job.deliveredAt) {

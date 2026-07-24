@@ -93,3 +93,9 @@ export const INVOICE_STATUS_COLORS: Record<string, string> = {
   OVERDUE: "bg-red-100 text-red-800",
   VOID: "bg-gray-100 text-gray-500",
 };
+
+/** Display form of an order number — the legacy "JOB-" prefix stays in the
+ * database (search, invoices reference it) but never in the UI. */
+export function formatOrderNumber(jobNumber: string): string {
+  return jobNumber.replace(/^JOB-?/i, "");
+}

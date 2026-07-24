@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatOrderNumber } from "@/lib/utils";
 import { ORDER_STAGE_COLORS, ORDER_STAGE_LABELS, type OrderStage } from "@/lib/orders/stage";
 import {
   AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight,
@@ -36,8 +36,7 @@ const EMPTY_COPY: Partial<Record<OrderViewKey, { title: string; sub: string }>> 
   upcoming:        { title: "Nothing upcoming", sub: "No future shoots on the books yet." },
   unscheduled:     { title: "Nothing unscheduled", sub: "Every order has a shoot time." },
   production:      { title: "Nothing in production", sub: "No orders are being edited right now." },
-  qa:              { title: "QA queue is empty", sub: "Nothing is waiting for review." },
-  ready:           { title: "Nothing ready", sub: "No orders are ready to deliver." },
+  qa:              { title: "Quality check queue is empty", sub: "Nothing is waiting for review." },
   unpaid:          { title: "No unpaid invoices", sub: "Everything billed has been paid." },
   delivered:       { title: "Nothing delivered yet", sub: "Delivered orders will appear here." },
   cancelled:       { title: "No cancelled orders", sub: "" },
@@ -136,7 +135,7 @@ export function OrdersTable({ rows, total, page, limit, view, timezone }: {
                 <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
                   <MapPin className="h-2.5 w-2.5 shrink-0" />
                   {r.propertyCity}, {r.propertyState}
-                  <span className="mx-1 text-gray-300">·</span>#{r.jobNumber}
+                  <span className="mx-1 text-gray-300">·</span>#{formatOrderNumber(r.jobNumber)}
                 </p>
                 <p className="mt-1 text-xs text-gray-500">{r.clientName}</p>
               </div>
@@ -201,7 +200,7 @@ export function OrdersTable({ rows, total, page, limit, view, timezone }: {
                   <td className="min-w-[170px] max-w-[220px] px-2.5 py-3">
                     <p className="truncate text-[13px] font-semibold text-gray-900">{r.propertyAddress}</p>
                     <p className="mt-0.5 truncate text-[11px] text-gray-400">
-                      {r.propertyCity}, {r.propertyState} · #{r.jobNumber}
+                      {r.propertyCity}, {r.propertyState} · #{formatOrderNumber(r.jobNumber)}
                     </p>
                   </td>
                   <td className="max-w-[150px] px-2.5 py-3">

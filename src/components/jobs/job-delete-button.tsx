@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatOrderNumber } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
@@ -42,12 +43,12 @@ export function JobDeleteButton({ jobId, jobNumber }: JobDeleteButtonProps) {
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Delete Job</h3>
-                <p className="text-sm text-gray-500">#{jobNumber}</p>
+                <h3 className="font-semibold text-gray-900">Delete Order</h3>
+                <p className="text-sm text-gray-500">#{formatOrderNumber(jobNumber)}</p>
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-6">
-              This will permanently delete this job and all associated data including
+              This will permanently delete this order and all associated data including
               invoices, gallery, messages, and assignments. This cannot be undone.
             </p>
             <div className="flex gap-3">

@@ -46,6 +46,10 @@ interface OrderAppointmentsProps {
   appointments: AppointmentRow[];
   lat: number | null;
   lng: number | null;
+  /** short zone name for display, e.g. "MDT" */
+  tzLabel: string;
+  /** temperature unit by the property's location */
+  tempUnit: "F" | "C";
   primaryStaffProfileId?: string;
   primaryAssigneeName?: string;
   schedulingData?: SchedulingData;
@@ -63,15 +67,16 @@ function weatherIconFor(label: string): typeof Sun {
   return Sun;
 }
 
-function WeatherChip({ forecast }: { forecast: { tempHighF: number; icon: string; label: string } }) {
+function WeatherChip({ forecast, unit }: { forecast: { tempHighF: number; icon: string; label: string }; unit: "F" | "C" }) {
   const Icon = weatherIconFor(forecast.label);
+  const temp = unit === "F" ? Math.round(forecast.tempHighF) : Math.round(((forecast.tempHighF - 32) * 5) / 9);
   return (
     <span
       className="flex shrink-0 items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[12px] font-medium text-sky-700"
       title={forecast.label}
     >
       <Icon className="h-3.5 w-3.5" />
-      {Math.round(forecast.tempHighF)}°F
+      {temp}°{unit}
     </span>
   );
 }
@@ -233,6 +238,8 @@ export function OrderAppointments({
   appointments,
   lat,
   lng,
+  tzLabel,
+  tempUnit,
   primaryStaffProfileId,
   primaryAssigneeName,
   schedulingData,
@@ -252,7 +259,7 @@ export function OrderAppointments({
         <h2 className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
           <Calendar className="h-4 w-4 text-gray-400" /> Appointments
         </h2>
-        <span className="text-[11px] text-gray-400">Times shown in workspace time</span>
+        <span className="text-[11px] text-gray-400">Times in {tzLabel}</span>
       </div>
 
       {appointments.length === 0 && (
@@ -275,7 +282,7 @@ export function OrderAppointments({
                 )}
                 <span className={cn(DIM_BADGE, meta.cls)}>{meta.label}</span>
               </p>
-              {forecast && <WeatherChip forecast={forecast} />}
+              {forecast && <WeatherChip forecast={forecast} unit={tempUnit} />}
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">

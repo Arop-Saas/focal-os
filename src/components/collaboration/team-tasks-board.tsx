@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc/client";
-import { cn } from "@/lib/utils";
+import { cn, formatOrderNumber } from "@/lib/utils";
 import { format } from "date-fns";
 import { Calendar, Check, Link2, Loader2, Plus, Search, Trash2, User, X } from "lucide-react";
 
@@ -33,7 +33,7 @@ function OrderChip({ job }: { job: { id: string; jobNumber: string; propertyAddr
       className="inline-flex max-w-[240px] items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 transition-colors hover:bg-blue-100"
     >
       <Link2 className="h-3 w-3 shrink-0" />
-      <span className="truncate">#{job.jobNumber} · {job.propertyAddress}</span>
+      <span className="truncate">#{formatOrderNumber(job.jobNumber)} · {job.propertyAddress}</span>
     </Link>
   );
 }
@@ -66,7 +66,7 @@ function OrderPicker({
   if (selected) {
     return (
       <span className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-700">
-        #{selected.jobNumber} · <span className="max-w-[160px] truncate">{selected.propertyAddress}</span>
+        #{formatOrderNumber(selected.jobNumber)} · <span className="max-w-[160px] truncate">{selected.propertyAddress}</span>
         <button type="button" onClick={() => onSelect(null)} className="ml-0.5 text-blue-400 hover:text-blue-700">
           <X className="h-3 w-3" />
         </button>
@@ -114,7 +114,7 @@ function OrderPicker({
                   <div className="min-w-0">
                     <p className="truncate font-medium text-gray-800">{j.propertyAddress}</p>
                     <p className="text-xs text-gray-400">
-                      #{j.jobNumber}
+                      #{formatOrderNumber(j.jobNumber)}
                       {j.client && <> · {j.client.firstName} {j.client.lastName}</>}
                     </p>
                   </div>
@@ -297,7 +297,7 @@ export function TeamTasksBoard() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-gray-400 line-through">{t.title}</p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-300">
-                      {t.job && <span>#{t.job.jobNumber}</span>}
+                      {t.job && <span>#{formatOrderNumber(t.job.jobNumber)}</span>}
                       {t.completedAt && <span>done {format(new Date(t.completedAt), "MMM d, h:mm a")}</span>}
                     </div>
                   </div>
