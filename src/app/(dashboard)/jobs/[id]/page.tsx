@@ -25,6 +25,8 @@ import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-but
 import { JobScheduleEditor } from "@/components/jobs/job-schedule-editor";
 import { JobPropertyMap } from "@/components/jobs/job-property-map";
 import { JobWeatherCard } from "@/components/jobs/job-weather-card";
+import { AddProductionTask } from "@/components/orders/add-production-task";
+import { TeamTasksCard } from "@/components/orders/team-tasks-card";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +117,7 @@ export default async function JobDetailPage({
 
   if (!job) notFound();
 
-  const [workspace, activityLog, clientOrderCount] = await Promise.all([
+  const [workspace, activityLog, clientOrderCount, staffOptions] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, select: { timezone: true } }),
     prisma.activityLog.findMany({
       where: { workspaceId, entityType: "job", entityId: job.id },
@@ -124,7 +126,13 @@ export default async function JobDetailPage({
       include: { user: { select: { fullName: true } } },
     }),
     prisma.job.count({ where: { workspaceId, clientId: job.clientId } }),
+    prisma.staffProfile.findMany({
+      where: { workspaceId, isActive: true },
+      select: { id: true, member: { select: { user: { select: { fullName: true } } } } },
+      orderBy: { member: { user: { fullName: "asc" } } },
+    }),
   ]);
+  const staffForTasks = staffOptions.map((s) => ({ id: s.id, name: s.member.user.fullName }));
   const tz = workspace?.timezone ?? "America/New_York";
   const now = new Date();
 
@@ -683,11 +691,13 @@ export default async function JobDetailPage({
 
   const productionPanel = (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <section className="rounded-xl border border-gray-200 bg-white p-4 lg:col-span-2">
+      <section className="h-fit rounded-xl border border-gray-200 bg-white p-4 lg:col-span-2">
         <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Production tasks</h2>
         <ProductionTaskList tasks={taskRows} />
+        <AddProductionTask jobId={job.id} staff={staffForTasks} />
       </section>
-      <div>
+      <div className="space-y-4">
+        <TeamTasksCard jobId={job.id} />
         <JobChecklist jobId={job.id} />
       </div>
     </div>

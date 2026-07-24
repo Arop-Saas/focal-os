@@ -926,6 +926,46 @@ export const jobsRouter = router({
       };
     }),
 
+  /** Manually add a production task to an order (command center Production tab). */
+  createProductionTask: workspaceProcedure
+    .input(zod.object({
+      jobId: zod.string(),
+      title: zod.string().min(1).max(200),
+      type: zod.enum(["PHOTO_EDITING", "VIDEO_EDITING", "FLOOR_PLAN", "VIRTUAL_TOUR", "QA", "OTHER"]).default("OTHER"),
+      assigneeStaffId: zod.string().nullable().optional(),
+      dueAt: zod.date().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        select: { id: true },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      if (input.assigneeStaffId) {
+        const staff = await ctx.prisma.staffProfile.findFirst({
+          where: { id: input.assigneeStaffId, workspaceId: ctx.workspace.id },
+          select: { id: true },
+        });
+        if (!staff) throw new TRPCError({ code: "NOT_FOUND", message: "Staff member not found" });
+      }
+      const last = await ctx.prisma.productionTask.findFirst({
+        where: { jobId: input.jobId },
+        orderBy: { sortOrder: "desc" },
+        select: { sortOrder: true },
+      });
+      return ctx.prisma.productionTask.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          jobId: input.jobId,
+          title: input.title.trim(),
+          type: input.type,
+          assigneeStaffId: input.assigneeStaffId ?? null,
+          dueAt: input.dueAt ?? null,
+          sortOrder: (last?.sortOrder ?? -1) + 1,
+        },
+      });
+    }),
+
   /** Move a production task through its lifecycle (command center Production tab). */
   updateProductionTask: workspaceProcedure
     .input(zod.object({

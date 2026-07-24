@@ -116,6 +116,7 @@ model Workspace {
   offerings        Offering[]
   productRules     ProductRule[]
   orderLineSnapshots OrderLineSnapshot[]
+  teamTasks        TeamTask[]
   pricingPlans     PricingPlan[]
   adjustmentPolicies AdjustmentPolicy[]
 
@@ -227,6 +228,8 @@ model User {
   featureRequestVotes    FeatureRequestVote[]
   featureRequestComments FeatureRequestComment[]
   jobNotes      JobNote[]
+  teamTasksAssigned TeamTask[] @relation("TeamTaskAssignee")
+  teamTasksCreated  TeamTask[] @relation("TeamTaskCreator")
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -751,6 +754,7 @@ model Job {
   productionTasks ProductionTask[]
   orderNotes      JobNote[]
   orderLines      OrderLineSnapshot[]
+  teamTasks       TeamTask[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -987,6 +991,32 @@ model JobNote {
 // Catalog item → Offering (per order form) → OrderLineSnapshot (frozen buy).
 // Legacy Service/Package rows are bridged via legacyServiceId/legacyPackageId
 // and stay the source for old surfaces until each migrates to the catalog.
+
+// General team to-do (Collaboration → Tasks). Distinct from ProductionTask,
+// which is the per-order production pipeline: a TeamTask is a checkbox item
+// that can optionally be attached to an order.
+model TeamTask {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  title             String
+  jobId             String?
+  assignedUserId    String?
+  createdByUserId   String?
+  dueAt             DateTime?
+  completedAt       DateTime?
+  completedByUserId String?
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job        Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  assignee   User?     @relation("TeamTaskAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  createdBy  User?     @relation("TeamTaskCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([workspaceId, completedAt])
+  @@index([jobId])
+}
 
 enum CatalogItemRole {
   MAIN

@@ -22,6 +22,7 @@ import { orderFormRouter } from "./order-form";
 import { couponsRouter } from "./coupons";
 import { weatherRouter } from "./weather";
 import { emailTemplatesRouter } from "./email-templates";
+import { tasksRouter } from "./tasks";
 
 export const appRouter = router({
   workspace: workspaceRouter,
@@ -47,6 +48,7 @@ export const appRouter = router({
   coupons: couponsRouter,
   weather: weatherRouter,
   emailTemplates: emailTemplatesRouter,
+  tasks: tasksRouter,
 });
 
 export type AppRouter = typeof appRouter;

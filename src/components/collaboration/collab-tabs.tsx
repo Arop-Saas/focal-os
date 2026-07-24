@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
  */
 const TABS: { key: string; label: string; href: string }[] = [
   { key: "order-notes", label: "Order Notes", href: "/collaboration" },
+  { key: "tasks", label: "Tasks", href: "/collaboration/tasks" },
 ];
 
 export function CollabTabs({ active }: { active: string }) {
