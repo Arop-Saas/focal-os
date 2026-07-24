@@ -38,6 +38,7 @@ export interface QuotedLine {
   visitMode: VisitMode;
   fulfillmentMode: FulfillmentMode;
   productionTaskType: ProductionTaskType | null;
+  solarConstraint: boolean;
   explanation: string[];
 }
 
@@ -123,6 +124,7 @@ export async function quoteOrderLines(
         visitMode: "SAME_VISIT",
         fulfillmentMode: "ON_SITE",
         productionTaskType: null,
+        solarConstraint: false,
         explanation: ["Custom line — price entered manually"],
       });
       continue;
@@ -183,6 +185,7 @@ export async function quoteOrderLines(
       visitMode: v.visitMode,
       fulfillmentMode: v.fulfillmentMode,
       productionTaskType: v.productionTaskType,
+      solarConstraint: v.solarConstraint,
       explanation,
     });
   }
@@ -242,6 +245,7 @@ export async function snapshotAndGenerate(
           scheduledAt: null,
           durationMins: line.durationMins || 60,
           isPrimary: false,
+          timeConstraint: line.solarConstraint ? "SOLAR" : null,
         },
       });
     }

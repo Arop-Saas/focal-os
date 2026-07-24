@@ -901,6 +901,7 @@ model Appointment {
   durationMins Int       @default(90)
   status       AppointmentStatus @default(SCHEDULED)
   isPrimary    Boolean   @default(true)  // mirrored into Job.scheduledAt for legacy readers
+  timeConstraint String?  // "SOLAR" = golden-hour window at the property (lib/scheduling/solar)
   notes        String?
 
   job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -1059,6 +1060,7 @@ model CatalogItemVersion {
   baseDurationMins   Int      @default(60)
   requiredSkills     String[] // matches StaffProfile.skills tokens
   productionTaskType ProductionTaskType? // task generated for PRODUCTION_ONLY/HYBRID
+  solarConstraint    Boolean  @default(false) // twilight: schedule in the golden-hour window
 
   item               CatalogItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
   currentOf          CatalogItem? @relation("CurrentVersion")
