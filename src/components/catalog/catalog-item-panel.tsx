@@ -53,6 +53,7 @@ function EditSection({ itemId }: { itemId: string }) {
   const [draft, setDraft] = useState<null | {
     name: string; category: string; description: string; basePrice: string;
     baseDurationMins: string; visitMode: "NONE" | "SAME_VISIT" | "SEPARATE_VISIT";
+    solarConstraint: boolean;
   }>(null);
 
   if (item.isLoading || !item.data?.currentVersion) {
@@ -72,6 +73,7 @@ function EditSection({ itemId }: { itemId: string }) {
     basePrice: String(v.basePrice),
     baseDurationMins: String(v.baseDurationMins),
     visitMode: v.visitMode,
+    solarConstraint: v.solarConstraint,
   };
   const set = (patch: Partial<typeof d>) => setDraft({ ...d, ...patch });
   const dirty = draft !== null;
@@ -86,6 +88,7 @@ function EditSection({ itemId }: { itemId: string }) {
       baseDurationMins: parseInt(d.baseDurationMins) || 0,
       visitMode: d.visitMode,
       fulfillmentMode: d.visitMode === "NONE" ? "PRODUCTION_ONLY" : undefined,
+      solarConstraint: d.solarConstraint,
     });
     setDraft(null);
   }
@@ -125,6 +128,20 @@ function EditSection({ itemId }: { itemId: string }) {
             </div>
           )}
         </div>
+        {d.visitMode === "SEPARATE_VISIT" && (
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+            <input
+              type="checkbox"
+              checked={d.solarConstraint}
+              onChange={(e) => set({ solarConstraint: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-[12px] text-gray-700">
+              Twilight — schedule in the golden-hour window
+              <span className="block text-[10px] text-gray-400">Computed from the property&apos;s location and date (sunset −40 min)</span>
+            </span>
+          </label>
+        )}
         <textarea
           value={d.description}
           onChange={(e) => set({ description: e.target.value })}

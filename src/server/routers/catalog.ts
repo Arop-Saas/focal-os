@@ -50,6 +50,7 @@ export const catalogRouter = router({
         baseDurationMins: z.number().int().min(0).max(24 * 60).default(60),
         visitMode: z.enum(VISIT_MODES).default("SAME_VISIT"),
         fulfillmentMode: z.enum(FULFILLMENT_MODES).default("ON_SITE"),
+        solarConstraint: z.boolean().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -72,6 +73,7 @@ export const catalogRouter = router({
             baseDurationMins: input.baseDurationMins,
             visitMode: input.visitMode,
             fulfillmentMode: input.fulfillmentMode,
+            solarConstraint: input.solarConstraint,
             // PRODUCTION_ONLY/HYBRID items generate an editing task by default
             productionTaskType: input.fulfillmentMode === "ON_SITE" ? null : "PHOTO_EDITING",
           },
@@ -109,6 +111,7 @@ export const catalogRouter = router({
         baseDurationMins: z.number().int().min(0).max(24 * 60).optional(),
         visitMode: z.enum(VISIT_MODES).optional(),
         fulfillmentMode: z.enum(FULFILLMENT_MODES).optional(),
+        solarConstraint: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -136,6 +139,7 @@ export const catalogRouter = router({
             baseDurationMins: input.baseDurationMins ?? cur.baseDurationMins,
             requiredSkills: cur.requiredSkills,
             productionTaskType: cur.productionTaskType,
+            solarConstraint: input.solarConstraint ?? cur.solarConstraint,
           },
         });
         await tx.catalogItem.update({
