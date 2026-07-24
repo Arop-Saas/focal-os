@@ -853,6 +853,46 @@ export const jobsRouter = router({
       };
     }),
 
+  /** Move a production task through its lifecycle (command center Production tab). */
+  updateProductionTask: workspaceProcedure
+    .input(zod.object({
+      taskId: zod.string(),
+      status: zod.enum(["WAITING_FILES", "QUEUED", "IN_PROGRESS", "QA", "REVISION", "READY"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const task = await ctx.prisma.productionTask.findFirst({
+        where: { id: input.taskId, workspaceId: ctx.workspace.id },
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.productionTask.update({
+        where: { id: task.id },
+        data: { status: input.status },
+      });
+    }),
+
+  /** Typed order note (docs/orders-architecture.md notes taxonomy). */
+  addNote: workspaceProcedure
+    .input(zod.object({
+      jobId: zod.string(),
+      kind: zod.enum(["CUSTOMER_INSTRUCTIONS", "INTERNAL", "FIELD", "EDITOR", "QA_REVISION"]),
+      body: zod.string().min(1).max(4000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id }, select: { id: true },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.jobNote.create({
+        data: {
+          workspaceId: ctx.workspace.id,
+          jobId: input.jobId,
+          kind: input.kind,
+          body: input.body.trim(),
+          authorUserId: ctx.user.id,
+        },
+      });
+    }),
+
   cancel: workspaceProcedure
     .input(z.object({ id: z.string(), reason: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
