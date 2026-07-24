@@ -53,7 +53,7 @@ const STATE_CLS = {
 const inputCls =
   "h-9 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-[13px] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
 
-export function CatalogList({ rows }: { rows: CatalogRow[] }) {
+export function CatalogList({ rows, rulesEnabled }: { rows: CatalogRow[]; rulesEnabled: boolean }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("all");
   const [showNew, setShowNew] = useState(false);
@@ -189,7 +189,7 @@ export function CatalogList({ rows }: { rows: CatalogRow[] }) {
                       )}
                     </div>
                   </div>
-                  {isOpen && <CatalogItemPanel itemId={r.id} role={r.role} />}
+                  {isOpen && <CatalogItemPanel itemId={r.id} role={r.role} rulesEnabled={rulesEnabled} />}
                 </div>
               );
             })}

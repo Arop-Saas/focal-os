@@ -84,6 +84,7 @@ model Workspace {
   bookingFormSettings   Json?    // Serialized BookingFormSettings object
   portalSettings        Json?    // Serialized PortalSettings object
   estimatedShootsPerMonth String? // Self-reported volume bucket from onboarding, e.g. "11-30"
+  pricingRulesEnabled   Boolean  @default(false) // opt-in: apply ProductRules in the pricing service
 
   // Relations
   members          WorkspaceMember[]

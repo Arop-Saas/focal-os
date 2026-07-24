@@ -48,6 +48,13 @@ export async function quoteOrderLines(
   const sqft = args.squareFootage ?? null;
   const out: QuotedLine[] = [];
 
+  // Rule-based pricing is opt-in (Services & Pricing → Pricing)
+  const ws = await db.workspace.findUnique({
+    where: { id: args.workspaceId },
+    select: { pricingRulesEnabled: true },
+  });
+  const rulesEnabled = ws?.pricingRulesEnabled ?? false;
+
   for (const input of args.lines) {
     const quantity = Math.max(1, input.quantity ?? 1);
 
@@ -93,8 +100,8 @@ export async function quoteOrderLines(
     let unitPrice = v.basePrice;
     let durationMins = v.baseDurationMins;
 
-    // SQFT_RANGE rules (sorted by priority; cumulative)
-    const rules = item.rules
+    // SQFT_RANGE rules (sorted by priority; cumulative) — only when enabled
+    const rules = (rulesEnabled ? item.rules : [])
       .filter((r) => r.conditionType === "SQFT_RANGE")
       .sort((a, b) => a.priority - b.priority);
     for (const rule of rules) {

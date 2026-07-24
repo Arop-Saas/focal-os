@@ -16,9 +16,11 @@ const inputCls =
 export function CatalogItemPanel({
   itemId,
   role,
+  rulesEnabled,
 }: {
   itemId: string;
   role: "MAIN" | "ADD_ON" | "PACKAGE";
+  rulesEnabled: boolean;
 }) {
   return (
     <div className="grid grid-cols-1 gap-5 border-t border-gray-100 bg-gray-50/60 px-5 py-4 pl-12 lg:grid-cols-2">
@@ -26,7 +28,7 @@ export function CatalogItemPanel({
       <div className="space-y-5">
         <OfferedOnSection itemId={itemId} />
         {role === "PACKAGE" && <ComponentsSection itemId={itemId} />}
-        <RulesSection itemId={itemId} />
+        <RulesSection itemId={itemId} rulesEnabled={rulesEnabled} />
       </div>
     </div>
   );
@@ -277,7 +279,7 @@ function ComponentsSection({ itemId }: { itemId: string }) {
 
 // ── Square-footage rules (sentence builder) ─────────────────────────────────
 
-function RulesSection({ itemId }: { itemId: string }) {
+function RulesSection({ itemId, rulesEnabled }: { itemId: string; rulesEnabled: boolean }) {
   const router = useRouter();
   const rules = trpc.catalog.listRules.useQuery({ itemId });
   const addRule = trpc.catalog.addRule.useMutation({
@@ -312,6 +314,13 @@ function RulesSection({ itemId }: { itemId: string }) {
       <SectionTitle>
         <span className="flex items-center gap-1.5"><Ruler className="h-3 w-3" /> Square-footage rules</span>
       </SectionTitle>
+
+      {!rulesEnabled && (
+        <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          Rule-based pricing is off — rules are saved but not applied.{" "}
+          <a href="/catalog?section=pricing" className="font-medium underline">Enable it in Pricing</a>.
+        </p>
+      )}
 
       {rules.isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-gray-300" />

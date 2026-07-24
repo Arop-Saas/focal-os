@@ -170,6 +170,7 @@ export const workspaceRouter = router({
         showBranding: z.boolean().optional(),
         emailSubtitle: z.string().max(100).optional(),
         estimatedShootsPerMonth: z.string().max(20).optional(),
+        pricingRulesEnabled: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

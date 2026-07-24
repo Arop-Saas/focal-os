@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { startOfDay, endOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { generateJobNumber } from "@/lib/utils";
 import { syncPrimaryAppointment } from "@/lib/orders/appointments";
+import { quoteOrderLines, snapshotAndGenerate } from "@/lib/orders/pricing";
 
 // ─── Mobile procedure — requires logged-in user with a StaffProfile ──────────
 
@@ -789,13 +790,25 @@ export const mobileRouter = router({
       // isRush/rushFee are not Job columns — map onto priority fields instead
       const { assignedStaffIds, scheduledAt, isRush, rushFee, ...jobData } = input;
 
-      // Resolve package price → subtotal
+      // Price through THE pricing service (falls back to the raw package
+      // price if the package has no catalog identity yet)
       let subtotal = 0;
+      let quotedLines: Awaited<ReturnType<typeof quoteOrderLines>>["lines"] = [];
       if (jobData.packageId) {
-        const pkg = await ctx.prisma.package.findFirst({
-          where: { id: jobData.packageId, workspaceId: ctx.workspace.id },
+        const quoted = await quoteOrderLines(ctx.prisma, {
+          workspaceId: ctx.workspace.id,
+          squareFootage: jobData.squareFootage ?? null,
+          lines: [{ packageId: jobData.packageId, quantity: 1 }],
         });
-        if (pkg) subtotal = pkg.price;
+        if (quoted.lines.length > 0 && quoted.lines.every((l) => l.source !== "CUSTOM")) {
+          subtotal = quoted.subtotal;
+          quotedLines = quoted.lines;
+        } else {
+          const pkg = await ctx.prisma.package.findFirst({
+            where: { id: jobData.packageId, workspaceId: ctx.workspace.id },
+          });
+          if (pkg) subtotal = pkg.price;
+        }
       }
       const taxAmount = (subtotal * (ctx.workspace.defaultTaxRate ?? 0)) / 100;
       const totalAmount = subtotal + taxAmount + (rushFee ?? 0);
@@ -838,6 +851,15 @@ export const mobileRouter = router({
           scheduledAt: newJob.scheduledAt,
           durationMins: newJob.estimatedDurationMins,
         });
+
+        // Frozen order lines + generated work
+        if (quotedLines.length > 0) {
+          await snapshotAndGenerate(tx, {
+            workspaceId: ctx.workspace.id,
+            jobId: newJob.id,
+            lines: quotedLines,
+          });
+        }
 
         if (assignedStaffIds.length > 0) {
           await tx.jobAssignment.createMany({
