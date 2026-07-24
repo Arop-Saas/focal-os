@@ -1,4 +1,6 @@
 import { z } from "zod";
+import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { storageAdmin, PRIVATE_MEDIA_BUCKET, SIGNED_VIEW_TTL_SECONDS } from "@/lib/gallery-security";
 import { runDeliverySideEffects } from "@/lib/delivery";
@@ -9,6 +11,22 @@ import { notifyJobDelivered } from "@/lib/notify";
 import crypto from "crypto";
 
 // ─── Gallery Router ───────────────────────────────────────────────────────────
+
+/** The cover is ALWAYS the first photo in display order. */
+async function syncCoverToFirstPhoto(db: Prisma.TransactionClient | typeof prisma, galleryId: string) {
+  const first = await db.galleryMedia.findFirst({
+    where: { galleryId, mediaType: { in: ["PHOTO", "DRONE_PHOTO"] } },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, isCover: true },
+  });
+  await db.galleryMedia.updateMany({
+    where: { galleryId, isCover: true, ...(first ? { id: { not: first.id } } : {}) },
+    data: { isCover: false },
+  });
+  if (first && !first.isCover) {
+    await db.galleryMedia.update({ where: { id: first.id }, data: { isCover: true } });
+  }
+}
 
 export const galleryRouter = router({
   // ── Internal (authenticated) ────────────────────────────────────────────────
@@ -52,6 +70,29 @@ export const galleryRouter = router({
     return galleries;
   }),
 
+  /** Persist a new media order; the cover follows the first photo. */
+  reorderMedia: workspaceProcedure
+    .input(z.object({ galleryId: z.string(), orderedIds: z.array(z.string()).min(1).max(500) }))
+    .mutation(async ({ ctx, input }) => {
+      const gallery = await ctx.prisma.gallery.findFirst({
+        where: { id: input.galleryId, workspaceId: ctx.workspace.id },
+        select: { id: true },
+      });
+      if (!gallery) throw new TRPCError({ code: "NOT_FOUND" });
+      await ctx.prisma.$transaction(async (tx) => {
+        await Promise.all(
+          input.orderedIds.map((id, i) =>
+            tx.galleryMedia.updateMany({
+              where: { id, galleryId: gallery.id },
+              data: { sortOrder: i },
+            })
+          )
+        );
+        await syncCoverToFirstPhoto(tx, gallery.id);
+      });
+      return { ok: true };
+    }),
+
   // Get single gallery for management (internal)
   getById: workspaceProcedure
     .input(z.object({ id: z.string() }))
@@ -64,7 +105,7 @@ export const galleryRouter = router({
               client: { select: { firstName: true, lastName: true, email: true } },
             },
           },
-          media: { orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }] },
+          media: { orderBy: { sortOrder: "asc" } },
         },
       });
       if (!gallery) throw new TRPCError({ code: "NOT_FOUND" });
@@ -139,6 +180,7 @@ export const galleryRouter = router({
         isPublic: z.boolean().optional(),
         password: z.string().nullable().optional(),
         downloadEnabled: z.boolean().optional(),
+        requirePaymentForDownload: z.boolean().optional(),
         watermarkEnabled: z.boolean().optional(),
         expiresAt: z.date().nullable().optional(),
       })
@@ -213,6 +255,8 @@ export const galleryRouter = router({
         },
       });
 
+      await syncCoverToFirstPhoto(ctx.prisma, input.galleryId);
+
       // Update gallery media count and set READY if first photo
       await ctx.prisma.gallery.update({
         where: { id: input.galleryId },
@@ -240,6 +284,8 @@ export const galleryRouter = router({
         where: { id: input.galleryId },
         data: { mediaCount: { decrement: 1 } },
       });
+
+      await syncCoverToFirstPhoto(ctx.prisma, input.galleryId);
 
       return { success: true };
     }),
@@ -460,7 +506,7 @@ export const galleryRouter = router({
       // Check invoice payment gate
       const invoice = gallery.job.invoice;
       const isPaid = !invoice || invoice.status === "PAID";
-      const requiresPayment = !isPaid;
+      const requiresPayment = !isPaid && gallery.requirePaymentForDownload;
 
       // Increment view count (fire-and-forget)
       ctx.prisma.gallery.update({

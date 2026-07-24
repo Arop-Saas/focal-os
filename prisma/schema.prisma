@@ -502,6 +502,7 @@ model Client {
   @@index([workspaceId])
   @@index([email, workspaceId])
   pricingPlans  PricingPlan[]
+  jobLinks      JobClient[]
 }
 
 enum ClientType {
@@ -543,6 +544,22 @@ model BrokerageGroup {
   pricingPlans PricingPlan[]
 }
 
+// Additional clients on an order (the primary client stays Job.clientId
+// for all legacy readers; these are extra recipients/participants).
+model JobClient {
+  id        String @id @default(cuid())
+  jobId     String
+  clientId  String
+
+  job       Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, clientId])
+  @@index([clientId])
+}
+
 model CustomerTeam {
   id               String   @id @default(cuid())
   workspaceId      String
@@ -556,6 +573,7 @@ model CustomerTeam {
 
   workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members          Client[]
+  jobs             Job[]
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -758,6 +776,9 @@ model Job {
   orderLines      OrderLineSnapshot[]
   teamTasks       TeamTask[]
   rawFiles        RawFile[]
+  additionalClients JobClient[]
+  customerTeamId  String?
+  customerTeam    CustomerTeam? @relation(fields: [customerTeamId], references: [id], onDelete: SetNull)
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1396,6 +1417,7 @@ model Gallery {
 
   // Delivery
   downloadEnabled Boolean       @default(true)
+  requirePaymentForDownload Boolean @default(true)
   watermarkEnabled Boolean      @default(true)
   downloadCount   Int           @default(0)
 

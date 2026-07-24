@@ -2,6 +2,12 @@
 
 _Important decisions and why. Newest first. Remove entries only when genuinely reversed (note the reversal)._
 
+## 2026-07-24 — Availability warns, never blocks (interim)
+The working-hours configuration UI isn't actually wired to StaffAvailability, so enforcement read every photographer as "not scheduled to work". Until the scheduling/permissions cluster lands: unconfigured photographers default to available all day, hours issues render as informational warnings, and admin assignment proceeds despite availability errors (logged). `TODO(booking-permissions)` markers sit at each softened site. The end-state design (owner): customers can never book outside a photographer's territory/hours; only full-booking-permission users can override, with explicit warnings.
+
+## 2026-07-24 — Deliver modal is the delivery contract
+Nothing sends without the admin seeing it: the deliver modal previews media count and outstanding balance and lets the admin edit subject/message/CC, deliver silently, or mark paid before anything happens. The button never disappears (re-delivery is normal). Invoice line sync is forward-only: removing an order line only touches the invoice if that exact line exists on it — pre-sync invoices are never silently mutated.
+
 ## 2026-07-24 — Order progress is fully automatic; manual status control removed
 The bar derives from real signals (appointment times, raw files, listing media, delivery) computed at read time — no cron, no stored stage, can't drift. Legacy `Job.status` remains in the DB for terminal states (cancelled/on hold/completed) and mobile-app readers, but has no order-page UI and doesn't drive the bar. "Ready" stage removed: if it's ready, it's delivered.
 

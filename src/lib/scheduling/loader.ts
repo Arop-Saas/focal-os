@@ -79,7 +79,7 @@ export async function loadEngineStaff(db: Db, args: LoadStaffArgs): Promise<Engi
     },
     include: {
       member: { include: { user: { select: { fullName: true, email: true, avatarUrl: true, googleRefreshToken: true, googleCalendarId: true } } } },
-      availability: { where: { dayOfWeek } },
+      availability: true,
       timeOffEntries: {
         where: { startsAt: { lt: end }, endsAt: { gt: start } },
         select: { startsAt: true, endsAt: true },
@@ -125,7 +125,12 @@ export async function loadEngineStaff(db: Db, args: LoadStaffArgs): Promise<Engi
       return true;
     })
     .map((p) => {
-      const win = p.availability.find((a) => a.isAvailable);
+      // Unconfigured photographers (no availability rows at all) default to
+      // available all day — hours only restrict once someone sets them.
+      // TODO(booking-permissions): territory/hours enforcement with
+      // permission-gated overrides + warnings.
+      const dayWin = p.availability.find((a) => a.dayOfWeek === dayOfWeek && a.isAvailable);
+      const win = dayWin ?? (p.availability.length === 0 ? { startTime: "00:00", endTime: "23:59" } : undefined);
       const jobs = p.jobAssignments
         .map((a) => a.job)
         .filter((j) => {

@@ -247,34 +247,23 @@ export async function checkStaffAvailability(
       const proposedEndMins =
         proposedStartMins + proposedJob.estimatedDurationMins;
 
+      // Working-hours issues WARN but never block — anyone can be assigned.
+      // TODO(booking-permissions): make hours/territory hard limits for
+      // customer bookings with permission-gated admin overrides.
       const window = staff.availableWindows.find(
         (w) => w.dayOfWeek === proposedDay && w.isAvailable
       );
-
+      let hoursNote: string | undefined;
       if (!window) {
-        return {
-          staffId: staff.staffId,
-          staffName: staff.staffName,
-          isAvailable: false,
-          unavailableReason: "Not scheduled to work on this day",
-          conflictResult: { hasConflict: false, conflicts: [] },
-        };
-      }
-
-      const windowStart = timeStringToMins(window.startTime);
-      const windowEnd = timeStringToMins(window.endTime);
-
-      if (
-        proposedStartMins < windowStart ||
-        proposedEndMins > windowEnd
-      ) {
-        return {
-          staffId: staff.staffId,
-          staffName: staff.staffName,
-          isAvailable: false,
-          unavailableReason: `Outside availability window (${window.startTime}–${window.endTime})`,
-          conflictResult: { hasConflict: false, conflicts: [] },
-        };
+        hoursNote = staff.availableWindows.length === 0
+          ? "No working hours set — assumed available"
+          : "Not scheduled to work this day";
+      } else {
+        const windowStart = timeStringToMins(window.startTime);
+        const windowEnd = timeStringToMins(window.endTime);
+        if (proposedStartMins < windowStart || proposedEndMins > windowEnd) {
+          hoursNote = `Outside their usual hours (${window.startTime}–${window.endTime})`;
+        }
       }
 
       // 2. Check travel conflicts
@@ -289,7 +278,7 @@ export async function checkStaffAvailability(
         isAvailable: !conflictResult.hasConflict,
         unavailableReason: conflictResult.hasConflict
           ? conflictResult.conflicts[0].message
-          : undefined,
+          : hoursNote,
         conflictResult,
       };
     })

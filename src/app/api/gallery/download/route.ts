@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
       password: true,
       passwordHash: true,
       downloadEnabled: true,
+      requirePaymentForDownload: true,
       job: { select: { invoice: { select: { status: true } } } },
       media: {
         where: { id: mediaId },
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
 
   // THE paywall — server-side, non-negotiable
   const invoice = gallery.job?.invoice;
-  if (invoice && invoice.status !== "PAID") {
+  if (gallery.requirePaymentForDownload && invoice && invoice.status !== "PAID") {
     return NextResponse.json({ error: "Payment required to download" }, { status: 402 });
   }
 

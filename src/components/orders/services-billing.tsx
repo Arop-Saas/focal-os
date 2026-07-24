@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Check, Copy, CreditCard, Loader2, Mail, Plus, Receipt } from "lucide-react";
+import { Check, Copy, CreditCard, Loader2, Mail, Plus, Receipt, Trash2 } from "lucide-react";
 import { DIM_BADGE } from "./status-meta";
 
 /**
@@ -49,7 +49,7 @@ interface ServicesBillingProps {
   legacyLines: { id: string; name: string; quantity: number; totalPrice: number }[];
   totals: BillingTotals;
   payChip: { value: string; cls: string };
-  invoice: { id: string; number: string; payToken: string | null; amountDue: number; status: string } | null;
+  invoice: { id: string; number: string; payToken: string | null; amountDue: number; amountPaid: number; total: number; status: string } | null;
   catalogItems: CatalogOption[];
   appointments: ApptOption[];
   /** server-rendered invoice action (auto-invoice button) when no invoice exists */
@@ -73,6 +73,13 @@ export function ServicesBilling({
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState(1);
   const [apptChoice, setApptChoice] = useState("NONE");
+  const [customName, setCustomName] = useState("");
+  const [customPrice, setCustomPrice] = useState("");
+  const [customDuration, setCustomDuration] = useState("");
+
+  const removeLine = trpc.jobs.removeOrderLine.useMutation({
+    onSuccess: () => router.refresh(),
+  });
 
   const addLine = trpc.jobs.addOrderLine.useMutation({
     onSuccess: () => {
@@ -80,15 +87,28 @@ export function ServicesBilling({
       setItemId("");
       setQty(1);
       setApptChoice("NONE");
+      setCustomName("");
+      setCustomPrice("");
+      setCustomDuration("");
       router.refresh();
     },
   });
 
+  const isCustom = itemId === "CUSTOM";
+  const customValid = customName.trim() && Number(customPrice) >= 0 && customPrice.trim() !== "";
   const submit = () => {
     if (!itemId || addLine.isPending) return;
+    if (isCustom && !customValid) return;
     addLine.mutate({
       jobId,
-      catalogItemId: itemId,
+      catalogItemId: isCustom ? undefined : itemId,
+      custom: isCustom
+        ? {
+            name: customName.trim(),
+            unitPrice: Number(customPrice),
+            durationMins: apptChoice !== "NONE" && customDuration.trim() !== "" ? Math.max(0, Math.round(Number(customDuration))) : 0,
+          }
+        : undefined,
       quantity: qty,
       appointmentMode: apptChoice === "NONE" ? "NONE" : apptChoice === "NEW" ? "NEW" : "EXISTING",
       appointmentId: apptChoice !== "NONE" && apptChoice !== "NEW" ? apptChoice : undefined,
@@ -112,13 +132,26 @@ export function ServicesBilling({
       ) : (
         <div className="space-y-2">
           {rows.map((l) => (
-            <div key={l.id} className="border-b border-gray-50 pb-2 last:border-0 last:pb-0">
-              <div className="flex items-center justify-between text-sm">
+            <div key={l.id} className="group border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+              <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="font-medium text-gray-900">
                   {l.name}
                   {l.quantity > 1 && <span className="font-normal text-gray-400"> × {l.quantity}</span>}
                 </span>
-                <span className="font-medium text-gray-900">{formatCurrency(l.totalPrice)}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-medium text-gray-900">{formatCurrency(l.totalPrice)}</span>
+                  {lines.length > 0 && (
+                    <button
+                      type="button"
+                      title="Remove from order"
+                      onClick={() => { if (confirm(`Remove ${l.name} from this order? The invoice updates too.`)) removeLine.mutate({ lineId: l.id }); }}
+                      disabled={removeLine.isPending}
+                      className="rounded p-0.5 text-gray-200 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </span>
               </div>
               {l.explanation.length > 0 && (
                 <p className="mt-0.5 text-[11px] text-gray-400">{l.explanation.join(" · ")}</p>
@@ -144,6 +177,7 @@ export function ServicesBilling({
                     {c.name} — {formatCurrency(c.basePrice)}
                   </option>
                 ))}
+                <option value="CUSTOM">Custom item…</option>
               </select>
               <input
                 type="number"
@@ -153,6 +187,42 @@ export function ServicesBilling({
                 className="w-14 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-xs outline-none"
               />
             </div>
+            {isCustom && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Item name — e.g. Rush editing"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none"
+                />
+                <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5">
+                  <span className="text-xs text-gray-400">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={customPrice}
+                    onChange={(e) => setCustomPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-16 text-xs outline-none"
+                  />
+                </div>
+                {apptChoice !== "NONE" && (
+                  <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5">
+                    <input
+                      type="number"
+                      min={0}
+                      step={5}
+                      value={customDuration}
+                      onChange={(e) => setCustomDuration(e.target.value)}
+                      placeholder="60"
+                      className="w-12 text-xs outline-none"
+                    />
+                    <span className="text-xs text-gray-400">min</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <select
                 value={apptChoice}
@@ -176,7 +246,7 @@ export function ServicesBilling({
                 <button
                   type="button"
                   onClick={submit}
-                  disabled={!itemId || addLine.isPending}
+                  disabled={!itemId || addLine.isPending || (isCustom && !customValid)}
                   className="flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
                 >
                   {addLine.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -186,8 +256,8 @@ export function ServicesBilling({
             </div>
             {addLine.error && <p className="mt-1.5 text-xs text-red-600">{addLine.error.message}</p>}
             {invoice && (
-              <p className="mt-1.5 text-[11px] text-amber-700">
-                This order already has invoice #{invoice.number} — new services are not added to it automatically.
+              <p className="mt-1.5 text-[11px] text-gray-400">
+                Invoice #{invoice.number} updates automatically.
               </p>
             )}
           </div>
@@ -227,21 +297,40 @@ export function ServicesBilling({
         </div>
       </div>
 
-      {/* Invoice */}
+      {/* Invoice — inline, no separate page */}
       <div className="mt-3 border-t border-gray-100 pt-3">
         {invoice ? (
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/invoices/${invoice.id}`}
-              className="flex-1 rounded-lg border border-blue-200 py-2 text-center text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-            >
-              View invoice #{invoice.number}
-            </Link>
+          <div>
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="font-mono text-gray-500">Invoice #{invoice.number}</span>
+              <span className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                invoice.status === "PAID" ? "bg-emerald-100 text-emerald-700" :
+                invoice.status === "OVERDUE" ? "bg-red-100 text-red-700" :
+                invoice.status === "DRAFT" ? "bg-gray-100 text-gray-600" :
+                "bg-blue-100 text-blue-700"
+              )}>
+                {invoice.status}
+              </span>
+            </div>
+            <div className="mt-1.5 space-y-1 text-[12px] text-gray-600">
+              {invoice.amountPaid > 0 && (
+                <div className="flex items-center justify-between">
+                  <span>Paid</span><span className="text-emerald-700">{formatCurrency(invoice.amountPaid)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between font-medium text-gray-900">
+                <span>Balance due</span>
+                <span className={invoice.amountDue > 0 ? "text-amber-700" : "text-emerald-700"}>
+                  {formatCurrency(invoice.amountDue)}
+                </span>
+              </div>
+            </div>
             {invoice.amountDue > 0 && invoice.status !== "VOID" && (
               <button
                 type="button"
                 onClick={() => setCollecting(true)}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-900 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800"
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-gray-900 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800"
               >
                 <CreditCard className="h-3.5 w-3.5" /> Collect payment
               </button>

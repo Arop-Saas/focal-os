@@ -26,6 +26,7 @@ import {
   Paperclip,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PhotoGrid } from "./photo-grid";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -85,9 +86,6 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
   );
 
   const removeMutation = trpc.gallery.removeMedia.useMutation({
-    onSuccess: () => utils.gallery.getById.invalidate({ id: galleryId }),
-  });
-  const setCoverMutation = trpc.gallery.setCover.useMutation({
     onSuccess: () => utils.gallery.getById.invalidate({ id: galleryId }),
   });
   const updateMutation = trpc.gallery.update.useMutation({
@@ -418,39 +416,11 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
 
                 <UploadQueue uploads={uploads.filter((u) => !u.file.type.startsWith("video/") && u.mediaTypeHint !== "FLOOR_PLAN" && u.mediaTypeHint !== "DOCUMENT")} onDismiss={(id) => setUploads((p) => p.filter((x) => x.id !== id))} />
 
-                {photos.length === 0 ? (
-                  <EmptyState icon={<ImageIcon className="h-10 w-10 text-gray-200" />} label="No photos yet" sub="Upload photos above to get started." />
-                ) : (
-                  <div className="grid grid-cols-3 gap-3">
-                    {photos.map((photo) => (
-                      <div key={photo.id} className="relative group rounded-xl overflow-hidden bg-gray-100 aspect-[4/3]">
-                        {photo.cdnUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={photo.cdnUrl} alt={photo.originalName} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No preview</div>
-                        )}
-                        {photo.isCover && (
-                          <span className="absolute top-2 left-2 text-[10px] bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded font-semibold">Cover</span>
-                        )}
-                        {canEdit && (
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                            {!photo.isCover && (
-                              <button onClick={() => setCoverMutation.mutate({ mediaId: photo.id, galleryId })} title="Set as cover"
-                                className="p-1.5 bg-white/90 rounded-lg text-yellow-600 hover:bg-white transition-colors">
-                                <Star className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button onClick={() => { if (confirm("Remove this photo?")) removeMutation.mutate({ mediaId: photo.id, galleryId }); }}
-                              title="Remove photo" className="p-1.5 bg-white/90 rounded-lg text-red-500 hover:bg-white transition-colors">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <PhotoGrid
+                  galleryId={galleryId}
+                  photos={photos.map((ph) => ({ id: ph.id, cdnUrl: ph.cdnUrl, originalName: ph.originalName, isCover: ph.isCover }))}
+                  canEdit={canEdit}
+                />
               </div>
             )}
 
@@ -831,6 +801,14 @@ export function ListingManager({ galleryId }: { galleryId: string }) {
                 checked={gallery.downloadEnabled}
                 disabled={isArchived}
                 onChange={() => updateMutation.mutate({ id: galleryId, downloadEnabled: !gallery.downloadEnabled })}
+              />
+
+              <ToggleRow
+                icon={<Lock className="h-4 w-4 text-gray-400" />}
+                label="Require payment to download"
+                checked={gallery.requirePaymentForDownload}
+                disabled={isArchived}
+                onChange={() => updateMutation.mutate({ id: galleryId, requirePaymentForDownload: !gallery.requirePaymentForDownload })}
               />
 
               <div>

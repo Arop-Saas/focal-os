@@ -683,3 +683,51 @@ export async function sendJobRescheduledEmail({
     html: emailWrapper(tpl.body, branding),
   });
 }
+
+/** Delivery email with an admin-edited subject/message (deliver modal).
+ * The message is plain text — each line becomes a paragraph — followed by
+ * the gallery CTA, all inside the branded wrapper. */
+export async function sendCustomDeliveryEmail({
+  workspaceId, to, cc, subject, messageText, galleryUrl,
+}: {
+  workspaceId: string; to: string; cc?: string[];
+  subject: string; messageText: string; galleryUrl: string;
+}) {
+  const paragraphs = messageText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p style="color:#475569;margin:0 0 8px;">${line}</p>`)
+    .join("");
+  const body = `${paragraphs}${ctaButton("View & Download Gallery", galleryUrl)}`;
+  const branding = await getWorkspaceBranding(workspaceId);
+  return trackedSend("sendCustomDeliveryEmail", workspaceId, {
+    from: EMAIL_FROM,
+    to,
+    ...(cc && cc.length > 0 ? { cc } : {}),
+    subject,
+    html: emailWrapper(body, branding),
+  });
+}
+
+/** Internal email to a workspace member (e.g. raw files → editor). */
+export async function sendInternalEmail({
+  workspaceId, to, subject, messageText, ctaLabel, ctaUrl,
+}: {
+  workspaceId: string; to: string; subject: string;
+  messageText: string; ctaLabel: string; ctaUrl: string;
+}) {
+  const paragraphs = messageText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p style="color:#475569;margin:0 0 8px;">${line}</p>`)
+    .join("");
+  const branding = await getWorkspaceBranding(workspaceId);
+  return trackedSend("sendInternalEmail", workspaceId, {
+    from: EMAIL_FROM,
+    to,
+    subject,
+    html: emailWrapper(`${paragraphs}${ctaButton(ctaLabel, ctaUrl)}`, branding),
+  });
+}

@@ -18,7 +18,8 @@ import { ServicesBilling } from "@/components/orders/services-billing";
 import { PropertyAreaMap } from "@/components/orders/property-area-map";
 import { RawFilesTab } from "@/components/orders/raw-files-tab";
 import { DeliverButton } from "@/components/orders/deliver-button";
-import { EditAddressButton, ChangeClientButton, EditPropertyButton } from "@/components/orders/order-edit";
+import { EditAddressButton, EditPropertyButton } from "@/components/orders/order-edit";
+import { OrderClientsCard } from "@/components/orders/order-clients";
 import { DIM_BADGE } from "@/components/orders/status-meta";
 import { JobDeleteButton } from "@/components/jobs/job-delete-button";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
@@ -97,8 +98,9 @@ export default async function JobDetailPage({
       productionTasks: { select: { status: true, dueAt: true } },
       orderLines: { orderBy: { createdAt: "asc" } },
       orderNotes: { orderBy: { createdAt: "desc" }, take: 50, include: { author: { select: { fullName: true } } } },
+      additionalClients: { include: { client: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       gallery: { select: { id: true, slug: true, status: true, mediaCount: true } },
-      invoice: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true, amountDue: true, payToken: true } },
+      invoice: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true, amountDue: true, amountPaid: true, payToken: true } },
       statusHistory: { orderBy: { createdAt: "desc" }, take: 15 },
       _count: { select: { rawFiles: true } },
     },
@@ -120,7 +122,7 @@ export default async function JobDetailPage({
     }
   }
 
-  const [workspace, activityLog, clientOrderCount, catalogItems] = await Promise.all([
+  const [workspace, activityLog, clientOrderCount, clientBalanceAgg, customerTeams, catalogItems] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, select: { timezone: true } }),
     prisma.activityLog.findMany({
       where: { workspaceId, entityType: "job", entityId: job.id },
@@ -129,6 +131,15 @@ export default async function JobDetailPage({
       include: { user: { select: { fullName: true } } },
     }),
     prisma.job.count({ where: { workspaceId, clientId: job.clientId } }),
+    prisma.invoice.aggregate({
+      where: { workspaceId, clientId: job.clientId, status: { in: ["SENT", "VIEWED", "PARTIAL", "OVERDUE"] } },
+      _sum: { amountDue: true },
+    }),
+    prisma.customerTeam.findMany({
+      where: { workspaceId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     prisma.catalogItem.findMany({
       where: { workspaceId, state: "PUBLISHED" },
       select: { id: true, currentVersion: { select: { name: true, basePrice: true } } },
@@ -284,6 +295,8 @@ export default async function JobDetailPage({
             number: job.invoice.invoiceNumber,
             payToken: job.invoice.payToken,
             amountDue: job.invoice.amountDue,
+            amountPaid: job.invoice.amountPaid,
+            total: job.invoice.totalAmount,
             status: job.invoice.status,
           } : null}
           catalogItems={catalogOptions}
@@ -330,47 +343,26 @@ export default async function JobDetailPage({
 
       {/* Right column */}
       <div className="space-y-4">
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[13px] font-semibold text-gray-900">Customer</h2>
-            <div className="flex items-center gap-3">
-              <ChangeClientButton jobId={job.id} />
-              <Link href={`/clients/${job.clientId}`} className="text-[12px] font-medium text-blue-600 hover:text-blue-700">
-                View client
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-              {job.client.firstName?.[0]}{job.client.lastName?.[0]}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-gray-900">
-                {job.client.firstName} {job.client.lastName}
-              </p>
-              {job.client.company && (
-                <p className="flex items-center gap-1 text-[11px] text-gray-400">
-                  <Building2 className="h-3 w-3" /> {job.client.company}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="mt-3 space-y-1.5 text-[12px] text-gray-500">
-            <a href={`mailto:${job.client.email}`} className="flex items-center gap-2 transition-colors hover:text-blue-600">
-              <Mail className="h-3 w-3 shrink-0 text-gray-300" />
-              <span className="truncate">{job.client.email}</span>
-            </a>
-            {job.client.phone && (
-              <a href={`tel:${job.client.phone}`} className="flex items-center gap-2 transition-colors hover:text-blue-600">
-                <Phone className="h-3 w-3 text-gray-300" /> {job.client.phone}
-              </a>
-            )}
-            <p className="flex items-center gap-2">
-              <User className="h-3 w-3 text-gray-300" />
-              {clientOrderCount === 1 ? "First order" : `${clientOrderCount} orders with you`}
-            </p>
-          </div>
-        </section>
+        <OrderClientsCard
+          jobId={job.id}
+          primary={{
+            id: job.clientId,
+            name: `${job.client.firstName} ${job.client.lastName}`,
+            initials: `${job.client.firstName?.[0] ?? ""}${job.client.lastName?.[0] ?? ""}`,
+            company: job.client.company,
+            email: job.client.email,
+            phone: job.client.phone,
+          }}
+          additional={job.additionalClients.map((x) => ({
+            clientId: x.client.id,
+            name: `${x.client.firstName} ${x.client.lastName}`,
+            email: x.client.email,
+          }))}
+          balance={clientBalanceAgg._sum.amountDue ?? 0}
+          ordersCount={clientOrderCount}
+          teamId={job.customerTeamId}
+          teams={customerTeams}
+        />
 
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">

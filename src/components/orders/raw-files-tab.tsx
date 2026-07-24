@@ -4,7 +4,8 @@ import { useCallback, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Download, File, FileArchive, FileImage, FileVideo, Loader2, Trash2, UploadCloud } from "lucide-react";
+import { Download, File, FileArchive, FileImage, FileVideo, Loader2, Send, Trash2, UploadCloud, X } from "lucide-react";
+import { createPortal } from "react-dom";
 
 /**
  * Raw files — capture files uploaded straight to the platform's private
@@ -47,6 +48,7 @@ export function RawFilesTab({ jobId }: { jobId: string }) {
 
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [sendingToEditor, setSendingToEditor] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const uploadFile = useCallback(async (file: globalThis.File, itemId: string) => {
@@ -168,10 +170,20 @@ export function RawFilesTab({ jobId }: { jobId: string }) {
       <div className="rounded-xl border border-gray-200 bg-white">
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
           <h2 className="text-[13px] font-semibold text-gray-900">Raw files</h2>
-          <span className="text-[11px] text-gray-400">
-            {rows.length} file{rows.length !== 1 ? "s" : ""}
-            {rows.length > 0 && ` · ${fmtSize(rows.reduce((s, f) => s + f.fileSize, 0))}`}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-gray-400">
+              {rows.length} file{rows.length !== 1 ? "s" : ""}
+              {rows.length > 0 && ` · ${fmtSize(rows.reduce((s, f) => s + f.fileSize, 0))}`}
+            </span>
+            {rows.length > 0 && (
+              <button
+                onClick={() => setSendingToEditor(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-gray-800"
+              >
+                <Send className="h-3 w-3" /> Send to editor
+              </button>
+            )}
+          </div>
         </div>
         {files.isLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-gray-300" /></div>
@@ -217,6 +229,76 @@ export function RawFilesTab({ jobId }: { jobId: string }) {
           </div>
         )}
       </div>
+
+      {sendingToEditor && (
+        <SendToEditorModal jobId={jobId} onClose={() => setSendingToEditor(false)} />
+      )}
     </div>
+  );
+}
+
+function SendToEditorModal({ jobId, onClose }: { jobId: string; onClose: () => void }) {
+  const members = trpc.tasks.teamMembers.useQuery();
+  const [userId, setUserId] = useState("");
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const send = trpc.jobs.sendRawsToEditor.useMutation({
+    onSuccess: () => {
+      setSent(true);
+      setTimeout(onClose, 1200);
+    },
+  });
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b p-5">
+          <h2 className="text-sm font-semibold text-gray-900">Send raw files to an editor</h2>
+          <button onClick={onClose} className="rounded p-1 text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="space-y-3 p-5">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Editor</label>
+            <select
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none"
+            >
+              <option value="">Choose a team member…</option>
+              {(members.data ?? []).map((m) => (
+                <option key={m.id} value={m.id}>{m.fullName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Note <span className="font-normal text-gray-400">(optional)</span></label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Blue-sky the exteriors, deliver by Friday…"
+              className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+            />
+          </div>
+          <p className="text-[11px] text-gray-400">They get an email with your note and a link to this order&apos;s raw files.</p>
+          {send.error && <p className="text-xs text-red-600">{send.error.message}</p>}
+        </div>
+        <div className="flex gap-3 border-t p-5">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button
+            onClick={() => userId && send.mutate({ jobId, userId, note: note.trim() || undefined })}
+            disabled={!userId || send.isPending || sent}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+          >
+            {send.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : sent ? "Sent" : <><Send className="h-3.5 w-3.5" /> Send</>}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
