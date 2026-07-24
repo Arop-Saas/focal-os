@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { storageAdmin, PRIVATE_MEDIA_BUCKET, SIGNED_VIEW_TTL_SECONDS } from "@/lib/gallery-security";
 import { runDeliverySideEffects } from "@/lib/delivery";
 import { hashGalleryPassword, verifyGalleryPassword, mediaViewUrl } from "@/lib/gallery-security";
 import { router, workspaceProcedure, publicProcedure } from "../trpc";
@@ -13,7 +14,7 @@ export const galleryRouter = router({
   // ── Internal (authenticated) ────────────────────────────────────────────────
 
   list: workspaceProcedure.query(async ({ ctx }) => {
-    return ctx.prisma.gallery.findMany({
+    const galleries = await ctx.prisma.gallery.findMany({
       where: { workspaceId: ctx.workspace.id },
       include: {
         job: {
@@ -24,11 +25,31 @@ export const galleryRouter = router({
         media: {
           where: { isCover: true },
           take: 1,
-          select: { cdnUrl: true, thumbnailKey: true },
+          select: { cdnUrl: true, thumbnailKey: true, storageKey: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    // Sign private-bucket cover previews for the grid
+    const coverKeys = galleries
+      .map((g) => g.media[0])
+      .filter((c) => c && !c.cdnUrl)
+      .map((c) => c!.thumbnailKey ?? c!.storageKey)
+      .filter((k): k is string => !!k);
+    if (coverKeys.length > 0) {
+      const { data: signed } = await storageAdmin()
+        .storage.from(PRIVATE_MEDIA_BUCKET)
+        .createSignedUrls(coverKeys, SIGNED_VIEW_TTL_SECONDS);
+      const byPath = new Map((signed ?? []).filter((x) => x.path && x.signedUrl).map((x) => [x.path as string, x.signedUrl]));
+      for (const g of galleries) {
+        const cover = g.media[0];
+        if (cover && !cover.cdnUrl) {
+          cover.cdnUrl = byPath.get(cover.thumbnailKey ?? cover.storageKey) ?? null;
+        }
+      }
+    }
+    return galleries;
   }),
 
   // Get single gallery for management (internal)
@@ -47,6 +68,19 @@ export const galleryRouter = router({
         },
       });
       if (!gallery) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Private-bucket media has no public cdnUrl — the dashboard views
+      // through short-lived signed URLs, minted in one batch call.
+      const keys = gallery.media.filter((m) => !m.cdnUrl).map((m) => m.storageKey);
+      if (keys.length > 0) {
+        const { data: signed } = await storageAdmin()
+          .storage.from(PRIVATE_MEDIA_BUCKET)
+          .createSignedUrls(keys, SIGNED_VIEW_TTL_SECONDS);
+        const byPath = new Map((signed ?? []).filter((x) => x.path && x.signedUrl).map((x) => [x.path as string, x.signedUrl]));
+        gallery.media = gallery.media.map((m) =>
+          m.cdnUrl ? m : { ...m, cdnUrl: byPath.get(m.storageKey) ?? null }
+        );
+      }
       return gallery;
     }),
 

@@ -5,6 +5,7 @@ import { runDeliverySideEffects } from "@/lib/delivery";
 import { syncPrimaryAppointment, appointmentStatusForJobStatus, cancelAppointmentsForJob } from "@/lib/orders/appointments";
 import { findOrCreateProperty } from "@/lib/orders/property";
 import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/lib/orders/pricing";
+import { createInvoiceForJob, InvoiceExistsError } from "@/lib/money/invoice";
 import { twilightWindow } from "@/lib/scheduling/solar";
 import { z as zod } from "zod";
 import { notifyJobRescheduled } from "@/lib/notify";
@@ -496,8 +497,13 @@ export const jobsRouter = router({
         });
       }
 
-      // NOTE (S3): invoices are created on DELIVERY (see the DELIVERED hook
-      // in `update`), not at job creation — Build Brief W6.
+      // Every order gets an invoice up front (draft until sent); the
+      // on-delivery hook remains as a safety net for older orders.
+      try {
+        await createInvoiceForJob(ctx.prisma, { workspaceId: ctx.workspace.id, jobId: job.id });
+      } catch (e) {
+        if (!(e instanceof InvoiceExistsError)) console.error("Auto-invoice on create failed:", e);
+      }
 
       return job;
     }),

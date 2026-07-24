@@ -8,10 +8,8 @@ import { fmtInTz } from "@/lib/scheduling/tz";
 import { computeOrderAttention } from "@/lib/orders/attention";
 import type { OrderStage } from "@/lib/orders/stage";
 import { geocodeAddress } from "@/lib/geocode";
-import { mediaViewUrl } from "@/lib/gallery-security";
 import {
-  Building2, ChevronRight, FileText, Home, Image as ImageIcon, KeyRound,
-  Mail, Phone, User, Video,
+  Building2, ChevronRight, FileText, Home, KeyRound, Mail, Phone, User,
 } from "lucide-react";
 import { OrderTabs } from "@/components/orders/order-tabs";
 import { OrderNotes, type OrderNoteRow } from "@/components/orders/order-notes";
@@ -24,6 +22,7 @@ import { DIM_BADGE } from "@/components/orders/status-meta";
 import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
 import { JobDeleteButton } from "@/components/jobs/job-delete-button";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
+import { ListingManager } from "@/components/gallery/listing-manager";
 import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-button";
 
 export const dynamic = "force-dynamic";
@@ -92,17 +91,8 @@ export default async function JobDetailPage({
       productionTasks: { select: { status: true, dueAt: true } },
       orderLines: { orderBy: { createdAt: "asc" } },
       orderNotes: { orderBy: { createdAt: "desc" }, take: 50, include: { author: { select: { fullName: true } } } },
-      gallery: {
-        select: {
-          id: true, slug: true, status: true, mediaCount: true,
-          media: {
-            orderBy: { sortOrder: "asc" },
-            take: 60,
-            select: { id: true, mediaType: true, storageKey: true, cdnUrl: true, thumbnailKey: true, originalName: true },
-          },
-        },
-      },
-      invoice: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true, amountDue: true } },
+      gallery: { select: { id: true, slug: true, status: true, mediaCount: true } },
+      invoice: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true, amountDue: true, payToken: true } },
       statusHistory: { orderBy: { createdAt: "desc" }, take: 15 },
     },
   });
@@ -239,19 +229,6 @@ export default async function JobDetailPage({
     })),
   ].sort((a, b) => b.when.getTime() - a.when.getTime());
 
-  // ── Files & Delivery: signed thumbnails ──────────────────────────────────
-  const media = job.gallery?.media ?? [];
-  const photoMedia = media.filter((m) => m.mediaType === "PHOTO" || m.mediaType === "DRONE_PHOTO");
-  const videoCount = media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO").length;
-  const otherCount = media.filter((m) => m.mediaType === "DOCUMENT").length;
-  const thumbs = await Promise.all(
-    photoMedia.slice(0, 12).map(async (m) => ({
-      id: m.id,
-      name: m.originalName,
-      url: await mediaViewUrl({ storageKey: m.thumbnailKey ?? m.storageKey, cdnUrl: m.cdnUrl }),
-    }))
-  );
-
   // ── Panels ───────────────────────────────────────────────────────────────
 
   const overviewPanel = (
@@ -303,7 +280,13 @@ export default async function JobDetailPage({
             total: job.totalAmount,
           }}
           payChip={payChip}
-          invoice={job.invoice ? { id: job.invoice.id, number: job.invoice.invoiceNumber } : null}
+          invoice={job.invoice ? {
+            id: job.invoice.id,
+            number: job.invoice.invoiceNumber,
+            payToken: job.invoice.payToken,
+            amountDue: job.invoice.amountDue,
+            status: job.invoice.status,
+          } : null}
           catalogItems={catalogOptions}
           appointments={apptOptions}
           invoiceAction={
@@ -425,102 +408,13 @@ export default async function JobDetailPage({
     </div>
   );
 
-  const filesPanel = (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="space-y-4 lg:col-span-2">
-        {!job.gallery ? (
-          <JobGalleryCard
-            jobId={job.id}
-            propertyAddress={job.propertyAddress}
-            gallery={null}
-          />
-        ) : (
-          <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
-                <ImageIcon className="h-4 w-4 text-gray-400" /> Listing media
-              </h2>
-              <Link
-                href={`/gallery/${job.gallery.id}`}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700"
-              >
-                Open listing
-              </Link>
-            </div>
-            <div className="mb-3 flex flex-wrap gap-3 text-[12px] text-gray-500">
-              <span className="flex items-center gap-1.5">
-                <ImageIcon className="h-3.5 w-3.5 text-gray-300" /> {photoMedia.length} photos
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Video className="h-3.5 w-3.5 text-gray-300" /> {videoCount} videos
-              </span>
-              {otherCount > 0 && (
-                <span className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-gray-300" /> {otherCount} other files
-                </span>
-              )}
-            </div>
-            {thumbs.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-[13px] text-gray-400">
-                Nothing uploaded yet — open the listing to add photos and videos.
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
-                {thumbs.map((t) =>
-                  t.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={t.id}
-                      src={t.url}
-                      alt={t.name}
-                      className="aspect-[4/3] w-full rounded-lg object-cover"
-                    />
-                  ) : null
-                )}
-                {photoMedia.length > 12 && (
-                  <Link
-                    href={`/gallery/${job.gallery.id}`}
-                    className="flex aspect-[4/3] items-center justify-center rounded-lg bg-gray-100 text-[13px] font-semibold text-gray-500 transition-colors hover:bg-gray-200"
-                  >
-                    +{photoMedia.length - 12} more
-                  </Link>
-                )}
-              </div>
-            )}
-          </section>
-        )}
-      </div>
-      <section className="h-fit rounded-xl border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Delivery</h2>
-        <div className="space-y-2.5 text-[12px]">
-          <div className="flex items-center justify-between text-gray-600">
-            <span>Status</span>
-            <span className={cn(
-              DIM_BADGE,
-              job.deliveredAt || job.status === "DELIVERED"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-gray-200 bg-gray-50 text-gray-500"
-            )}>
-              {job.deliveredAt || job.status === "DELIVERED" ? "Delivered" : "Not delivered"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-gray-600">
-            <span>Media files</span>
-            <span className="font-medium text-gray-800">{job.gallery?.mediaCount ?? 0}</span>
-          </div>
-          <div className="flex items-center justify-between text-gray-600">
-            <span>Delivered</span>
-            <span className="font-medium text-gray-800">
-              {job.deliveredAt ? fmtInTz(job.deliveredAt, tz, FULL_FMT) : "Not yet"}
-            </span>
-          </div>
-          {job.invoice && job.invoice.amountDue > 0 && (
-            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-800">
-              {formatCurrency(job.invoice.amountDue)} is still outstanding on this order.
-            </p>
-          )}
-        </div>
-      </section>
+  const filesPanel = job.gallery ? (
+    // The whole listing system lives here — uploads, sections, publish,
+    // share link — one seamless surface on the order.
+    <ListingManager galleryId={job.gallery.id} />
+  ) : (
+    <div className="mx-auto max-w-xl">
+      <JobGalleryCard jobId={job.id} propertyAddress={job.propertyAddress} gallery={null} />
     </div>
   );
 

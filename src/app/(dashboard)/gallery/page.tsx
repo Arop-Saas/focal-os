@@ -209,7 +209,13 @@ export default function GalleryPage() {
                         href={`/gallery/${gallery.id}`}
                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 hover:bg-blue-100 transition-colors font-medium"
                       >
-                        <Eye className="h-3 w-3" /> Manage
+                        <Eye className="h-3 w-3" /> View
+                      </Link>
+                      <Link
+                        href={`/jobs/${gallery.jobId}?tab=files`}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+                      >
+                        Manage
                       </Link>
                     </div>
                   </div>

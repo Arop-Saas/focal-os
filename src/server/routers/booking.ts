@@ -9,6 +9,7 @@ import { verifyPortalToken, PORTAL_COOKIE } from "@/lib/portal-auth";
 import { syncPrimaryAppointment } from "@/lib/orders/appointments";
 import { findOrCreateProperty } from "@/lib/orders/property";
 import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/lib/orders/pricing";
+import { createInvoiceForJob, InvoiceExistsError } from "@/lib/money/invoice";
 
 // ─── Public Booking Router ────────────────────────────────────────────────────
 // No auth required — used by the client-facing booking form at /book/[slug]
@@ -751,6 +752,13 @@ export const bookingRouter = router({
 
         return { job, client };
       }, { timeout: 15000 });
+
+      // Every order gets an invoice up front (draft until sent).
+      try {
+        await createInvoiceForJob(ctx.prisma, { workspaceId: workspace.id, jobId: result.job.id });
+      } catch (e) {
+        if (!(e instanceof InvoiceExistsError)) console.error("Auto-invoice on booking failed:", e);
+      }
 
       const clientName = `${input.firstName} ${input.lastName}`;
       const pkgName = pkg?.name ?? (alaCarteServices.length > 0 ? alaCarteServices.map((s) => s.name).join(", ") : "");

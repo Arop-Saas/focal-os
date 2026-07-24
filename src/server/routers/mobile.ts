@@ -6,6 +6,7 @@ import { startOfDay, endOfDay, addDays, startOfMonth, endOfMonth } from "date-fn
 import { generateJobNumber } from "@/lib/utils";
 import { syncPrimaryAppointment } from "@/lib/orders/appointments";
 import { quoteOrderLines, snapshotAndGenerate } from "@/lib/orders/pricing";
+import { createInvoiceForJob, InvoiceExistsError } from "@/lib/money/invoice";
 
 // ─── Mobile procedure — requires logged-in user with a StaffProfile ──────────
 
@@ -885,6 +886,13 @@ export const mobileRouter = router({
 
         return newJob;
       });
+
+      // Every order gets an invoice up front (draft until sent).
+      try {
+        await createInvoiceForJob(ctx.prisma, { workspaceId: ctx.workspace.id, jobId: job.id });
+      } catch (e) {
+        if (!(e instanceof InvoiceExistsError)) console.error("Auto-invoice on mobile create failed:", e);
+      }
 
       return { id: job.id, jobNumber: job.jobNumber };
     }),

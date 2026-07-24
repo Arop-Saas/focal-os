@@ -37,6 +37,7 @@ export async function createInvoiceForJob(
       client: { include: { brokerageGroup: true } },
       package: { include: { items: { select: { serviceId: true } } } },
       services: { include: { service: true } },
+      orderLines: { orderBy: { createdAt: "asc" } },
       invoice: { select: { id: true } },
     },
   });
@@ -59,7 +60,19 @@ export async function createInvoiceForJob(
   // services outside the package. À-la-carte bookings: the services.
   // Fallback: the job total.
   const lineItems: { description: string; quantity: number; unitPrice: number; totalPrice: number; sortOrder: number }[] = [];
-  if (job.package) {
+  if (job.orderLines.length > 0) {
+    // Catalog-era orders: bill the frozen line snapshots — exactly what was
+    // quoted, including manually added services.
+    job.orderLines.forEach((l, i) =>
+      lineItems.push({
+        description: l.name,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        totalPrice: l.totalPrice,
+        sortOrder: i,
+      })
+    );
+  } else if (job.package) {
     lineItems.push({
       description: job.package.name,
       quantity: 1,
