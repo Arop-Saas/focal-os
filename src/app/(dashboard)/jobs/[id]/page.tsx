@@ -143,7 +143,9 @@ export default async function JobDetailPage({
         clientId: job.customerTeam
           ? { in: job.customerTeam.members.map((m) => m.id) }
           : job.clientId ?? "__none__",
-        status: { in: ["SENT", "VIEWED", "PARTIAL", "OVERDUE"] },
+        // Every unpaid dollar counts — including invoices not yet sent
+        status: { notIn: ["VOID"] },
+        amountDue: { gt: 0 },
       },
       _sum: { amountDue: true },
     }),
