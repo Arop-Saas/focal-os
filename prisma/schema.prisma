@@ -777,6 +777,7 @@ model Job {
   teamTasks       TeamTask[]
   rawFiles        RawFile[]
   additionalClients JobClient[]
+  attentionDismissedKey String?  // hash of dismissed attention reasons — card re-shows when reasons change
   customerTeamId  String?
   customerTeam    CustomerTeam? @relation(fields: [customerTeamId], references: [id], onDelete: SetNull)
 

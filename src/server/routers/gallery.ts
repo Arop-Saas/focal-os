@@ -2,6 +2,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { logOrderActivity } from "@/lib/orders/activity";
 import { storageAdmin, PRIVATE_MEDIA_BUCKET, SIGNED_VIEW_TTL_SECONDS } from "@/lib/gallery-security";
 import { runDeliverySideEffects } from "@/lib/delivery";
 import { hashGalleryPassword, verifyGalleryPassword, mediaViewUrl } from "@/lib/gallery-security";
@@ -256,6 +257,15 @@ export const galleryRouter = router({
       });
 
       await syncCoverToFirstPhoto(ctx.prisma, input.galleryId);
+
+      await logOrderActivity(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        jobId: gallery.jobId,
+        userId: ctx.user.id,
+        message: `File uploaded to the listing — ${input.originalName}`,
+        collapseKey: "listing-upload",
+        plural: (n) => `${n} files uploaded to the listing`,
+      });
 
       // Update gallery media count and set READY if first photo
       await ctx.prisma.gallery.update({

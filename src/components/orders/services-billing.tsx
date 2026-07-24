@@ -52,6 +52,8 @@ interface ServicesBillingProps {
   invoice: { id: string; number: string; payToken: string | null; amountDue: number; amountPaid: number; total: number; status: string } | null;
   catalogItems: CatalogOption[];
   appointments: ApptOption[];
+  /** workspace default tax rate (%) — used to re-apply tax */
+  wsTaxRate: number;
   /** server-rendered invoice action (auto-invoice button) when no invoice exists */
   invoiceAction?: React.ReactNode;
 }
@@ -65,6 +67,7 @@ export function ServicesBilling({
   invoice,
   catalogItems,
   appointments,
+  wsTaxRate,
   invoiceAction,
 }: ServicesBillingProps) {
   const router = useRouter();
@@ -73,11 +76,26 @@ export function ServicesBilling({
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState(1);
   const [apptChoice, setApptChoice] = useState("NONE");
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState("");
   const [customDuration, setCustomDuration] = useState("");
 
   const removeLine = trpc.jobs.removeOrderLine.useMutation({
+    onSuccess: () => router.refresh(),
+  });
+  const applyCoupon = trpc.jobs.applyCoupon.useMutation({
+    onSuccess: () => {
+      setCouponOpen(false);
+      setCouponCode("");
+      router.refresh();
+    },
+  });
+  const removeDiscount = trpc.jobs.removeOrderDiscount.useMutation({
+    onSuccess: () => router.refresh(),
+  });
+  const setTax = trpc.jobs.setOrderTax.useMutation({
     onSuccess: () => router.refresh(),
   });
 
@@ -282,16 +300,85 @@ export function ServicesBilling({
             <span>Priority fee</span><span>{formatCurrency(totals.priorityFee)}</span>
           </div>
         )}
-        {totals.discount > 0 && (
-          <div className="flex items-center justify-between text-gray-600">
-            <span>Discount</span><span>−{formatCurrency(totals.discount)}</span>
+
+        {/* Discount / coupon */}
+        {totals.discount > 0 ? (
+          <div className="group flex items-center justify-between text-gray-600">
+            <span>Discount</span>
+            <span className="flex items-center gap-1">
+              −{formatCurrency(totals.discount)}
+              <button
+                type="button"
+                title="Remove discount"
+                onClick={() => removeDiscount.mutate({ jobId })}
+                disabled={removeDiscount.isPending}
+                className="rounded p-0.5 text-gray-200 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </span>
           </div>
-        )}
-        {totals.tax > 0 && (
-          <div className="flex items-center justify-between text-gray-600">
-            <span>Tax</span><span>{formatCurrency(totals.tax)}</span>
+        ) : couponOpen ? (
+          <div className="flex items-center gap-1.5">
+            <input
+              autoFocus
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => { if (e.key === "Enter" && couponCode.trim()) applyCoupon.mutate({ jobId, code: couponCode.trim() }); }}
+              placeholder="COUPON CODE"
+              className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1 font-mono text-[11px] uppercase outline-none focus:border-blue-400"
+            />
+            <button
+              type="button"
+              onClick={() => couponCode.trim() && applyCoupon.mutate({ jobId, code: couponCode.trim() })}
+              disabled={!couponCode.trim() || applyCoupon.isPending}
+              className="rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+            >
+              {applyCoupon.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Apply"}
+            </button>
+            <button type="button" onClick={() => setCouponOpen(false)} className="px-1 text-[11px] text-gray-400 hover:text-gray-600">
+              Cancel
+            </button>
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCouponOpen(true)}
+            className="text-[11px] font-medium text-blue-600 transition-colors hover:text-blue-700"
+          >
+            + Add coupon
+          </button>
         )}
+        {applyCoupon.error && <p className="text-[11px] text-red-600">{applyCoupon.error.message}</p>}
+
+        {/* Tax */}
+        {totals.tax > 0 ? (
+          <div className="group flex items-center justify-between text-gray-600">
+            <span>Tax{wsTaxRate > 0 ? ` (${wsTaxRate}%)` : ""}</span>
+            <span className="flex items-center gap-1">
+              {formatCurrency(totals.tax)}
+              <button
+                type="button"
+                title="Remove tax"
+                onClick={() => setTax.mutate({ jobId, apply: false })}
+                disabled={setTax.isPending}
+                className="rounded p-0.5 text-gray-200 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
+        ) : wsTaxRate > 0 ? (
+          <button
+            type="button"
+            onClick={() => setTax.mutate({ jobId, apply: true })}
+            disabled={setTax.isPending}
+            className="text-[11px] font-medium text-blue-600 transition-colors hover:text-blue-700"
+          >
+            + Add tax ({wsTaxRate}%)
+          </button>
+        ) : null}
+
         <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-[13px] font-semibold text-gray-900">
           <span>Total</span><span>{formatCurrency(totals.total)}</span>
         </div>
@@ -302,7 +389,10 @@ export function ServicesBilling({
         {invoice ? (
           <div>
             <div className="flex items-center justify-between text-[12px]">
-              <span className="font-mono text-gray-500">Invoice #{invoice.number}</span>
+              <span className="font-mono text-gray-500">
+                Invoice #{invoice.number}
+                <span className="ml-1.5 font-sans text-[10px] text-gray-400">updates with the order</span>
+              </span>
               <span className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                 invoice.status === "PAID" ? "bg-emerald-100 text-emerald-700" :
@@ -310,7 +400,7 @@ export function ServicesBilling({
                 invoice.status === "DRAFT" ? "bg-gray-100 text-gray-600" :
                 "bg-blue-100 text-blue-700"
               )}>
-                {invoice.status}
+                {invoice.status === "DRAFT" ? "Not sent" : invoice.status}
               </span>
             </div>
             <div className="mt-1.5 space-y-1 text-[12px] text-gray-600">

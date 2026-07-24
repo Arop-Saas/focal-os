@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { logOrderActivity } from "@/lib/orders/activity";
 import { router, workspaceProcedure, managerProcedure } from "../trpc";
 import { generateInvoiceNumber } from "@/lib/utils";
 import { randomUUID } from "crypto";
@@ -209,6 +210,15 @@ export const invoicesRouter = router({
         data: { status: "SENT", issuedAt: new Date(), paymentLink },
       });
 
+      if (invoice.jobId) {
+        await logOrderActivity(ctx.prisma, {
+          workspaceId: ctx.workspace.id,
+          jobId: invoice.jobId,
+          userId: ctx.user.id,
+          message: `Invoice ${invoice.invoiceNumber} sent to the client`,
+        });
+      }
+
       void ctx.prisma.activityLog.create({
         data: {
           workspaceId: ctx.workspace.id,
@@ -368,6 +378,15 @@ export const invoicesRouter = router({
           invoiceNumber: invoice.invoiceNumber,
           amount: newAmountPaid,
           paidAt,
+        });
+      }
+
+      if (invoice.jobId) {
+        await logOrderActivity(ctx.prisma, {
+          workspaceId: ctx.workspace.id,
+          jobId: invoice.jobId,
+          userId: ctx.user.id,
+          message: `Payment recorded — $${input.amount.toFixed(2)} (${input.method.toLowerCase()})`,
         });
       }
 

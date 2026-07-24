@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
-import { formatCurrency, formatOrderNumber, cn, JOB_STATUS_LABELS } from "@/lib/utils";
+import { formatCurrency, formatOrderNumber, cn } from "@/lib/utils";
 import { fmtInTz } from "@/lib/scheduling/tz";
 import { computeOrderAttention } from "@/lib/orders/attention";
 import type { OrderStage } from "@/lib/orders/stage";
@@ -18,6 +18,7 @@ import { ServicesBilling } from "@/components/orders/services-billing";
 import { PropertyAreaMap } from "@/components/orders/property-area-map";
 import { RawFilesTab } from "@/components/orders/raw-files-tab";
 import { DeliverButton } from "@/components/orders/deliver-button";
+import { DismissAttentionButton } from "@/components/orders/dismiss-attention";
 import { EditAddressButton, EditPropertyButton } from "@/components/orders/order-edit";
 import { OrderClientsCard } from "@/components/orders/order-clients";
 import { DIM_BADGE } from "@/components/orders/status-meta";
@@ -60,6 +61,9 @@ const DATE_FMT: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
 const FULL_FMT: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
 
 function humanizeAction(action: string): string {
+  // New log entries are already human sentences — only legacy machine keys
+  // ("job.created") need cleanup.
+  if (action.includes(" ")) return action;
   const label = action.replace(/[._]/g, " ").trim();
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
@@ -99,9 +103,9 @@ export default async function JobDetailPage({
       orderLines: { orderBy: { createdAt: "asc" } },
       orderNotes: { orderBy: { createdAt: "desc" }, take: 50, include: { author: { select: { fullName: true } } } },
       additionalClients: { include: { client: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+      customerTeam: { select: { id: true, name: true, members: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       gallery: { select: { id: true, slug: true, status: true, mediaCount: true } },
       invoice: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true, amountDue: true, amountPaid: true, payToken: true } },
-      statusHistory: { orderBy: { createdAt: "desc" }, take: 15 },
       _count: { select: { rawFiles: true } },
     },
   });
@@ -123,16 +127,22 @@ export default async function JobDetailPage({
   }
 
   const [workspace, activityLog, clientOrderCount, clientBalanceAgg, customerTeams, catalogItems] = await Promise.all([
-    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { timezone: true } }),
+    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { timezone: true, defaultTaxRate: true } }),
     prisma.activityLog.findMany({
       where: { workspaceId, entityType: "job", entityId: job.id },
       orderBy: { createdAt: "desc" },
-      take: 30,
+      take: 60,
       include: { user: { select: { fullName: true } } },
     }),
     prisma.job.count({ where: { workspaceId, clientId: job.clientId } }),
     prisma.invoice.aggregate({
-      where: { workspaceId, clientId: job.clientId, status: { in: ["SENT", "VIEWED", "PARTIAL", "OVERDUE"] } },
+      where: {
+        workspaceId,
+        clientId: job.customerTeam
+          ? { in: job.customerTeam.members.map((m) => m.id) }
+          : job.clientId,
+        status: { in: ["SENT", "VIEWED", "PARTIAL", "OVERDUE"] },
+      },
       _sum: { amountDue: true },
     }),
     prisma.customerTeam.findMany({
@@ -171,6 +181,11 @@ export default async function JobDetailPage({
       .formatToParts(now)
       .find((part) => part.type === "timeZoneName")?.value ?? tz;
   const tempUnit: "F" | "C" = US_STATES.has(job.propertyState.trim().toUpperCase()) ? "F" : "C";
+
+  // Dismissible attention: hidden while the dismissed key matches the current
+  // reasons — any change in reasons brings the card back.
+  const attentionKey = attention.slice().sort().join("|").slice(0, 500);
+  const attentionVisible = attention.length > 0 && job.attentionDismissedKey !== attentionKey;
 
   const primaryAssignment = job.assignments.find((a) => a.isPrimary);
   const primaryPhotographer = primaryAssignment?.staff.member.user;
@@ -242,30 +257,26 @@ export default async function JobDetailPage({
     .filter((c) => c.currentVersion)
     .map((c) => ({ id: c.id, name: c.currentVersion!.name, basePrice: c.currentVersion!.basePrice }));
 
-  // ── Merged activity timeline ─────────────────────────────────────────────
-  const timeline = [
-    ...activityLog.map((a) => ({
-      when: a.createdAt,
-      text: humanizeAction(a.action),
-      who: a.user?.fullName ?? null,
-    })),
-    ...job.statusHistory.map((h) => ({
-      when: h.createdAt,
-      text: `Status changed to ${JOB_STATUS_LABELS[h.status] ?? h.status}`,
-      who: null as string | null,
-    })),
-  ].sort((a, b) => b.when.getTime() - a.when.getTime());
+  // ── Activity timeline — the order's real event log ───────────────────────
+  const timeline = activityLog.map((a) => ({
+    when: a.createdAt,
+    text: humanizeAction(a.action),
+    who: a.user?.fullName ?? null,
+  }));
 
   // ── Panels ───────────────────────────────────────────────────────────────
 
   const overviewPanel = (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
-        {attention.length > 0 && (
+        {attentionVisible && (
           <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
             <div className="mb-2.5 flex items-center justify-between">
               <h2 className="text-[13px] font-semibold text-amber-900">Needs attention</h2>
-              <span className="text-[11px] font-medium text-amber-700">Next: {nextAction}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-amber-700">Next: {nextAction}</span>
+                <DismissAttentionButton jobId={job.id} attentionKey={attentionKey} />
+              </span>
             </div>
             <div className="space-y-2">
               {attention.map((reason) => (
@@ -301,6 +312,7 @@ export default async function JobDetailPage({
           } : null}
           catalogItems={catalogOptions}
           appointments={apptOptions}
+          wsTaxRate={workspace?.defaultTaxRate ?? 0}
           invoiceAction={
             <JobAutoInvoiceButton
               jobId={job.id}
@@ -360,7 +372,15 @@ export default async function JobDetailPage({
           }))}
           balance={clientBalanceAgg._sum.amountDue ?? 0}
           ordersCount={clientOrderCount}
-          teamId={job.customerTeamId}
+          team={job.customerTeam ? {
+            id: job.customerTeam.id,
+            name: job.customerTeam.name,
+            members: job.customerTeam.members.map((m) => ({
+              id: m.id,
+              name: `${m.firstName} ${m.lastName}`,
+              email: m.email,
+            })),
+          } : null}
           teams={customerTeams}
         />
 

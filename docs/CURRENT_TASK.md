@@ -4,7 +4,7 @@ _Update after every major milestone: goal, progress, failures, exact next step. 
 
 ## Status
 
-No task in flight. The 2026-07-24 big feature round is shipped and verified: pre-delivery email modal (editable subject/message/CC, silent delivery, mark-paid), inline invoice with live sync, deletable + custom order lines, pro photo management (drag reorder, multi-select, shortcuts, lightbox, cover = first photo), per-listing download payment gate, raw files → send to editor, Client card (balance, multiple clients, team attachment), and availability softened to warnings.
+No task in flight. Latest round (2026-07-24, second): invoice is a live mirror of the order (money re-synced on every billing change, "Not sent · updates with the order"); coupon apply/remove and removable tax on the Services & Billing card; dismissible Needs Attention (returns when reasons change); real order activity log via `logOrderActivity` (assigned, rescheduled, services, coupon/tax, payments, invoice sent, clients, team, delivery, uploads w/ collapse) — timeline no longer shows status-history noise; team-as-client card (team header, member list, primary contact selection, team-wide balance, teams in the Change picker).
 
 ## DEFERRED WORK — the authoritative "later" list (owner: track these!)
 
@@ -22,6 +22,7 @@ No task in flight. The 2026-07-24 big feature round is shipped and verified: pre
 
 **Billing:**
 - Invoice adjustments/discounts itemization; reconcile invoices whose orders gained lines BEFORE the sync existed (sync only covers changes going forward; unmatched removals deliberately don't touch the invoice).
+- Tax rules (owner 2026-07-24): user-created tax rates applied automatically per territory or order form (`TODO(tax-rules)` in jobs.setOrderTax). Coupon-apply on orders shipped but not live-tested (no coupons exist in the test workspace).
 
 **Media:**
 - Thumbnail generation pipeline (grids serve full-size images).

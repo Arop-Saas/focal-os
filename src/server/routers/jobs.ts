@@ -8,6 +8,7 @@ import { findOrCreateProperty } from "@/lib/orders/property";
 import { quoteOrderLines, snapshotAndGenerate, applyOrderAdjustments } from "@/lib/orders/pricing";
 import { createInvoiceForJob, InvoiceExistsError } from "@/lib/money/invoice";
 import { sendCustomDeliveryEmail, sendInternalEmail } from "@/lib/resend";
+import { logOrderActivity } from "@/lib/orders/activity";
 import { twilightWindow } from "@/lib/scheduling/solar";
 import { z as zod } from "zod";
 import { notifyJobRescheduled } from "@/lib/notify";
@@ -76,9 +77,34 @@ const JobCreateSchema = z.object({
   assignedStaffIds: z.array(z.string()).default([]),
 });
 
-/** Keep the order's invoice in lockstep when lines are added/removed.
- * Adds/removes the matching InvoiceLineItem and adjusts totals using the
- * invoice's own tax rate. A PAID invoice that gains charges drops to PARTIAL. */
+/** Mirror the invoice's money from the ORDER — the invoice is a live view of
+ * the order until paid. Call inside the same tx AFTER the job totals update. */
+async function mirrorInvoiceFromJob(tx: Prisma.TransactionClient, jobId: string) {
+  const job = await tx.job.findUnique({
+    where: { id: jobId },
+    select: { subtotal: true, taxAmount: true, discountAmount: true, totalAmount: true },
+  });
+  const invoice = await tx.invoice.findUnique({ where: { jobId } });
+  if (!job || !invoice || invoice.status === "VOID") return;
+  const newDue = Math.max(0, job.totalAmount - invoice.amountPaid);
+  await tx.invoice.update({
+    where: { id: invoice.id },
+    data: {
+      subtotal: job.subtotal,
+      taxAmount: job.taxAmount,
+      discountAmount: job.discountAmount,
+      totalAmount: job.totalAmount,
+      amountDue: newDue,
+      status:
+        invoice.status === "PAID" && newDue > 0 ? "PARTIAL" :
+        (invoice.status === "PARTIAL" || invoice.status === "PAID") && newDue <= 0 ? "PAID" :
+        invoice.status,
+    },
+  });
+}
+
+/** Add/remove the matching InvoiceLineItem, then mirror totals from the job.
+ * Removals only touch line items the invoice actually carries. */
 async function syncInvoiceLine(
   tx: Prisma.TransactionClient,
   args: {
@@ -96,9 +122,6 @@ async function syncInvoiceLine(
   });
   if (!invoice || invoice.status === "VOID") return;
 
-  const lineTax = (args.totalPrice * (invoice.taxRate ?? 0)) / 100;
-  const delta = (args.totalPrice + lineTax) * (args.mode === "ADD" ? 1 : -1);
-
   if (args.mode === "ADD") {
     await tx.invoiceLineItem.create({
       data: {
@@ -114,29 +137,9 @@ async function syncInvoiceLine(
     const match = invoice.lineItems.find(
       (li) => li.description === args.description && Math.abs(li.totalPrice - args.totalPrice) < 0.005
     );
-    // Only adjust totals for lines the invoice actually carries — removing an
-    // order line that predates the invoice sync must not corrupt the invoice.
-    if (!match) return;
-    await tx.invoiceLineItem.delete({ where: { id: match.id } });
+    if (match) await tx.invoiceLineItem.delete({ where: { id: match.id } });
   }
-
-  const newSubtotal = Math.max(0, invoice.subtotal + args.totalPrice * (args.mode === "ADD" ? 1 : -1));
-  const newTax = Math.max(0, invoice.taxAmount + lineTax * (args.mode === "ADD" ? 1 : -1));
-  const newTotal = Math.max(0, invoice.totalAmount + delta);
-  const newDue = Math.max(0, newTotal - invoice.amountPaid);
-  await tx.invoice.update({
-    where: { id: invoice.id },
-    data: {
-      subtotal: newSubtotal,
-      taxAmount: newTax,
-      totalAmount: newTotal,
-      amountDue: newDue,
-      status:
-        invoice.status === "PAID" && newDue > 0 ? "PARTIAL" :
-        invoice.status === "PARTIAL" && newDue <= 0 ? "PAID" :
-        invoice.status,
-    },
-  });
+  await mirrorInvoiceFromJob(tx, args.jobId);
 }
 
 export const jobsRouter = router({
@@ -886,6 +889,17 @@ export const jobsRouter = router({
         },
       });
 
+      const assignedStaff = await ctx.prisma.staffProfile.findUnique({
+        where: { id: input.staffId },
+        select: { member: { select: { user: { select: { fullName: true } } } } },
+      });
+      await logOrderActivity(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        jobId: input.jobId,
+        userId: ctx.user.id,
+        message: `Photographer assigned — ${assignedStaff?.member.user.fullName ?? "team member"}`,
+      });
+
       // Fire-and-forget: push to Google Calendar if photographer has connected
       if (jobForNotify?.scheduledAt && staffForNotify) {
         const photographerUser = await ctx.prisma.user.findUnique({
@@ -1001,6 +1015,124 @@ export const jobsRouter = router({
       };
     }),
 
+  /** Apply a coupon to the order — totals and invoice update live. */
+  applyCoupon: workspaceProcedure
+    .input(zod.object({ jobId: zod.string(), code: zod.string().min(1).max(40) }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        include: { client: { select: { email: true } } },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      const coupon = await ctx.prisma.coupon.findUnique({
+        where: { workspaceId_code: { workspaceId: ctx.workspace.id, code: input.code.trim().toUpperCase() } },
+      });
+      const valid =
+        coupon &&
+        coupon.isActive &&
+        (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
+        (coupon.maxUses == null || coupon.usedCount < coupon.maxUses);
+      if (!valid) throw new TRPCError({ code: "BAD_REQUEST", message: "That coupon code isn't valid" });
+
+      const discount =
+        coupon.discountType === "PERCENTAGE"
+          ? Math.round(job.subtotal * coupon.discountValue) / 100
+          : Math.min(coupon.discountValue, job.subtotal);
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.job.update({
+          where: { id: job.id },
+          data: {
+            discountAmount: job.discountAmount + discount,
+            totalAmount: Math.max(0, job.totalAmount - discount),
+          },
+        });
+        await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+        await tx.couponUsage.create({
+          data: { couponId: coupon.id, orderId: job.id, email: job.client.email },
+        });
+        await mirrorInvoiceFromJob(tx, job.id);
+        await logOrderActivity(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: job.id,
+          userId: ctx.user.id,
+          message: `Coupon ${coupon.code} applied — $${discount.toFixed(2)} off`,
+        });
+      });
+      return { discount };
+    }),
+
+  /** Clear the order's discount (coupon usage stays counted). */
+  removeOrderDiscount: workspaceProcedure
+    .input(zod.object({ jobId: zod.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        select: { id: true, discountAmount: true, totalAmount: true },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      if (job.discountAmount <= 0) return { ok: true };
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.job.update({
+          where: { id: job.id },
+          data: { discountAmount: 0, totalAmount: job.totalAmount + job.discountAmount },
+        });
+        await mirrorInvoiceFromJob(tx, job.id);
+        await logOrderActivity(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: job.id,
+          userId: ctx.user.id,
+          message: "Discount removed",
+        });
+      });
+      return { ok: true };
+    }),
+
+  /** Toggle tax on the order at the workspace default rate.
+   * TODO(tax-rules): territory/order-form specific tax rates. */
+  setOrderTax: workspaceProcedure
+    .input(zod.object({ jobId: zod.string(), apply: zod.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        select: { id: true, subtotal: true, taxAmount: true, discountAmount: true, priorityFee: true },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      const rate = ctx.workspace.defaultTaxRate ?? 0;
+      const newTax = input.apply ? Math.round(job.subtotal * rate) / 100 : 0;
+      const newTotal = Math.max(0, job.subtotal + job.priorityFee - job.discountAmount + newTax);
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.job.update({
+          where: { id: job.id },
+          data: { taxAmount: newTax, totalAmount: newTotal },
+        });
+        await mirrorInvoiceFromJob(tx, job.id);
+        await logOrderActivity(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: job.id,
+          userId: ctx.user.id,
+          message: input.apply ? `Tax applied (${rate}%)` : "Tax removed",
+        });
+      });
+      return { ok: true };
+    }),
+
+  /** Dismiss the Needs Attention card for the current set of reasons —
+   * it reappears automatically when the reasons change. */
+  dismissAttention: workspaceProcedure
+    .input(zod.object({ jobId: zod.string(), key: zod.string().max(500) }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id }, select: { id: true },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      await ctx.prisma.job.update({
+        where: { id: job.id },
+        data: { attentionDismissedKey: input.key },
+      });
+      return { ok: true };
+    }),
+
   /** Prefill data for the deliver modal. */
   deliveryPreview: workspaceProcedure
     .input(zod.object({ jobId: zod.string() }))
@@ -1092,7 +1224,7 @@ export const jobsRouter = router({
           data: {
             workspaceId: ctx.workspace.id,
             userId: ctx.user.id,
-            action: input.silent ? "order.delivered_silently" : "order.delivered",
+            action: input.silent ? "Order delivered silently" : "Order delivered — client emailed",
             entityType: "job",
             entityId: job.id,
           },
@@ -1140,11 +1272,21 @@ export const jobsRouter = router({
       if (job.clientId === input.clientId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Already the primary client on this order" });
       }
-      return ctx.prisma.jobClient.upsert({
+      const row = await ctx.prisma.jobClient.upsert({
         where: { jobId_clientId: { jobId: job.id, clientId: client.id } },
         update: {},
         create: { jobId: job.id, clientId: client.id },
       });
+      const c = await ctx.prisma.client.findUnique({
+        where: { id: client.id }, select: { firstName: true, lastName: true },
+      });
+      await logOrderActivity(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        jobId: job.id,
+        userId: ctx.user.id,
+        message: `Client added — ${c?.firstName ?? ""} ${c?.lastName ?? ""}`.trim(),
+      });
+      return row;
     }),
 
   removeOrderClient: workspaceProcedure
@@ -1155,6 +1297,15 @@ export const jobsRouter = router({
       });
       if (!job) throw new TRPCError({ code: "NOT_FOUND" });
       await ctx.prisma.jobClient.deleteMany({ where: { jobId: job.id, clientId: input.clientId } });
+      const c = await ctx.prisma.client.findUnique({
+        where: { id: input.clientId }, select: { firstName: true, lastName: true },
+      });
+      await logOrderActivity(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        jobId: job.id,
+        userId: ctx.user.id,
+        message: `Client removed — ${c?.firstName ?? ""} ${c?.lastName ?? ""}`.trim(),
+      });
       return { ok: true };
     }),
 
@@ -1172,10 +1323,20 @@ export const jobsRouter = router({
         });
         if (!team) throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
       }
-      return ctx.prisma.job.update({
+      const updated = await ctx.prisma.job.update({
         where: { id: job.id },
         data: { customerTeamId: input.customerTeamId },
       });
+      const teamName = input.customerTeamId
+        ? (await ctx.prisma.customerTeam.findUnique({ where: { id: input.customerTeamId }, select: { name: true } }))?.name
+        : null;
+      await logOrderActivity(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        jobId: job.id,
+        userId: ctx.user.id,
+        message: teamName ? `Team attached — ${teamName}` : "Team detached",
+      });
+      return updated;
     }),
 
   /** Notify a workspace member that raw files are ready for editing. */
@@ -1257,6 +1418,12 @@ export const jobsRouter = router({
           unitPrice: line.unitPrice,
           totalPrice: line.totalPrice,
         });
+        await logOrderActivity(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: line.job.id,
+          userId: ctx.user.id,
+          message: `Service removed — ${line.name}`,
+        });
       });
       return { ok: true };
     }),
@@ -1318,6 +1485,12 @@ export const jobsRouter = router({
           propertyId = property.id;
         }
 
+        await logOrderActivity(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: job.id,
+          userId: ctx.user.id,
+          message: clientId ? "Primary client changed" : addressChanged ? "Property address updated" : "Order details updated",
+        });
         return tx.job.update({
           where: { id: job.id },
           data: {
@@ -1379,6 +1552,17 @@ export const jobsRouter = router({
                 : { status: "CANCELLED" },
           });
         }
+      });
+      await logOrderActivity(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        jobId: appt.jobId,
+        userId: ctx.user.id,
+        message:
+          input.action === "RESCHEDULE"
+            ? `Appointment rescheduled${input.scheduledAt ? ` — ${input.scheduledAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}`
+            : input.action === "POSTPONE"
+            ? "Appointment postponed"
+            : "Appointment cancelled",
       });
       return { ok: true };
     }),
@@ -1516,6 +1700,12 @@ export const jobsRouter = router({
           unitPrice: line.unitPrice,
           totalPrice: line.totalPrice,
         });
+        await logOrderActivity(tx, {
+          workspaceId: ctx.workspace.id,
+          jobId: job.id,
+          userId: ctx.user.id,
+          message: `Service added — ${line.name} ($${line.totalPrice.toFixed(2)})`,
+        });
       });
 
       return { line };
@@ -1558,9 +1748,18 @@ export const jobsRouter = router({
         select: { id: true },
       });
       if (!job) throw new TRPCError({ code: "NOT_FOUND" });
-      return ctx.prisma.rawFile.create({
+      const created = await ctx.prisma.rawFile.create({
         data: { ...input, workspaceId: ctx.workspace.id, uploadedByUserId: ctx.user.id },
       });
+      await logOrderActivity(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        jobId: input.jobId,
+        userId: ctx.user.id,
+        message: `Raw file uploaded — ${input.originalName}`,
+        collapseKey: "raw-upload",
+        plural: (n) => `${n} raw files uploaded`,
+      });
+      return created;
     }),
 
   deleteRawFile: workspaceProcedure
