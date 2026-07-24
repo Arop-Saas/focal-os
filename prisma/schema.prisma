@@ -117,6 +117,7 @@ model Workspace {
   productRules     ProductRule[]
   orderLineSnapshots OrderLineSnapshot[]
   teamTasks        TeamTask[]
+  rawFiles         RawFile[]
   pricingPlans     PricingPlan[]
   adjustmentPolicies AdjustmentPolicy[]
 
@@ -230,6 +231,7 @@ model User {
   jobNotes      JobNote[]
   teamTasksAssigned TeamTask[] @relation("TeamTaskAssignee")
   teamTasksCreated  TeamTask[] @relation("TeamTaskCreator")
+  rawFilesUploaded  RawFile[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -755,6 +757,7 @@ model Job {
   orderNotes      JobNote[]
   orderLines      OrderLineSnapshot[]
   teamTasks       TeamTask[]
+  rawFiles        RawFile[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1015,6 +1018,28 @@ model TeamTask {
   updatedAt  DateTime @updatedAt
 
   @@index([workspaceId, completedAt])
+  @@index([jobId])
+}
+
+// Raw capture files uploaded against an order (command center → Raw files).
+// Stored in the private media bucket under raw/<jobId>/; served via signed URLs.
+model RawFile {
+  id               String @id @default(cuid())
+  workspaceId      String
+  jobId            String
+  fileName         String
+  originalName     String
+  mimeType         String
+  fileSize         Int
+  storageKey       String
+  uploadedByUserId String?
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job        Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  uploadedBy User?     @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime @default(now())
+
   @@index([jobId])
 }
 

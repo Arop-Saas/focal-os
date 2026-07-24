@@ -138,7 +138,7 @@ export const galleryRouter = router({
         storageKey: z.string(),
         cdnUrl: z.string().nullish(), // null for private-bucket media (S4)
         mediaType: z
-          .enum(["PHOTO", "VIDEO", "DRONE_PHOTO", "DRONE_VIDEO", "FLOOR_PLAN", "VIRTUAL_TOUR"])
+          .enum(["PHOTO", "VIDEO", "DRONE_PHOTO", "DRONE_VIDEO", "FLOOR_PLAN", "VIRTUAL_TOUR", "DOCUMENT"])
           .default("PHOTO"),
         isCover: z.boolean().default(false),
       })

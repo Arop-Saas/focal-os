@@ -24,7 +24,7 @@ export const ORDER_STAGE_LABELS: Record<OrderStage, string> = {
   SCHEDULED: "Scheduled",
   CAPTURE: "Shoot day",
   PRODUCTION: "In production",
-  QA: "QA",
+  QA: "Quality Check",
   READY: "Ready",
   DELIVERED: "Delivered",
   CLOSED: "Closed",
@@ -63,7 +63,15 @@ export function computeOrderStage(input: StageInput): OrderStage {
   if (jobStatus === "COMPLETED") return "CLOSED";
   if (jobStatus === "DELIVERED" || input.deliveredAt) return "DELIVERED";
 
-  // Production dimension (most specific available signal)
+  // Explicit lifecycle statuses win next, in BOTH directions — when someone
+  // manually moves an order back to "In progress" the bar must follow, not
+  // stay pinned by the production dimension.
+  if (jobStatus === "REVIEW") return "QA";
+  if (jobStatus === "EDITING") return "PRODUCTION";
+  if (jobStatus === "IN_PROGRESS") return "CAPTURE";
+
+  // Production dimension — drives the stage while the order sits in the
+  // ambiguous early statuses (PENDING / CONFIRMED / ASSIGNED).
   const tasks = input.productionTasks ?? [];
   if (tasks.length > 0) {
     const active = tasks.filter((t) => t.status !== "READY");
@@ -72,14 +80,10 @@ export function computeOrderStage(input: StageInput): OrderStage {
     return "PRODUCTION";
   }
 
-  // Legacy production signal from the job lifecycle
-  if (jobStatus === "EDITING") return "PRODUCTION";
-  if (jobStatus === "REVIEW") return "QA";
-
   // Capture dimension
   const appts = input.appointments ?? [];
   const anyLive = appts.some((a) => a.status === "EN_ROUTE" || a.status === "ARRIVED");
-  if (anyLive || jobStatus === "IN_PROGRESS") return "CAPTURE";
+  if (anyLive) return "CAPTURE";
   const allCaptured = appts.length > 0 && appts.every((a) => a.status === "CAPTURED" || a.status === "CANCELLED");
   if (allCaptured && appts.some((a) => a.status === "CAPTURED")) return "PRODUCTION";
 

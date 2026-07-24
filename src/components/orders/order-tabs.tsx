@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Send, Zap } from "lucide-react";
+import { ArrowLeft, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DIM_BADGE } from "./status-meta";
 
@@ -13,12 +13,6 @@ import { DIM_BADGE } from "./status-meta";
  * owns which panel is visible.
  */
 
-export interface OrderDimension {
-  label: string;
-  value: string;
-  cls: string;
-}
-
 export interface OrderTabDef {
   key: string;
   label: string;
@@ -28,7 +22,6 @@ interface OrderTabsProps {
   address: string;
   metaLine: string;
   isRush: boolean;
-  dimensions: OrderDimension[];
   /** index into progressSteps; -1 = nothing filled */
   progressStep: number;
   progressSteps: string[];
@@ -44,7 +37,6 @@ export function OrderTabs({
   address,
   metaLine,
   isRush,
-  dimensions,
   progressStep,
   progressSteps,
   showProgress,
@@ -90,31 +82,13 @@ export function OrderTabs({
                 <p className="mt-0.5 truncate text-[13px] text-gray-400">{metaLine}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2 pt-4">
-                <button
-                  onClick={() => switchTab("messages")}
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50"
-                >
-                  <Send className="h-3.5 w-3.5" /> Message client
-                </button>
                 {headerActions}
               </div>
             </div>
 
-            {/* Status dimensions */}
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
-              {dimensions.map((d) => (
-                <div key={d.label} className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
-                    {d.label}
-                  </span>
-                  <span className={cn(DIM_BADGE, d.cls)}>{d.value}</span>
-                </div>
-              ))}
-            </div>
-
             {/* Progress line */}
             {showProgress && (
-              <div className="mt-3 flex items-center gap-1">
+              <div className="mt-4 flex items-center gap-1">
                 {progressSteps.map((s, i) => (
                   <div key={s} className="flex-1">
                     <div className={cn("h-1 rounded-full", i <= progressStep ? "bg-blue-600" : "bg-gray-200")} />
@@ -132,7 +106,7 @@ export function OrderTabs({
             )}
 
             {/* Tabs */}
-            <div className="mt-2 flex items-center gap-0.5 overflow-x-auto">
+            <div className="mt-2 flex items-center gap-0.5">
               {tabs.map((t) => (
                 <button
                   key={t.key}

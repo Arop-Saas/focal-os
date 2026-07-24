@@ -54,10 +54,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "galleryId, fileName, and mimeType are required" }, { status: 400 });
     }
 
-    // Validate file type
+    // Validate file type. The "Other" section (DOCUMENT) accepts any file.
+    const isDocument = mediaTypeHint === "DOCUMENT";
     const isImage = IMAGE_TYPES.has(mimeType);
     const isVideo = VIDEO_TYPES.has(mimeType);
-    if (!isImage && !isVideo) {
+    if (!isDocument && !isImage && !isVideo) {
       return NextResponse.json(
         { error: `File type not allowed: ${mimeType}` },
         { status: 400 }
@@ -65,9 +66,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate file size
-    const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+    const maxSize = isDocument || isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
     if (fileSize > maxSize) {
-      const limitLabel = isVideo ? "500MB" : "25MB";
+      const limitLabel = isDocument || isVideo ? "500MB" : "25MB";
       return NextResponse.json(
         { error: `File too large. Maximum size is ${limitLabel}.` },
         { status: 400 }
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       originalName: fileName,
       mimeType,
       fileSize,
-      mediaType: isVideo ? "VIDEO" : mediaTypeHint === "FLOOR_PLAN" ? "FLOOR_PLAN" : "PHOTO",
+      mediaType: isDocument ? "DOCUMENT" : isVideo ? "VIDEO" : mediaTypeHint === "FLOOR_PLAN" ? "FLOOR_PLAN" : "PHOTO",
     });
   } catch (err) {
     console.error("Upload URL route error:", err);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { Trash2, Loader2, AlertTriangle } from "lucide-react";
@@ -25,13 +26,15 @@ export function JobDeleteButton({ jobId, jobNumber }: JobDeleteButtonProps) {
     <>
       <button
         onClick={() => setShowConfirm(true)}
-        className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 px-3 py-2 rounded-lg transition-colors"
+        aria-label="Delete order"
+        title="Delete order"
+        className="rounded-lg border border-red-200 bg-white p-2 text-red-600 transition-colors hover:border-red-300 hover:bg-red-50"
       >
-        <Trash2 className="w-3.5 h-3.5" />
-        Delete
+        <Trash2 className="w-4 h-4" />
       </button>
 
-      {showConfirm && (
+      {/* Portaled so ancestor backdrop-blur (sticky header) can't trap the fixed overlay */}
+      {showConfirm && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
             <div className="flex items-center gap-3 mb-4">
@@ -69,7 +72,8 @@ export function JobDeleteButton({ jobId, jobNumber }: JobDeleteButtonProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

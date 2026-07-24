@@ -3,34 +3,32 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { resolveWorkspaceId } from "@/lib/resolve-workspace";
-import { formatCurrency, JOB_STATUS_COLORS, JOB_STATUS_LABELS, cn } from "@/lib/utils";
+import { formatCurrency, cn, JOB_STATUS_LABELS } from "@/lib/utils";
 import { fmtInTz } from "@/lib/scheduling/tz";
 import { computeOrderAttention } from "@/lib/orders/attention";
 import type { OrderStage } from "@/lib/orders/stage";
+import { geocodeAddress } from "@/lib/geocode";
+import { mediaViewUrl } from "@/lib/gallery-security";
 import {
-  Bath, BedDouble, Building2, Calendar, Camera, ChevronRight, Clock, FileText,
-  Home, KeyRound, Mail, Package, Phone, Receipt, Ruler, Sunset, User,
+  Building2, ChevronRight, FileText, Home, Image as ImageIcon, KeyRound,
+  Mail, Phone, User, Video,
 } from "lucide-react";
-import { OrderTabs, type OrderDimension } from "@/components/orders/order-tabs";
-import { ProductionTaskList, type ProductionTaskRow } from "@/components/orders/production-task-list";
+import { OrderTabs } from "@/components/orders/order-tabs";
 import { OrderNotes, type OrderNoteRow } from "@/components/orders/order-notes";
-import { DIM_BADGE, APPOINTMENT_STATUS_META, PRODUCTION_TASK_TYPE_LABELS } from "@/components/orders/status-meta";
+import { OrderAppointments, type AppointmentRow } from "@/components/orders/order-appointments";
+import { ServicesBilling } from "@/components/orders/services-billing";
+import { Property3DMap } from "@/components/orders/property-3d-map";
+import { RawFilesTab } from "@/components/orders/raw-files-tab";
+import { DeliverButton } from "@/components/orders/deliver-button";
+import { DIM_BADGE } from "@/components/orders/status-meta";
 import { JobStatusUpdater } from "@/components/jobs/job-status-updater";
 import { JobDeleteButton } from "@/components/jobs/job-delete-button";
 import { JobGalleryCard } from "@/components/jobs/job-gallery-card";
-import { JobAssignmentPicker } from "@/components/jobs/job-assignment-picker";
-import { JobMessageThread } from "@/components/messages/job-message-thread";
-import { JobChecklist } from "@/components/jobs/job-checklist";
 import { JobAutoInvoiceButton } from "@/components/invoices/job-auto-invoice-button";
-import { JobScheduleEditor } from "@/components/jobs/job-schedule-editor";
-import { JobPropertyMap } from "@/components/jobs/job-property-map";
-import { JobWeatherCard } from "@/components/jobs/job-weather-card";
-import { AddProductionTask } from "@/components/orders/add-production-task";
-import { TeamTasksCard } from "@/components/orders/team-tasks-card";
 
 export const dynamic = "force-dynamic";
 
-const PROGRESS_STEPS = ["Scheduled", "Captured", "Editing", "QA", "Ready", "Delivered"];
+const PROGRESS_STEPS = ["Scheduled", "Captured", "Editing", "Quality Check", "Ready", "Delivered"];
 
 const STAGE_TO_STEP: Record<OrderStage, number> = {
   NEEDS_SCHEDULING: -1,
@@ -48,24 +46,12 @@ const STAGE_TO_STEP: Record<OrderStage, number> = {
 const TABS = [
   { key: "overview", label: "Overview" },
   { key: "files", label: "Files & Delivery" },
-  { key: "production", label: "Production" },
-  { key: "billing", label: "Billing" },
-  { key: "messages", label: "Messages" },
+  { key: "raw", label: "Raw files" },
   { key: "activity", label: "Activity" },
 ];
 
-const TIME_FMT: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
 const DATE_FMT: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
 const FULL_FMT: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
-
-/** Reasons whose fix lives on another tab get a jump link; the rest are fixed right on Overview. */
-function attentionLink(reason: string, jobId: string): { label: string; href: string } | null {
-  const r = reason.toLowerCase();
-  if (r.includes("invoice") || r.includes("payment")) return { label: "Open billing", href: `/jobs/${jobId}?tab=billing` };
-  if (r.includes("qa") || r.includes("production")) return { label: "Open production", href: `/jobs/${jobId}?tab=production` };
-  if (r.includes("deliver")) return { label: "Open delivery", href: `/jobs/${jobId}?tab=files` };
-  return null;
-}
 
 function humanizeAction(action: string): string {
   const label = action.replace(/[._]/g, " ").trim();
@@ -103,13 +89,19 @@ export default async function JobDetailPage({
           },
         },
       },
-      productionTasks: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        include: { assignee: { include: { member: { include: { user: { select: { fullName: true } } } } } } },
-      },
+      productionTasks: { select: { status: true, dueAt: true } },
       orderLines: { orderBy: { createdAt: "asc" } },
       orderNotes: { orderBy: { createdAt: "desc" }, take: 50, include: { author: { select: { fullName: true } } } },
-      gallery: { select: { id: true, slug: true, status: true, mediaCount: true } },
+      gallery: {
+        select: {
+          id: true, slug: true, status: true, mediaCount: true,
+          media: {
+            orderBy: { sortOrder: "asc" },
+            take: 60,
+            select: { id: true, mediaType: true, storageKey: true, cdnUrl: true, thumbnailKey: true, originalName: true },
+          },
+        },
+      },
       invoice: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true, amountDue: true } },
       statusHistory: { orderBy: { createdAt: "desc" }, take: 15 },
     },
@@ -117,7 +109,21 @@ export default async function JobDetailPage({
 
   if (!job) notFound();
 
-  const [workspace, activityLog, clientOrderCount, staffOptions] = await Promise.all([
+  // Lazy coordinate backfill — admin-created orders have no lat/lng until now
+  let lat = job.propertyLat;
+  let lng = job.propertyLng;
+  if (lat == null || lng == null) {
+    const geo = await geocodeAddress(
+      `${job.propertyAddress}, ${job.propertyCity}, ${job.propertyState} ${job.propertyZip ?? ""}`
+    );
+    if (geo) {
+      lat = geo.lat;
+      lng = geo.lng;
+      await prisma.job.update({ where: { id: job.id }, data: { propertyLat: lat, propertyLng: lng } });
+    }
+  }
+
+  const [workspace, activityLog, clientOrderCount, catalogItems] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, select: { timezone: true } }),
     prisma.activityLog.findMany({
       where: { workspaceId, entityType: "job", entityId: job.id },
@@ -126,13 +132,12 @@ export default async function JobDetailPage({
       include: { user: { select: { fullName: true } } },
     }),
     prisma.job.count({ where: { workspaceId, clientId: job.clientId } }),
-    prisma.staffProfile.findMany({
-      where: { workspaceId, isActive: true },
-      select: { id: true, member: { select: { user: { select: { fullName: true } } } } },
-      orderBy: { member: { user: { fullName: "asc" } } },
+    prisma.catalogItem.findMany({
+      where: { workspaceId, state: "PUBLISHED" },
+      select: { id: true, currentVersion: { select: { name: true, basePrice: true } } },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
-  const staffForTasks = staffOptions.map((s) => ({ id: s.id, name: s.member.user.fullName }));
   const tz = workspace?.timezone ?? "America/New_York";
   const now = new Date();
 
@@ -141,7 +146,7 @@ export default async function JobDetailPage({
     jobStatus: job.status,
     scheduledAt: job.scheduledAt,
     appointments: job.appointments.map((a) => ({ status: a.status, scheduledAt: a.scheduledAt })),
-    productionTasks: job.productionTasks.map((t) => ({ status: t.status, dueAt: t.dueAt })),
+    productionTasks: job.productionTasks,
     invoiceStatus: job.invoice?.status ?? null,
     deliveredAt: job.deliveredAt,
     hasAssignment: job.assignments.length > 0,
@@ -153,99 +158,72 @@ export default async function JobDetailPage({
   const primaryAssignment = job.assignments.find((a) => a.isPrimary);
   const primaryPhotographer = primaryAssignment?.staff.member.user;
   const isRush = job.priority === "URGENT";
-
-  // ── Status dimensions ────────────────────────────────────────────────────
   const activeAppts = job.appointments.filter((a) => a.status !== "CANCELLED");
-  const capturedCount = activeAppts.filter((a) => a.status === "CAPTURED").length;
-  const unscheduledCount = activeAppts.filter((a) => !a.scheduledAt).length;
 
-  let apptDim: OrderDimension;
-  if (activeAppts.length === 0) {
-    apptDim = { label: "Appointments", value: "None yet", cls: "border-gray-200 bg-gray-50 text-gray-500" };
-  } else if (unscheduledCount > 0) {
-    apptDim = { label: "Appointments", value: `${unscheduledCount} unscheduled`, cls: "border-amber-200 bg-amber-50 text-amber-700" };
-  } else if (capturedCount === activeAppts.length) {
-    apptDim = { label: "Appointments", value: activeAppts.length > 1 ? "All captured" : "Captured", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" };
-  } else if (capturedCount > 0) {
-    apptDim = { label: "Appointments", value: `${capturedCount} of ${activeAppts.length} captured`, cls: "border-violet-200 bg-violet-50 text-violet-700" };
-  } else {
-    apptDim = { label: "Appointments", value: `${activeAppts.length} scheduled`, cls: "border-blue-200 bg-blue-50 text-blue-700" };
-  }
-
-  const tasks = job.productionTasks;
-  let prodDim: OrderDimension;
-  if (tasks.length === 0) {
-    prodDim = { label: "Production", value: "No tasks", cls: "border-gray-200 bg-gray-50 text-gray-500" };
-  } else if (tasks.every((t) => t.status === "READY")) {
-    prodDim = { label: "Production", value: "Ready", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" };
-  } else if (tasks.some((t) => t.status === "QA")) {
-    prodDim = { label: "Production", value: "QA", cls: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700" };
-  } else if (tasks.some((t) => t.status === "REVISION")) {
-    prodDim = { label: "Production", value: "Revision", cls: "border-amber-200 bg-amber-50 text-amber-700" };
-  } else if (tasks.some((t) => t.status === "IN_PROGRESS")) {
-    prodDim = { label: "Production", value: "Editing", cls: "border-indigo-200 bg-indigo-50 text-indigo-700" };
-  } else if (tasks.some((t) => t.status === "QUEUED")) {
-    prodDim = { label: "Production", value: "Queued", cls: "border-blue-200 bg-blue-50 text-blue-700" };
-  } else {
-    prodDim = { label: "Production", value: "Waiting files", cls: "border-gray-200 bg-gray-50 text-gray-500" };
-  }
-
-  let payDim: OrderDimension;
-  if (!job.invoice) {
-    payDim = { label: "Payment", value: "Unbilled", cls: "border-gray-200 bg-gray-50 text-gray-500" };
-  } else if (job.invoice.status === "PAID") {
-    payDim = { label: "Payment", value: "Paid", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" };
-  } else if (job.invoice.status === "OVERDUE") {
-    payDim = { label: "Payment", value: `Overdue · ${formatCurrency(job.invoice.amountDue)}`, cls: "border-red-200 bg-red-50 text-red-700" };
-  } else if (job.invoice.status === "DRAFT") {
-    payDim = { label: "Payment", value: "Draft invoice", cls: "border-gray-200 bg-gray-50 text-gray-500" };
-  } else if (job.invoice.status === "VOID" || job.invoice.status === "UNCOLLECTIBLE") {
-    payDim = { label: "Payment", value: job.invoice.status === "VOID" ? "Void" : "Uncollectible", cls: "border-gray-200 bg-gray-50 text-gray-500" };
-  } else {
-    payDim = { label: "Payment", value: `Due · ${formatCurrency(job.invoice.amountDue)}`, cls: "border-amber-200 bg-amber-50 text-amber-700" };
-  }
-
-  let deliveryDim: OrderDimension;
-  if (job.deliveredAt || job.status === "DELIVERED") {
-    deliveryDim = {
-      label: "Delivery",
-      value: job.deliveredAt ? `Delivered ${fmtInTz(job.deliveredAt, tz, DATE_FMT)}` : "Delivered",
-      cls: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    };
-  } else if (stage === "READY") {
-    deliveryDim = { label: "Delivery", value: "Ready", cls: "border-teal-200 bg-teal-50 text-teal-700" };
-  } else if (job.gallery && job.gallery.mediaCount > 0) {
-    deliveryDim = { label: "Delivery", value: "In progress", cls: "border-indigo-200 bg-indigo-50 text-indigo-700" };
-  } else {
-    deliveryDim = { label: "Delivery", value: "Not ready", cls: "border-gray-200 bg-gray-50 text-gray-500" };
-  }
-
-  const dimensions: OrderDimension[] = [
-    { label: "Order", value: JOB_STATUS_LABELS[job.status] ?? job.status, cls: JOB_STATUS_COLORS[job.status] ?? "border-gray-200 bg-gray-50 text-gray-500" },
-    apptDim,
-    prodDim,
-    payDim,
-    deliveryDim,
-  ];
+  // Payment chip for Services & Billing
+  const payChip = !job.invoice
+    ? { value: "Unbilled", cls: "border-gray-200 bg-gray-50 text-gray-500" }
+    : job.invoice.status === "PAID"
+    ? { value: "Paid", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" }
+    : job.invoice.status === "OVERDUE"
+    ? { value: `Overdue · ${formatCurrency(job.invoice.amountDue)}`, cls: "border-red-200 bg-red-50 text-red-700" }
+    : job.invoice.status === "DRAFT"
+    ? { value: "Draft invoice", cls: "border-gray-200 bg-gray-50 text-gray-500" }
+    : { value: `Due · ${formatCurrency(job.invoice.amountDue)}`, cls: "border-amber-200 bg-amber-50 text-amber-700" };
 
   // ── Serialized rows for client components ────────────────────────────────
-  const taskRows: ProductionTaskRow[] = tasks.map((t) => ({
-    id: t.id,
-    title: t.title,
-    typeLabel: PRODUCTION_TASK_TYPE_LABELS[t.type] ?? "Production",
-    status: t.status,
-    assigneeName: t.assignee?.member.user.fullName ?? null,
-    dueLabel: t.dueAt ? fmtInTz(t.dueAt, tz, DATE_FMT) : null,
-    overdue: t.status !== "READY" && t.dueAt != null && t.dueAt.getTime() < now.getTime(),
+  const appointmentRows: AppointmentRow[] = activeAppts.map((a) => ({
+    id: a.id,
+    title: a.title ?? (a.isPrimary ? "Primary shoot" : "Appointment"),
+    isPrimary: a.isPrimary,
+    solar: a.timeConstraint === "SOLAR",
+    status: a.status,
+    scheduledAtISO: a.scheduledAt ? a.scheduledAt.toISOString() : null,
+    durationMins: a.durationMins,
+    crew: a.assignments.map((x) => x.staff.member.user.fullName).filter(Boolean).join(", "),
+    dateKey: a.scheduledAt
+      ? new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(a.scheduledAt)
+      : null,
   }));
 
-  const noteRows: OrderNoteRow[] = job.orderNotes.map((n) => ({
-    id: n.id,
-    kind: n.kind,
-    body: n.body,
-    authorName: n.author?.fullName ?? null,
-    whenLabel: fmtInTz(n.createdAt, tz, FULL_FMT),
+  const noteRows: OrderNoteRow[] = [
+    ...job.orderNotes.map((n) => ({
+      id: n.id,
+      kind: n.kind,
+      body: n.body,
+      authorName: n.author?.fullName ?? null,
+      whenLabel: fmtInTz(n.createdAt, tz, FULL_FMT),
+    })),
+    // Order-form notes surface here too — same section, clearly attributed
+    ...(job.clientNotes
+      ? [{ id: "form-client", kind: "CUSTOMER_INSTRUCTIONS", body: job.clientNotes, authorName: "Order form", whenLabel: fmtInTz(job.createdAt, tz, DATE_FMT) }]
+      : []),
+    ...(job.internalNotes
+      ? [{ id: "form-internal", kind: "INTERNAL", body: job.internalNotes, authorName: "Order form", whenLabel: fmtInTz(job.createdAt, tz, DATE_FMT) }]
+      : []),
+  ];
+
+  const billingLines = job.orderLines.map((l) => ({
+    id: l.id,
+    name: l.name,
+    quantity: l.quantity,
+    totalPrice: l.totalPrice,
+    explanation: Array.isArray(l.explanation) ? (l.explanation as unknown[]).map(String) : [],
   }));
+  const legacyLines = job.package
+    ? [{ id: "pkg", name: job.package.name, quantity: 1, totalPrice: job.subtotal }]
+    : job.services.map((s) => ({ id: s.id, name: s.service.name, quantity: s.quantity, totalPrice: s.totalPrice }));
+
+  const apptOptions = activeAppts.map((a) => ({
+    id: a.id,
+    label: `${a.title ?? (a.isPrimary ? "Primary shoot" : "Appointment")}${
+      a.scheduledAt ? ` — ${fmtInTz(a.scheduledAt, tz, DATE_FMT)}` : " (unscheduled)"
+    }`,
+  }));
+
+  const catalogOptions = catalogItems
+    .filter((c) => c.currentVersion)
+    .map((c) => ({ id: c.id, name: c.currentVersion!.name, basePrice: c.currentVersion!.basePrice }));
 
   // ── Merged activity timeline ─────────────────────────────────────────────
   const timeline = [
@@ -261,207 +239,17 @@ export default async function JobDetailPage({
     })),
   ].sort((a, b) => b.when.getTime() - a.when.getTime());
 
-  // ── Shared card fragments ────────────────────────────────────────────────
-
-  const appointmentsCard = (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
-          <Calendar className="h-4 w-4 text-gray-400" /> Appointments
-        </h2>
-        {job.scheduledAt && (
-          <span className="text-[11px] text-gray-400">Times shown in workspace time</span>
-        )}
-      </div>
-
-      {activeAppts.length === 0 ? (
-        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 text-[13px] text-amber-800">
-          No appointments yet — pick a date and time below to schedule the shoot.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {activeAppts.map((a) => {
-            const meta = APPOINTMENT_STATUS_META[a.status] ?? APPOINTMENT_STATUS_META.SCHEDULED;
-            const start = a.scheduledAt;
-            const end = start ? new Date(start.getTime() + a.durationMins * 60000) : null;
-            const crew = a.assignments
-              .map((x) => x.staff.member.user.fullName)
-              .filter(Boolean)
-              .join(", ");
-            const unscheduled = !start;
-            return (
-              <div
-                key={a.id}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg border px-3 py-2.5",
-                  unscheduled ? "border-amber-200 bg-amber-50/40" : "border-gray-100 bg-gray-50/50"
-                )}
-              >
-                <div className="w-16 shrink-0 text-center">
-                  {start ? (
-                    <>
-                      <p className="text-[10px] font-bold uppercase text-gray-400">{fmtInTz(start, tz, { weekday: "short" })}</p>
-                      <p className="text-[15px] font-bold text-gray-800">{fmtInTz(start, tz, DATE_FMT)}</p>
-                    </>
-                  ) : (
-                    <p className="text-[13px] font-bold text-amber-600">TBD</p>
-                  )}
-                </div>
-                <div className={cn("w-px self-stretch", unscheduled ? "bg-amber-200" : "bg-gray-200")} />
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
-                    {a.title ?? (a.isPrimary ? "Primary shoot" : "Appointment")}
-                    {a.timeConstraint === "SOLAR" && (
-                      <span className={cn(DIM_BADGE, "border-amber-200 bg-amber-50 text-amber-700")}>
-                        <Sunset className="h-2.5 w-2.5" /> Twilight
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-500">
-                    {start && end ? (
-                      <>
-                        <Clock className="h-3 w-3" /> {fmtInTz(start, tz, TIME_FMT)} – {fmtInTz(end, tz, TIME_FMT)}
-                      </>
-                    ) : (
-                      <span className="font-medium text-amber-600">Unscheduled</span>
-                    )}
-                    {crew ? (
-                      <>
-                        <Camera className="ml-1 h-3 w-3" /> {crew}
-                      </>
-                    ) : (
-                      <span className="font-medium text-amber-600">Unassigned</span>
-                    )}
-                  </p>
-                </div>
-                <span className={cn(DIM_BADGE, meta.cls, "shrink-0")}>{meta.label}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="mt-4 border-t border-gray-100 pt-4">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-400">Primary appointment</p>
-        <JobScheduleEditor
-          jobId={job.id}
-          scheduledAt={job.scheduledAt}
-          estimatedDurationMins={job.estimatedDurationMins ?? 90}
-        />
-        <div className="mt-4 border-t border-gray-100 pt-4">
-          <p className="mb-1.5 text-xs text-gray-400">Photographer</p>
-          <JobAssignmentPicker
-            jobId={job.id}
-            currentStaffProfileId={primaryAssignment?.staff.id}
-            currentAssigneeName={primaryPhotographer?.fullName}
-            schedulingData={job.scheduledAt ? {
-              propertyAddress: job.propertyAddress,
-              propertyCity: job.propertyCity,
-              propertyState: job.propertyState,
-              propertyZip: job.propertyZip,
-              scheduledAt: new Date(job.scheduledAt),
-              estimatedDurationMins: job.estimatedDurationMins ?? 90,
-            } : undefined}
-          />
-        </div>
-      </div>
-    </section>
-  );
-
-  const lineItems = job.orderLines.length > 0 ? (
-    <div className="space-y-1.5 text-[12px]">
-      {job.orderLines.map((l) => (
-        <div key={l.id} className="flex items-center justify-between text-gray-600">
-          <span>
-            {l.name}
-            {l.quantity > 1 && <span className="text-gray-400"> × {l.quantity}</span>}
-          </span>
-          <span>{formatCurrency(l.totalPrice)}</span>
-        </div>
-      ))}
-    </div>
-  ) : job.package ? (
-    <div className="text-[12px] text-gray-600">
-      <div className="flex items-center justify-between">
-        <span>{job.package.name}</span>
-        <span>{formatCurrency(job.subtotal)}</span>
-      </div>
-      <p className="mt-0.5 text-[11px] text-gray-400">
-        Includes: {job.package.items.map((i) => i.service.name).join(", ")}
-      </p>
-    </div>
-  ) : job.services.length > 0 ? (
-    <div className="space-y-1.5 text-[12px]">
-      {job.services.map((s) => (
-        <div key={s.id} className="flex items-center justify-between text-gray-600">
-          <span>{s.service.name}{s.quantity > 1 && <span className="text-gray-400"> × {s.quantity}</span>}</span>
-          <span>{formatCurrency(s.totalPrice)}</span>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <p className="text-[12px] italic text-gray-400">No services on this order</p>
-  );
-
-  const totalsBlock = (
-    <div className="mt-2 space-y-1.5 border-t border-gray-100 pt-2 text-[12px]">
-      <div className="flex items-center justify-between text-gray-600">
-        <span>Subtotal</span><span>{formatCurrency(job.subtotal)}</span>
-      </div>
-      {job.priorityFee > 0 && (
-        <div className="flex items-center justify-between text-gray-600">
-          <span>Priority fee</span><span>{formatCurrency(job.priorityFee)}</span>
-        </div>
-      )}
-      {job.discountAmount > 0 && (
-        <div className="flex items-center justify-between text-gray-600">
-          <span>Discount</span><span>−{formatCurrency(job.discountAmount)}</span>
-        </div>
-      )}
-      {job.taxAmount > 0 && (
-        <div className="flex items-center justify-between text-gray-600">
-          <span>Tax</span><span>{formatCurrency(job.taxAmount)}</span>
-        </div>
-      )}
-      <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-[13px] font-semibold text-gray-900">
-        <span>Total</span><span>{formatCurrency(job.totalAmount)}</span>
-      </div>
-    </div>
-  );
-
-  const invoiceBlock = job.invoice ? (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-mono text-xs text-gray-500">#{job.invoice.invoiceNumber}</span>
-        <span className={cn(
-          "rounded-full px-2 py-0.5 text-xs font-semibold",
-          job.invoice.status === "PAID" ? "bg-green-100 text-green-700" :
-          job.invoice.status === "OVERDUE" ? "bg-red-100 text-red-700" :
-          "bg-blue-100 text-blue-700"
-        )}>
-          {job.invoice.status}
-        </span>
-      </div>
-      <p className="mb-1 text-xl font-bold text-gray-900">{formatCurrency(job.invoice.totalAmount)}</p>
-      {job.invoice.amountDue > 0 && (
-        <p className="mb-3 text-xs text-amber-600">{formatCurrency(job.invoice.amountDue)} outstanding</p>
-      )}
-      <Link
-        href={`/invoices/${job.invoice.id}`}
-        className="block rounded-lg border border-blue-200 py-2 text-center text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-      >
-        View invoice
-      </Link>
-    </div>
-  ) : (
-    <JobAutoInvoiceButton
-      jobId={job.id}
-      packageName={job.package?.name}
-      packagePrice={job.package?.price}
-      brokerageGroupName={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.name : null}
-      brokerageDiscountType={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.discountType : null}
-      brokerageDiscountValue={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.discountValue : null}
-    />
+  // ── Files & Delivery: signed thumbnails ──────────────────────────────────
+  const media = job.gallery?.media ?? [];
+  const photoMedia = media.filter((m) => m.mediaType === "PHOTO" || m.mediaType === "DRONE_PHOTO");
+  const videoCount = media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO").length;
+  const otherCount = media.filter((m) => m.mediaType === "DOCUMENT").length;
+  const thumbs = await Promise.all(
+    photoMedia.slice(0, 12).map(async (m) => ({
+      id: m.id,
+      name: m.originalName,
+      url: await mediaViewUrl({ storageKey: m.thumbnailKey ?? m.storageKey, cdnUrl: m.cdnUrl }),
+    }))
   );
 
   // ── Panels ───────────────────────────────────────────────────────────────
@@ -476,66 +264,67 @@ export default async function JobDetailPage({
               <span className="text-[11px] font-medium text-amber-700">Next: {nextAction}</span>
             </div>
             <div className="space-y-2">
-              {attention.map((reason) => {
-                const link = attentionLink(reason, job.id);
-                return (
-                  <div key={reason} className="flex items-center justify-between gap-3 rounded-lg border border-amber-200/70 bg-white px-3 py-2.5">
-                    <p className="flex items-center gap-2 text-[13px] text-gray-800">
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                      {reason}
-                    </p>
-                    {link && (
-                      <Link
-                        href={link.href}
-                        className="shrink-0 rounded-lg bg-gray-900 px-2.5 py-1 text-[12px] font-medium text-white transition-colors hover:bg-gray-800"
-                      >
-                        {link.label}
-                      </Link>
-                    )}
-                  </div>
-                );
-              })}
+              {attention.map((reason) => (
+                <div key={reason} className="flex items-center gap-2 rounded-lg border border-amber-200/70 bg-white px-3 py-2.5">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                  <p className="text-[13px] text-gray-800">{reason}</p>
+                </div>
+              ))}
             </div>
           </section>
         )}
 
-        {appointmentsCard}
+        <OrderAppointments
+          jobId={job.id}
+          appointments={appointmentRows}
+          lat={lat}
+          lng={lng}
+          primaryStaffProfileId={primaryAssignment?.staff.id}
+          primaryAssigneeName={primaryPhotographer?.fullName}
+          schedulingData={job.scheduledAt ? {
+            propertyAddress: job.propertyAddress,
+            propertyCity: job.propertyCity,
+            propertyState: job.propertyState,
+            propertyZip: job.propertyZip,
+            scheduledAt: new Date(job.scheduledAt),
+            estimatedDurationMins: job.estimatedDurationMins ?? 90,
+          } : undefined}
+        />
 
-        {/* Billing sits directly under appointments */}
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
-              <Receipt className="h-4 w-4 text-gray-400" /> Billing
-            </h2>
-            <span className={cn(DIM_BADGE, payDim.cls)}>{payDim.value}</span>
-          </div>
-          {lineItems}
-          {totalsBlock}
-          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-            {job.invoice ? (
-              <Link href={`/invoices/${job.invoice.id}`} className="text-[12px] font-medium text-blue-600 hover:text-blue-700">
-                View invoice #{job.invoice.invoiceNumber}
-              </Link>
-            ) : (
-              <span className="text-[12px] text-gray-400">No invoice yet</span>
-            )}
-            <Link href={`/jobs/${job.id}?tab=billing`} className="flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:text-blue-700">
-              Billing details <ChevronRight className="h-3 w-3" />
-            </Link>
-          </div>
-        </section>
+        <ServicesBilling
+          jobId={job.id}
+          lines={billingLines}
+          legacyLines={legacyLines}
+          totals={{
+            subtotal: job.subtotal,
+            priorityFee: job.priorityFee,
+            discount: job.discountAmount,
+            tax: job.taxAmount,
+            total: job.totalAmount,
+          }}
+          payChip={payChip}
+          invoice={job.invoice ? { id: job.invoice.id, number: job.invoice.invoiceNumber } : null}
+          catalogItems={catalogOptions}
+          appointments={apptOptions}
+          invoiceAction={
+            <JobAutoInvoiceButton
+              jobId={job.id}
+              packageName={job.package?.name}
+              packagePrice={job.package?.price}
+              brokerageGroupName={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.name : null}
+              brokerageDiscountType={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.discountType : null}
+              brokerageDiscountValue={job.client?.brokerageGroup?.isActive ? job.client.brokerageGroup.discountValue : null}
+            />
+          }
+        />
 
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
-              <Package className="h-4 w-4 text-gray-400" /> Production
-            </h2>
-            <Link href={`/jobs/${job.id}?tab=production`} className="flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:text-blue-700">
-              Open production <ChevronRight className="h-3 w-3" />
-            </Link>
-          </div>
-          <ProductionTaskList tasks={taskRows} />
-        </section>
+        {lat != null && lng != null && (
+          <Property3DMap
+            lat={lat}
+            lng={lng}
+            address={`${job.propertyAddress}, ${job.propertyCity}, ${job.propertyState}`}
+          />
+        )}
       </div>
 
       {/* Right column */}
@@ -577,56 +366,39 @@ export default async function JobDetailPage({
               {clientOrderCount === 1 ? "First order" : `${clientOrderCount} orders with you`}
             </p>
           </div>
-          {job.clientNotes && (
-            <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-500">
-              {job.clientNotes}
-            </p>
-          )}
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="p-4 pb-3">
-            <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Property</h2>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              {[
-                [job.bedrooms != null ? String(job.bedrooms) : "—", "Beds"],
-                [job.bathrooms != null ? String(job.bathrooms) : "—", "Baths"],
-                [job.squareFootage != null ? job.squareFootage.toLocaleString() : "—", "Sq ft"],
-              ].map(([v, l]) => (
-                <div key={l} className="rounded-lg bg-gray-50 py-2">
-                  <p className="text-[14px] font-bold text-gray-800">{v}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400">{l}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 space-y-1.5 text-[12px] text-gray-500">
-              <p className="flex items-center gap-2">
-                <Home className="h-3 w-3 shrink-0 text-gray-300" /> {job.propertyType.replace(/_/g, " ")}
-              </p>
-              <p className="flex items-start gap-2">
-                <KeyRound className="mt-0.5 h-3 w-3 shrink-0 text-gray-300" />
-                {job.accessNotes ? (
-                  <span className="leading-snug">{job.accessNotes}</span>
-                ) : (
-                  <span className="italic text-amber-600">No access info yet</span>
-                )}
-              </p>
-            </div>
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Property</h2>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              [job.bedrooms != null ? String(job.bedrooms) : "—", "Beds"],
+              [job.bathrooms != null ? String(job.bathrooms) : "—", "Baths"],
+              [job.squareFootage != null ? job.squareFootage.toLocaleString() : "—", "Sq ft"],
+            ].map(([v, l]) => (
+              <div key={l} className="rounded-lg bg-gray-50 py-2">
+                <p className="text-[14px] font-bold text-gray-800">{v}</p>
+                <p className="text-[10px] uppercase tracking-wide text-gray-400">{l}</p>
+              </div>
+            ))}
           </div>
-          <JobPropertyMap
-            lat={job.propertyLat}
-            lng={job.propertyLng}
-            address={`${job.propertyAddress}, ${job.propertyCity}, ${job.propertyState}`}
-          />
+          <div className="mt-3 space-y-1.5 text-[12px] text-gray-500">
+            <p className="flex items-center gap-2">
+              <Home className="h-3 w-3 shrink-0 text-gray-300" /> {job.propertyType.replace(/_/g, " ")}
+            </p>
+            <p className="flex items-start gap-2">
+              <KeyRound className="mt-0.5 h-3 w-3 shrink-0 text-gray-300" />
+              {job.accessNotes ? (
+                <span className="leading-snug">{job.accessNotes}</span>
+              ) : (
+                <span className="italic text-amber-600">No access info yet</span>
+              )}
+            </p>
+          </div>
         </section>
 
-        {job.propertyLat && job.propertyLng && job.scheduledAt && (
-          <JobWeatherCard
-            lat={job.propertyLat}
-            lng={job.propertyLng}
-            scheduledDate={new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(job.scheduledAt)}
-          />
-        )}
+        {/* Notes — team notes and order-form notes together */}
+        <OrderNotes jobId={job.id} notes={noteRows} />
 
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Activity</h2>
@@ -655,19 +427,82 @@ export default async function JobDetailPage({
 
   const filesPanel = (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="lg:col-span-2">
-        <JobGalleryCard
-          jobId={job.id}
-          propertyAddress={job.propertyAddress}
-          gallery={job.gallery}
-        />
+      <div className="space-y-4 lg:col-span-2">
+        {!job.gallery ? (
+          <JobGalleryCard
+            jobId={job.id}
+            propertyAddress={job.propertyAddress}
+            gallery={null}
+          />
+        ) : (
+          <section className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
+                <ImageIcon className="h-4 w-4 text-gray-400" /> Listing media
+              </h2>
+              <Link
+                href={`/gallery/${job.gallery.id}`}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                Open listing
+              </Link>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-3 text-[12px] text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-gray-300" /> {photoMedia.length} photos
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Video className="h-3.5 w-3.5 text-gray-300" /> {videoCount} videos
+              </span>
+              {otherCount > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-gray-300" /> {otherCount} other files
+                </span>
+              )}
+            </div>
+            {thumbs.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-[13px] text-gray-400">
+                Nothing uploaded yet — open the listing to add photos and videos.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                {thumbs.map((t) =>
+                  t.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={t.id}
+                      src={t.url}
+                      alt={t.name}
+                      className="aspect-[4/3] w-full rounded-lg object-cover"
+                    />
+                  ) : null
+                )}
+                {photoMedia.length > 12 && (
+                  <Link
+                    href={`/gallery/${job.gallery.id}`}
+                    className="flex aspect-[4/3] items-center justify-center rounded-lg bg-gray-100 text-[13px] font-semibold text-gray-500 transition-colors hover:bg-gray-200"
+                  >
+                    +{photoMedia.length - 12} more
+                  </Link>
+                )}
+              </div>
+            )}
+          </section>
+        )}
       </div>
       <section className="h-fit rounded-xl border border-gray-200 bg-white p-4">
         <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Delivery</h2>
         <div className="space-y-2.5 text-[12px]">
           <div className="flex items-center justify-between text-gray-600">
             <span>Status</span>
-            <span className={cn(DIM_BADGE, deliveryDim.cls)}>{deliveryDim.value}</span>
+            <span className={cn(
+              DIM_BADGE,
+              job.deliveredAt || job.status === "DELIVERED"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-gray-200 bg-gray-50 text-gray-500"
+            )}>
+              {job.deliveredAt || job.status === "DELIVERED" ? "Delivered" : "Not delivered"}
+            </span>
           </div>
           <div className="flex items-center justify-between text-gray-600">
             <span>Media files</span>
@@ -689,83 +524,7 @@ export default async function JobDetailPage({
     </div>
   );
 
-  const productionPanel = (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <section className="h-fit rounded-xl border border-gray-200 bg-white p-4 lg:col-span-2">
-        <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Production tasks</h2>
-        <ProductionTaskList tasks={taskRows} />
-        <AddProductionTask jobId={job.id} staff={staffForTasks} />
-      </section>
-      <div className="space-y-4">
-        <TeamTasksCard jobId={job.id} />
-        <JobChecklist jobId={job.id} />
-      </div>
-    </div>
-  );
-
-  const billingPanel = (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <section className="rounded-xl border border-gray-200 bg-white p-4 lg:col-span-2">
-        <h2 className="mb-3 text-[13px] font-semibold text-gray-900">Line items</h2>
-        {job.orderLines.length > 0 ? (
-          <div className="space-y-3">
-            {job.orderLines.map((l) => {
-              const explanation = Array.isArray(l.explanation) ? (l.explanation as unknown[]).map(String) : [];
-              return (
-                <div key={l.id} className="border-b border-gray-50 pb-3 last:border-0 last:pb-0">
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="font-medium text-gray-800">
-                      {l.name}
-                      {l.quantity > 1 && <span className="font-normal text-gray-400"> × {l.quantity}</span>}
-                    </span>
-                    <span className="font-medium text-gray-900">{formatCurrency(l.totalPrice)}</span>
-                  </div>
-                  {explanation.length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {explanation.map((line, i) => (
-                        <p key={i} className="text-[11px] text-gray-400">{line}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div>
-            {lineItems}
-            {(job.package || job.services.length > 0) && (
-              <p className="mt-3 text-[11px] text-gray-400">
-                This order predates itemized pricing — the totals below are authoritative.
-              </p>
-            )}
-          </div>
-        )}
-        {totalsBlock}
-      </section>
-      <section className="h-fit rounded-xl border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-gray-900">
-          <Receipt className="h-4 w-4 text-gray-400" /> Invoice
-        </h2>
-        {invoiceBlock}
-      </section>
-    </div>
-  );
-
-  const messagesPanel = (
-    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-      <JobMessageThread jobId={job.id} />
-      <div className="space-y-4">
-        <OrderNotes jobId={job.id} notes={noteRows} />
-        {job.internalNotes && (
-          <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h2 className="mb-2 text-[13px] font-semibold text-gray-900">Order form notes</h2>
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-gray-700">{job.internalNotes}</p>
-          </section>
-        )}
-      </div>
-    </div>
-  );
+  const rawPanel = <RawFilesTab jobId={job.id} />;
 
   const activityPanel = (
     <div className="mx-auto max-w-3xl">
@@ -805,7 +564,6 @@ export default async function JobDetailPage({
       address={job.propertyAddress}
       metaLine={metaLine}
       isRush={isRush}
-      dimensions={dimensions}
       progressStep={STAGE_TO_STEP[stage]}
       progressSteps={PROGRESS_STEPS}
       showProgress={stage !== "ON_HOLD" && stage !== "CANCELLED"}
@@ -814,14 +572,13 @@ export default async function JobDetailPage({
       panels={{
         overview: overviewPanel,
         files: filesPanel,
-        production: productionPanel,
-        billing: billingPanel,
-        messages: messagesPanel,
+        raw: rawPanel,
         activity: activityPanel,
       }}
       headerActions={
         <>
           <JobStatusUpdater jobId={job.id} currentStatus={job.status} />
+          <DeliverButton jobId={job.id} delivered={!!job.deliveredAt || job.status === "DELIVERED"} />
           <JobDeleteButton jobId={job.id} jobNumber={job.jobNumber} />
         </>
       }

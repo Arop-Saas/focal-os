@@ -24,6 +24,7 @@ import {
   ExternalLink,
   ImageIcon,
   LayoutTemplate,
+  Paperclip,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +40,7 @@ interface UploadItem {
   mediaTypeHint?: string;
 }
 
-type MediaSection = "photos" | "videos" | "tours" | "floorplans";
+type MediaSection = "photos" | "videos" | "tours" | "floorplans" | "other";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ export default function GalleryDetailPage() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const floorplanInputRef = useRef<HTMLInputElement>(null);
+  const otherInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
 
   const { data: gallery, isLoading } = trpc.gallery.getById.useQuery(
@@ -249,6 +251,25 @@ export default function GalleryDetailPage() {
     [uploadFile]
   );
 
+  const queueOtherFiles = useCallback(
+    (files: FileList | File[]) => {
+      const arr = Array.from(files);
+      const items: UploadItem[] = arr.map((f) => ({
+        id: `${Date.now()}-${Math.random()}`,
+        file: f,
+        status: "queued",
+        progress: 0,
+        mediaTypeHint: "DOCUMENT",
+      }));
+      setUploads((prev) => [...prev, ...items]);
+      items.reduce(
+        (chain, item) => chain.then(() => uploadFile(item.file, item.id, "DOCUMENT")),
+        Promise.resolve()
+      );
+    },
+    [uploadFile]
+  );
+
   const shareUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/g/${gallery?.slug}`
@@ -280,12 +301,14 @@ export default function GalleryDetailPage() {
   const videos     = gallery.media.filter((m) => m.mediaType === "VIDEO" || m.mediaType === "DRONE_VIDEO");
   const tours      = gallery.media.filter((m) => m.mediaType === "VIRTUAL_TOUR");
   const floorplans = gallery.media.filter((m) => m.mediaType === "FLOOR_PLAN");
+  const documents  = gallery.media.filter((m) => m.mediaType === "DOCUMENT");
 
   const sectionTabs: { key: MediaSection; label: string; icon: React.ReactNode; count: number }[] = [
     { key: "photos",     label: "Photos",        icon: <ImageIcon className="h-3.5 w-3.5" />,     count: photos.length },
     { key: "videos",     label: "Videos",        icon: <Video className="h-3.5 w-3.5" />,         count: videos.length },
     { key: "tours",      label: "Virtual Tours", icon: <Compass className="h-3.5 w-3.5" />,       count: tours.length },
     { key: "floorplans", label: "Floorplans",    icon: <LayoutTemplate className="h-3.5 w-3.5" />, count: floorplans.length },
+    { key: "other",      label: "Other",         icon: <Paperclip className="h-3.5 w-3.5" />,      count: documents.length },
   ];
 
   return (
@@ -293,7 +316,7 @@ export default function GalleryDetailPage() {
       {/* ── Header ── */}
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between gap-4 shrink-0 flex-wrap">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/gallery")} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={() => router.push(gallery.jobId ? `/jobs/${gallery.jobId}` : "/gallery")} className="text-gray-400 hover:text-gray-600 transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
@@ -577,6 +600,70 @@ export default function GalleryDetailPage() {
                             onClick={() => { if (confirm("Remove this floor plan?")) removeMutation.mutate({ mediaId: fp.id, galleryId }); }}
                             className="absolute top-2 right-2 p-1.5 bg-white/90 hover:bg-red-50 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                             title="Remove floor plan"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── OTHER FILES section ── */}
+            {activeSection === "other" && (
+              <div className="space-y-4">
+                {canEdit && (
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => { e.preventDefault(); setIsDragging(false); queueOtherFiles(e.dataTransfer.files); }}
+                    onClick={() => otherInputRef.current?.click()}
+                    className={cn(
+                      "border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors",
+                      isDragging ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300 bg-gray-50"
+                    )}
+                  >
+                    <Paperclip className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-gray-600">
+                      Drop any files here or <span className="text-teal-600">click to browse</span>
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">PDFs, documents, archives — any file type · Max 500 MB each</p>
+                    <input
+                      ref={otherInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => e.target.files && queueOtherFiles(e.target.files)}
+                    />
+                  </div>
+                )}
+
+                <UploadQueue uploads={uploads.filter((u) => u.mediaTypeHint === "DOCUMENT")} onDismiss={(id) => setUploads((p) => p.filter((x) => x.id !== id))} />
+
+                {documents.length === 0 ? (
+                  <EmptyState icon={<Paperclip className="h-10 w-10 text-gray-200" />} label="No other files yet" sub="Upload disclosures, brochures, or anything else that belongs with this listing." />
+                ) : (
+                  <div className="bg-white border rounded-xl divide-y">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-3 px-4 py-3 group">
+                        <Paperclip className="h-4 w-4 text-gray-300 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{doc.originalName}</p>
+                          <p className="text-[11px] text-gray-400">{(doc.fileSize / (1024 * 1024)).toFixed(1)} MB</p>
+                        </div>
+                        {doc.cdnUrl && (
+                          <a href={doc.cdnUrl} target="_blank" rel="noopener noreferrer"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors" title="Download">
+                            <Download className="h-4 w-4" />
+                          </a>
+                        )}
+                        {canEdit && (
+                          <button
+                            onClick={() => { if (confirm("Remove this file?")) removeMutation.mutate({ mediaId: doc.id, galleryId }); }}
+                            className="p-1.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Remove file"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

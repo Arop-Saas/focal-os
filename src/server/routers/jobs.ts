@@ -10,6 +10,7 @@ import { z as zod } from "zod";
 import { notifyJobRescheduled } from "@/lib/notify";
 import { router, workspaceProcedure } from "../trpc";
 import { generateJobNumber, generateInvoiceNumber } from "@/lib/utils";
+import { storageAdmin, ensurePrivateBucket, PRIVATE_MEDIA_BUCKET, SIGNED_VIEW_TTL_SECONDS } from "@/lib/gallery-security";
 import {
   notifyJobBooked,
   notifyJobConfirmed,
@@ -924,6 +925,219 @@ export const jobsRouter = router({
         suggestedStart: w.suggestedStart.toISOString(),
         windowEnd: w.windowEnd.toISOString(),
       };
+    }),
+
+  /** Per-appointment scheduling actions. Primary appointments keep the
+   * Job.scheduledAt mirror in sync (orders architecture invariant). */
+  updateAppointment: workspaceProcedure
+    .input(zod.object({
+      appointmentId: zod.string(),
+      action: zod.enum(["RESCHEDULE", "POSTPONE", "CANCEL"]),
+      scheduledAt: zod.date().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const appt = await ctx.prisma.appointment.findFirst({
+        where: { id: input.appointmentId, workspaceId: ctx.workspace.id },
+        select: { id: true, jobId: true, isPrimary: true, durationMins: true },
+      });
+      if (!appt) throw new TRPCError({ code: "NOT_FOUND" });
+      if (input.action === "RESCHEDULE" && !input.scheduledAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "scheduledAt required to reschedule" });
+      }
+
+      await ctx.prisma.$transaction(async (tx) => {
+        if (appt.isPrimary) {
+          const scheduledAt = input.action === "RESCHEDULE" ? input.scheduledAt! : null;
+          await tx.job.update({ where: { id: appt.jobId }, data: { scheduledAt } });
+          await syncPrimaryAppointment(tx, {
+            workspaceId: ctx.workspace.id,
+            jobId: appt.jobId,
+            scheduledAt,
+            status:
+              input.action === "CANCEL" ? "CANCELLED" :
+              input.action === "POSTPONE" ? "POSTPONED" : "SCHEDULED",
+          });
+        } else {
+          await tx.appointment.update({
+            where: { id: appt.id },
+            data:
+              input.action === "RESCHEDULE"
+                ? { scheduledAt: input.scheduledAt!, status: "SCHEDULED" }
+                : input.action === "POSTPONE"
+                ? { scheduledAt: null, status: "POSTPONED" }
+                : { status: "CANCELLED" },
+          });
+        }
+      });
+      return { ok: true };
+    }),
+
+  /** Add a catalog service/product to an existing order (Services & Billing).
+   * Priced server-side; totals updated additively; the caller decides how the
+   * line maps to appointments. Existing invoices are not modified. */
+  addOrderLine: workspaceProcedure
+    .input(zod.object({
+      jobId: zod.string(),
+      catalogItemId: zod.string(),
+      quantity: zod.number().int().min(1).default(1),
+      appointmentMode: zod.enum(["NONE", "EXISTING", "NEW"]).default("NONE"),
+      appointmentId: zod.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        select: {
+          id: true, clientId: true, squareFootage: true,
+          subtotal: true, taxAmount: true, totalAmount: true, estimatedDurationMins: true,
+        },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const quote = await quoteOrderLines(ctx.prisma, {
+        workspaceId: ctx.workspace.id,
+        squareFootage: job.squareFootage ?? null,
+        clientId: job.clientId,
+        lines: [{ catalogItemId: input.catalogItemId, quantity: input.quantity }],
+      });
+      const line = quote.lines[0];
+      if (!line) throw new TRPCError({ code: "NOT_FOUND", message: "Catalog item not found" });
+
+      const taxRate = ctx.workspace.defaultTaxRate ?? 0;
+      const lineTax = (line.totalPrice * taxRate) / 100;
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.orderLineSnapshot.create({
+          data: {
+            workspaceId: ctx.workspace.id,
+            jobId: job.id,
+            catalogItemId: line.catalogItemId,
+            versionId: line.versionId,
+            source: line.source,
+            name: line.name,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            totalPrice: line.totalPrice,
+            durationMins: line.durationMins,
+            visitMode: line.visitMode,
+            fulfillmentMode: line.fulfillmentMode,
+            explanation: line.explanation,
+          },
+        });
+
+        if (line.productionTaskType && line.fulfillmentMode !== "ON_SITE") {
+          const last = await tx.productionTask.findFirst({
+            where: { jobId: job.id },
+            orderBy: { sortOrder: "desc" },
+            select: { sortOrder: true },
+          });
+          await tx.productionTask.create({
+            data: {
+              workspaceId: ctx.workspace.id,
+              jobId: job.id,
+              title: line.name,
+              type: line.productionTaskType,
+              sortOrder: (last?.sortOrder ?? -1) + 1,
+            },
+          });
+        }
+
+        if (input.appointmentMode === "NEW") {
+          await tx.appointment.create({
+            data: {
+              workspaceId: ctx.workspace.id,
+              jobId: job.id,
+              title: line.name,
+              scheduledAt: null,
+              durationMins: line.durationMins > 0 ? line.durationMins : 60,
+              status: "SCHEDULED",
+              isPrimary: false,
+              timeConstraint: line.solarConstraint ? "SOLAR" : null,
+            },
+          });
+        } else if (input.appointmentMode === "EXISTING" && input.appointmentId && line.durationMins > 0) {
+          const appt = await tx.appointment.findFirst({
+            where: { id: input.appointmentId, jobId: job.id },
+            select: { id: true, isPrimary: true, durationMins: true },
+          });
+          if (appt) {
+            await tx.appointment.update({
+              where: { id: appt.id },
+              data: { durationMins: appt.durationMins + line.durationMins },
+            });
+            if (appt.isPrimary) {
+              await tx.job.update({
+                where: { id: job.id },
+                data: { estimatedDurationMins: (job.estimatedDurationMins ?? 90) + line.durationMins },
+              });
+            }
+          }
+        }
+
+        await tx.job.update({
+          where: { id: job.id },
+          data: {
+            subtotal: job.subtotal + line.totalPrice,
+            taxAmount: job.taxAmount + lineTax,
+            totalAmount: job.totalAmount + line.totalPrice + lineTax,
+          },
+        });
+      });
+
+      return { line };
+    }),
+
+  /** Raw capture files — list with short-lived signed download URLs. */
+  listRawFiles: workspaceProcedure
+    .input(zod.object({ jobId: zod.string() }))
+    .query(async ({ ctx, input }) => {
+      const files = await ctx.prisma.rawFile.findMany({
+        where: { jobId: input.jobId, workspaceId: ctx.workspace.id },
+        include: { uploadedBy: { select: { fullName: true } } },
+        orderBy: { createdAt: "desc" },
+      });
+      const admin = storageAdmin();
+      const withUrls = await Promise.all(
+        files.map(async (f) => {
+          const { data } = await admin.storage
+            .from(PRIVATE_MEDIA_BUCKET)
+            .createSignedUrl(f.storageKey, SIGNED_VIEW_TTL_SECONDS, { download: f.originalName });
+          return { ...f, downloadUrl: data?.signedUrl ?? null };
+        })
+      );
+      return withUrls;
+    }),
+
+  /** Register a raw file after direct-to-storage upload. */
+  registerRawFile: workspaceProcedure
+    .input(zod.object({
+      jobId: zod.string(),
+      fileName: zod.string(),
+      originalName: zod.string(),
+      mimeType: zod.string(),
+      fileSize: zod.number().int().min(0),
+      storageKey: zod.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findFirst({
+        where: { id: input.jobId, workspaceId: ctx.workspace.id },
+        select: { id: true },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.rawFile.create({
+        data: { ...input, workspaceId: ctx.workspace.id, uploadedByUserId: ctx.user.id },
+      });
+    }),
+
+  deleteRawFile: workspaceProcedure
+    .input(zod.object({ fileId: zod.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const file = await ctx.prisma.rawFile.findFirst({
+        where: { id: input.fileId, workspaceId: ctx.workspace.id },
+      });
+      if (!file) throw new TRPCError({ code: "NOT_FOUND" });
+      await storageAdmin().storage.from(PRIVATE_MEDIA_BUCKET).remove([file.storageKey]);
+      await ctx.prisma.rawFile.delete({ where: { id: file.id } });
+      return { ok: true };
     }),
 
   /** Manually add a production task to an order (command center Production tab). */

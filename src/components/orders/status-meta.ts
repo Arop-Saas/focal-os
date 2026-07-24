@@ -11,7 +11,7 @@ export const PRODUCTION_STATUS_META: Record<string, { label: string; cls: string
   WAITING_FILES: { label: "Waiting files", cls: "border-gray-200 bg-gray-50 text-gray-500" },
   QUEUED:        { label: "Queued",        cls: "border-blue-200 bg-blue-50 text-blue-700" },
   IN_PROGRESS:   { label: "Editing",       cls: "border-indigo-200 bg-indigo-50 text-indigo-700" },
-  QA:            { label: "QA",            cls: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700" },
+  QA:            { label: "Quality Check", cls: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700" },
   REVISION:      { label: "Revision",      cls: "border-amber-200 bg-amber-50 text-amber-700" },
   READY:         { label: "Ready",         cls: "border-emerald-200 bg-emerald-50 text-emerald-700" },
 };
